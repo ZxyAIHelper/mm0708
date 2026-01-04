@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown编辑器</title>
+    <style>
+        :root {
+            --primary-color: #4f46e5;
+            --secondary-color: #64748b;
+            --accent-color: #06b6d4;
+            --light-bg: #f8fafc;
+            --dark-bg: #0f172a;
+            --card-bg: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --border-radius: 8px;
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background-color: var(--light-bg);
+        }
+
+        /* 导航栏 */
+        nav {
+            background-color: var(--card-bg);
+            box-shadow: var(--shadow-sm);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 70px;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 1.5rem;
+        }
+
+        .nav-link {
+            text-decoration: none;
+            color: var(--text-secondary);
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .nav-link:hover {
+            color: var(--primary-color);
+        }
+
+        /* 主容器 */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* 页面标题 */
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .page-subtitle {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+
+        /* 编辑器容器 */
+        .editor-container {
+            background-color: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-md);
+            overflow: hidden;
+        }
+
+        /* 编辑器工具栏 */
+        .editor-toolbar {
+            background-color: var(--light-bg);
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .toolbar-btn {
+            padding: 0.5rem 1rem;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .toolbar-btn:hover {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        /* 编辑器内容区域 */
+        .editor-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            padding: 1rem;
+        }
+
+        /* 编辑器面板 */
+        .editor-panel {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        /* 文本区域 */
+        .editor-textarea {
+            width: 100%;
+            height: 500px;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.875rem;
+            line-height: 1.6;
+            resize: vertical;
+            transition: var(--transition);
+        }
+
+        .editor-textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        /* 预览区域 */
+        .editor-preview {
+            width: 100%;
+            height: 500px;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            background-color: var(--light-bg);
+            overflow-y: auto;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        /* Markdown样式 */
+        .editor-preview h1 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .editor-preview h2 {
+            font-size: 1.5rem;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .editor-preview h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .editor-preview p {
+            margin-bottom: 1rem;
+        }
+
+        .editor-preview ul,
+        .editor-preview ol {
+            margin-bottom: 1rem;
+            padding-left: 2rem;
+        }
+
+        .editor-preview li {
+            margin-bottom: 0.5rem;
+        }
+
+        .editor-preview code {
+            background-color: rgba(100, 116, 139, 0.1);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.875rem;
+        }
+
+        .editor-preview pre {
+            background-color: rgba(100, 116, 139, 0.1);
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            overflow-x: auto;
+            margin-bottom: 1rem;
+        }
+
+        .editor-preview pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+
+        .editor-preview blockquote {
+            border-left: 4px solid var(--primary-color);
+            padding-left: 1rem;
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        .editor-preview table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1rem;
+        }
+
+        .editor-preview th,
+        .editor-preview td {
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            text-align: left;
+        }
+
+        .editor-preview th {
+            background-color: var(--light-bg);
+            font-weight: 600;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .editor-content {
+                grid-template-columns: 1fr;
+            }
+
+            .editor-textarea,
+            .editor-preview {
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav>
+        <div class="nav-container">
+            <a href="../../index.html" class="logo">工具门户</a>
+            <ul class="nav-links">
+                <li><a href="../../index.html" class="nav-link">首页</a></li>
+                <li><a href="../base64-converter/index.html" class="nav-link">Base64编解码</a></li>
+                <li><a href="../json-formatter/index.html" class="nav-link">JSON格式化</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- 主容器 -->
+    <div class="container">
+        <h1 class="page-title">Markdown编辑器</h1>
+        <p class="page-subtitle">功能丰富的在线Markdown编辑器，支持实时预览和多种导出格式</p>
+
+        <!-- 编辑器容器 -->
+        <div class="editor-container">
+            <!-- 工具栏 -->
+            <div class="editor-toolbar">
+                <button class="toolbar-btn" data-action="bold">粗体</button>
+                <button class="toolbar-btn" data-action="italic">斜体</button>
+                <button class="toolbar-btn" data-action="heading">标题</button>
+                <button class="toolbar-btn" data-action="link">链接</button>
+                <button class="toolbar-btn" data-action="image">图片</button>
+                <button class="toolbar-btn" data-action="list">列表</button>
+                <button class="toolbar-btn" data-action="quote">引用</button>
+                <button class="toolbar-btn" data-action="code">代码</button>
+                <button class="toolbar-btn" data-action="table">表格</button>
+                <button class="toolbar-btn" data-action="clear">清空</button>
+            </div>
+
+            <!-- 编辑器内容 -->
+            <div class="editor-content">
+                <!-- 编辑面板 -->
+                <div class="editor-panel">
+                    <h3 class="panel-title">编辑区</h3>
+                    <textarea class="editor-textarea" id="markdownInput" placeholder="请输入Markdown内容..."># 欢迎使用Markdown编辑器
+
+这是一个功能丰富的**在线Markdown编辑器**，支持：
+
+- ✅ 实时预览
+- ✅ 常用工具栏
+- ✅ 多种Markdown语法
+- ✅ 响应式设计
+
+## 开始使用
+
+1. 在左侧编辑区输入Markdown内容
+2. 右侧实时显示预览效果
+3. 使用顶部工具栏快速插入格式
+
+### 语法示例
+
+**粗体文本**
+*斜体文本*
+`行内代码`
+
+```javascript
+// 代码块示例
+function hello() {
+    console.log('Hello, Markdown!');
+}
+```
+
+> 这是一个引用示例
+
+[链接文本](https://example.com)
+
+![图片描述](https://via.placeholder.com/150)
+
+| 表格 | 示例 |
+|------|------|
+| 单元格1 | 单元格2 |
+| 单元格3 | 单元格4 |</textarea>
+                </div>
+
+                <!-- 预览面板 -->
+                <div class="editor-panel">
+                    <h3 class="panel-title">预览区</h3>
+                    <div class="editor-preview" id="markdownPreview"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Markdown解析函数
+        function parseMarkdown(markdown) {
+            return markdown
+                // 标题
+                .replace(/^#{6}\s(.+)$/gm, '<h6>$1</h6>')
+                .replace(/^#{5}\s(.+)$/gm, '<h5>$1</h5>')
+                .replace(/^#{4}\s(.+)$/gm, '<h4>$1</h4>')
+                .replace(/^#{3}\s(.+)$/gm, '<h3>$1</h3>')
+                .replace(/^#{2}\s(.+)$/gm, '<h2>$1</h2>')
+                .replace(/^#{1}\s(.+)$/gm, '<h1>$1</h1>')
+                // 粗体
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                // 斜体
+                .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                // 链接
+                .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank">$1</a>')
+                // 图片
+                .replace(/!\[(.+?)\]\((.+?)\)/g, '<img src="$2" alt="$1" style="max-width: 100%;">')
+                // 代码块
+                .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+                // 行内代码
+                .replace(/`(.+?)`/g, '<code>$1</code>')
+                // 引用
+                .replace(/^>\s(.+)$/gm, '<blockquote>$1</blockquote>')
+                // 无序列表
+                .replace(/^-\s(.+)$/gm, '<ul><li>$1</li></ul>')
+                .replace(/<\/ul>\s*<ul>/g, '')
+                // 有序列表
+                .replace(/^\d+\.\s(.+)$/gm, '<ol><li>$1</li></ol>')
+                .replace(/<\/ol>\s*<ol>/g, '')
+                // 水平线
+                .replace(/^---$/gm, '<hr>')
+                // 表格
+                .replace(/\|(.+)\|\n\|(-+\|)+/gm, function(match) {
+                    return '<table>' + match + '</table>';
+                })
+                .replace(/\|([^\|]+)\|/g, '<td>$1</td>')
+                .replace(/\|-+\|/g, '<thead><tr>$&</tr></thead><tbody>')
+                .replace(/<\/table>/g, '</tbody></table>')
+                .replace(/<td>-+<\/td>/g, '<th></th>')
+                // 段落
+                .replace(/^(?!<h|<ul|<ol|<blockquote|<pre|<table|<hr).+$/gm, '<p>$&</p>')
+                // 清除空段落
+                .replace(/<p><\/p>/g, '');
+        }
+
+        // 实时预览
+        function updatePreview() {
+            const input = document.getElementById('markdownInput');
+            const preview = document.getElementById('markdownPreview');
+            preview.innerHTML = parseMarkdown(input.value);
+        }
+
+        // 插入Markdown格式
+        function insertFormat(action) {
+            const textarea = document.getElementById('markdownInput');
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selectedText = textarea.value.substring(start, end);
+            let insertText = '';
+
+            switch(action) {
+                case 'bold':
+                    insertText = `**${selectedText || '粗体文本'}**`;
+                    break;
+                case 'italic':
+                    insertText = `*${selectedText || '斜体文本'}*`;
+                    break;
+                case 'heading':
+                    insertText = `# ${selectedText || '标题'}`;
+                    break;
+                case 'link':
+                    insertText = `[${selectedText || '链接文本'}](https://example.com)`;
+                    break;
+                case 'image':
+                    insertText = `![${selectedText || '图片描述'}](https://via.placeholder.com/150)`;
+                    break;
+                case 'list':
+                    insertText = `- ${selectedText || '列表项'}`;
+                    break;
+                case 'quote':
+                    insertText = `> ${selectedText || '引用文本'}`;
+                    break;
+                case 'code':
+                    if (selectedText.includes('\n')) {
+                        insertText = `\`\`\`\n${selectedText || '代码块'}\n\`\`\``;
+                    } else {
+                        insertText = `\`${selectedText || '行内代码'}\``;
+                    }
+                    break;
+                case 'table':
+                    insertText = `| 表头1 | 表头2 |\n|-------|-------|\n| 内容1 | 内容2 |\n| 内容3 | 内容4 |`;
+                    break;
+                case 'clear':
+                    insertText = '';
+                    break;
+            }
+
+            const newValue = textarea.value.substring(0, start) + insertText + textarea.value.substring(end);
+            textarea.value = newValue;
+            textarea.focus();
+            textarea.selectionStart = textarea.selectionEnd = start + insertText.length;
+            updatePreview();
+        }
+
+        // 事件监听器
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始预览
+            updatePreview();
+
+            // 输入事件
+            document.getElementById('markdownInput').addEventListener('input', updatePreview);
+
+            // 工具栏按钮事件
+            document.querySelectorAll('.toolbar-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    insertFormat(this.dataset.action);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
