@@ -326,7 +326,7 @@
             <h3 class="sidebar-title">分类</h3>
             <ul class="category-list">
                 <li class="category-item">
-                    <a href="#" class="category-link active" data-category="all">全部工具</a>
+                    <a href="#" class="category-link active" data-category="all">全部内容</a>
                 </li>
                 <li class="category-item">
                     <a href="#" class="category-link" data-category="development">开发工具</a>
@@ -335,13 +335,10 @@
                     <a href="#" class="category-link" data-category="design">设计工具</a>
                 </li>
                 <li class="category-item">
-                    <a href="#" class="category-link" data-category="security">安全工具</a>
-                </li>
-                <li class="category-item">
                     <a href="#" class="category-link" data-category="productivity">效率工具</a>
                 </li>
                 <li class="category-item">
-                    <a href="#" class="category-link" data-category="testing">测试工具</a>
+                    <a href="#" class="category-link" data-category="special">特色应用</a>
                 </li>
             </ul>
         </aside>
@@ -354,10 +351,22 @@
             </div>
 
             <!-- 内容标题 -->
-            <h1 class="content-title">全部工具</h1>
-            <p class="content-subtitle">精心挑选的实用工具，提高工作效率，解决实际问题</p>
+            <h1 class="content-title">全部内容</h1>
+            <p class="content-subtitle">精心挑选的实用工具和特色应用，提高工作效率，探索有趣体验</p>
+
+            <!-- 特色应用区域 -->
+            <h2 class="content-title" style="font-size: 1.25rem; margin-top: 2rem; margin-bottom: 1rem;">特色应用</h2>
+            <div class="tools-grid" id="specialGrid">
+                <!-- Aura Tree 特色应用 -->
+                <a href="tools/aura-tree/index.html" class="tool-card" data-category="special" style="text-decoration: none; color: inherit;">
+                    <div class="tool-icon">🎄</div>
+                    <h3 class="tool-title">Aura Tree</h3>
+                    <p class="tool-description">基于摄像头姿态检测的3D圣诞树效果，支持多种交互模式</p>
+                </a>
+            </div>
 
             <!-- 工具网格 -->
+            <h2 class="content-title" style="font-size: 1.25rem; margin-top: 2rem; margin-bottom: 1rem;">实用工具</h2>
             <div class="tools-grid" id="toolsGrid">
                 <!-- Markdown编辑器 -->
                 <a href="tools/markdown-editor/index.html" class="tool-card" data-category="development" style="text-decoration: none; color: inherit;">
@@ -414,6 +423,13 @@
                     <h3 class="tool-title">二维码生成器</h3>
                     <p class="tool-description">在线生成二维码，支持自定义尺寸和下载</p>
                 </a>
+
+                <!-- AI表情包生成器 -->
+                <a href="tools/ai-meme-generator/index.html" class="tool-card" data-category="productivity" style="text-decoration: none; color: inherit;">
+                    <div class="tool-icon">🤖</div>
+                    <h3 class="tool-title">AI表情包生成器</h3>
+                    <p class="tool-description">使用AI将图片转换为表情包，支持卡通和科幻风格</p>
+                </a>
             </div>
         </main>
     </div>
@@ -435,26 +451,37 @@
         document.addEventListener('DOMContentLoaded', function() {
             // 获取DOM元素
             const searchInput = document.getElementById('searchInput');
+            const specialGrid = document.getElementById('specialGrid');
             const toolsGrid = document.getElementById('toolsGrid');
             const categoryLinks = document.querySelectorAll('.category-link');
-            const toolCards = document.querySelectorAll('.tool-card');
+            
+            // 统一处理所有卡片
+            const getAllToolCards = () => {
+                return document.querySelectorAll('.tool-card');
+            };
 
             // 搜索功能
             searchInput.addEventListener('input', function() {
                 const searchTerm = this.value.toLowerCase();
                 const activeCategory = document.querySelector('.category-link.active').dataset.category;
                 
-                toolCards.forEach(card => {
-                    const title = card.querySelector('.tool-title'C=.uerySelector('.tool-description').textContent.toLowerCase();
+                const allCards = getAllToolCards();
+                allCards.forEach(card => {
+                    const title = card.querySelector('.tool-title').textContent.toLowerCase();
+                    const description = card.querySelector('.tool-description').textContent.toLowerCase();
                     const category = card.dataset.category;
-                 Search e.includes(udes(searchTerm);
-                    congry = activeCategory === 'all' || category === activeCategory;
                     
-                    if (matchesSearch && matchesCategory) {
-                        card.style.display = 'block';
-                    } else {
-                        card.style.display = 'none';
-                    // 分类切换功能
+                    const matchesSearch = title.includes(searchTerm) || description.includes(searchTerm);
+                    const matchesCategory = activeCategory === 'all' || category === activeCategory;
+                    
+                    card.style.display = (matchesSearch && matchesCategory) ? 'block' : 'none';
+                });
+                
+                // 更新网格显示状态
+                updateGridVisibility();
+            });
+
+            // 分类切换功能
             categoryLinks.forEach(link => {
                 link.addEventListener('click', function(e) {
                     e.preventDefault();
@@ -466,23 +493,43 @@
                     const selectedCategory = this.dataset.category;
                     const searchTerm = searchInput.value.toLowerCase();
                     
-                    // 筛选工 f    toolCards.forEach(card => {
-    {
-                        card.style.display =          const title = ca    r else {querySelector('.t        card.style.display = 'none';ool-title').textCt   }werCase();
-      }st description = card.querySelector('.tool-description').textContent.toLowerCase();
+                    // 筛选工具卡片
+                    const allCards = getAllToolCards();
+                    allCards.forEach(card => {
+                        const title = card.querySelector('.tool-title').textContent.toLowerCase();
+                        const description = card.querySelector('.tool-description').textContent.toLowerCase();
                         const category = card.dataset.category;
                         
                         const matchesSearch = title.includes(searchTerm) || description.includes(searchTerm);
                         const matchesCategory = selectedCategory === 'all' || category === selectedCategory;
                         
-                        if (matchesSearch && matchesCategory) {
-                            card.style.display = 'block';
-                        } else {
-                          rnone';
-              });
+                        card.style.display = (matchesSearch && matchesCategory) ? 'block' : 'none';
+                    });
+                    
+                    // 更新网格显示状态
+                    updateGridVisibility();
                 });
             });
+            
+            // 更新网格显示状态
+            function updateGridVisibility() {
+                const activeCategory = document.querySelector('.category-link.active').dataset.category;
+                
+                // 当显示全部内容或特色应用分类时，显示特色应用区域
+                const showSpecialGrid = activeCategory === 'all' || activeCategory === 'special';
+                specialGrid.style.display = showSpecialGrid ? 'grid' : 'none';
+                
+                // 当显示全部内容或工具分类时，显示工具区域
+                const showToolsGrid = activeCategory === 'all' || 
+                                     activeCategory === 'development' || 
+                                     activeCategory === 'design' || 
+                                     activeCategory === 'productivity';
+                toolsGrid.style.display = showToolsGrid ? 'grid' : 'none';
+            }
+            
+            // 初始化网格显示
+            updateGridVisibility();
         });
     </script>
 </body>
-</html>f{c.l.p'b}else{}})})
+</html>
