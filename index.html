@@ -445,22 +445,16 @@
                 const activeCategory = document.querySelector('.category-link.active').dataset.category;
                 
                 toolCards.forEach(card => {
-                    const title = card.querySelector('.tool-title').textContent.toLowerCase();
-                    const description = card.querySelector('.tool-description').textContent.toLowerCase();
+                    const title = card.querySelector('.tool-title'C=.uerySelector('.tool-description').textContent.toLowerCase();
                     const category = card.dataset.category;
-                    
-                    const matchesSearch = title.includes(searchTerm) || description.includes(searchTerm);
-                    const matchesCategory = activeCategory === 'all' || category === activeCategory;
+                 Search e.includes(udes(searchTerm);
+                    congry = activeCategory === 'all' || category === activeCategory;
                     
                     if (matchesSearch && matchesCategory) {
                         card.style.display = 'block';
                     } else {
                         card.style.display = 'none';
-                    }
-                });
-            });
-
-            // 分类切换功能
+                    // 分类切换功能
             categoryLinks.forEach(link => {
                 link.addEventListener('click', function(e) {
                     e.preventDefault();
@@ -472,10 +466,10 @@
                     const selectedCategory = this.dataset.category;
                     const searchTerm = searchInput.value.toLowerCase();
                     
-                    // 筛选工具卡片
-                    toolCards.forEach(card => {
-                        const title = card.querySelector('.tool-title').textContent.toLowerCase();
-                        const description = card.querySelector('.tool-description').textContent.toLowerCase();
+                    // 筛选工 f    toolCards.forEach(card => {
+    {
+                        card.style.display =          const title = ca    r else {querySelector('.t        card.style.display = 'none';ool-title').textCt   }werCase();
+      }st description = card.querySelector('.tool-description').textContent.toLowerCase();
                         const category = card.dataset.category;
                         
                         const matchesSearch = title.includes(searchTerm) || description.includes(searchTerm);
@@ -484,12 +478,11 @@
                         if (matchesSearch && matchesCategory) {
                             card.style.display = 'block';
                         } else {
-                            card.style.display = 'none';
-                        }
-                    });
+                          rnone';
+              });
                 });
             });
         });
     </script>
 </body>
-</html>
+</html>f{c.l.p'b}else{}})})

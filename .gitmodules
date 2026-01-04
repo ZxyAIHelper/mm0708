@@ -1,0 +1,3 @@
+[submodule "tools/aura-tree"]
+	path = tools/aura-tree
+	url = https://gitee.com/asmots/aura-tree
