@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI表情包生成器</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <!-- 导航栏 -->
     <nav>
@@ -41,7 +43,7 @@
                         <option value="nanobanana">NanoBanana</option>
                     </select>
                 </div>
-                
+
                 <div class="toolbar-group">
                     <button class="toolbar-btn primary" id="generateBtn">生成表情包</button>
                     <button class="toolbar-btn" id="downloadBtn">下载表情包</button>
@@ -59,7 +61,7 @@
                     <!-- 输入面板 -->
                     <div class="panel">
                         <h3 class="panel-title">输入设置</h3>
-                        
+
                         <!-- 图片上传 -->
                         <div class="upload-area" id="uploadArea">
                             <div class="upload-icon">📁</div>
@@ -67,12 +69,12 @@
                             <div class="upload-hint">支持 JPG、PNG、GIF 格式，大小不超过 5MB</div>
                             <input type="file" id="fileInput" accept="image/*">
                         </div>
-                        
+
                         <!-- 图片预览 -->
                         <div class="preview-area" id="previewArea">
                             <img id="previewImage" style="display: none;">
                         </div>
-                        
+
                         <!-- 模式选择 -->
                         <h4 class="panel-title" style="font-size: 0.875rem; margin-bottom: 0.5rem;">选择风格模式</h4>
                         <div class="mode-selector">
@@ -87,22 +89,23 @@
                                 <div class="mode-description">未来科技，霓虹效果</div>
                             </div>
                         </div>
-                        
+
                         <!-- 提示词显示 -->
                         <div class="prompt-area">
                             <div class="prompt-title">当前提示词</div>
                             <div class="prompt-text" id="promptText">将图片转换为可爱的卡通风格表情包，色彩鲜艳，表情生动</div>
                         </div>
-                        
+
                         <!-- 文本描述 -->
                         <h4 class="panel-title" style="font-size: 0.875rem; margin-bottom: 0.5rem;">附加描述（可选）</h4>
-                        <textarea class="text-description" id="textDescription" placeholder="添加自定义描述，让生成的表情包更符合你的需求..."></textarea>
+                        <textarea class="text-description" id="textDescription"
+                            placeholder="添加自定义描述，让生成的表情包更符合你的需求..."></textarea>
                     </div>
 
                     <!-- 输出面板 -->
                     <div class="panel">
                         <h3 class="panel-title">生成结果</h3>
-                        
+
                         <!-- 结果预览 -->
                         <div class="result-area" id="resultArea">
                             <div class="loading" id="loading">
@@ -111,7 +114,7 @@
                             </div>
                             <img id="resultImage" style="display: none;">
                         </div>
-                        
+
                         <!-- 生成参数 -->
                         <div class="prompt-area" style="margin-top: 1rem;">
                             <div class="prompt-title">生成参数</div>
@@ -125,4 +128,5 @@
 
     <script src="script.js"></script>
 </body>
+
 </html>

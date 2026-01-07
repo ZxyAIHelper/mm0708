@@ -40,10 +40,25 @@ WebPages/
 ## 使用方法
 
 ### 本地开发
+
+#### 方式一：基础静态服务器（不支持 API 函数）
 1. 克隆仓库：`git clone https://gitee.com/asmots/pages.git`
-2. 进入目录：`cd WebPages`
+2. 进入目录：`cd pages`
 3. 启动本地服务器：`python3 -m http.server 8000`
 4. 访问：`http://localhost:8000`
+
+#### 方式二：Wrangler 开发服务器（支持 API 函数测试）
+1. 确保已安装 Node.js (v18+)。
+2. 创建 `.dev.vars` 文件用于存放本地环境变量（参考 `.dev.vars.example`）：
+   ```bash
+   cp .dev.vars.example .dev.vars
+   # 然后编辑 .dev.vars 填入你的 API Key
+   ```
+3. 启动开发服务器：
+   ```bash
+   npx wrangler pages dev .
+   ```
+4. 访问：`http://localhost:8788`
 
 ### 部署到Cloudflare Pages
 1. 使用部署脚本：`./deploy.sh`
