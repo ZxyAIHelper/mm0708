@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>AuraTree Gesture Trainer</title>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+</head>
+
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>Gesture Data Recorder</h1>
+            <p>Select a label, stand in pose, and hold "Record" to capture data.</p>
+        </div>
+
+        <div class="main-view">
+            <video class="input_video"></video>
+            <canvas class="output_canvas" width="640" height="480"></canvas>
+        </div>
+
+        <div class="controls">
+            <div class="labels">
+                <button class="label-btn" data-label="neutral">🧍 Neutral (Stand)</button>
+                <button class="label-btn" data-label="stars">✨ Stars (T-Pose)</button>
+                <button class="label-btn" data-label="heart">❤️ Heart</button>
+                <button class="label-btn" data-label="star">🫡 Salute (Star)</button>
+                <button class="label-btn" data-label="fly">🛫 Fly (Bank)</button>
+            </div>
+
+            <div class="status-panel">
+                <h3>Data Counts</h3>
+                <ul id="count-list">
+                    <li>Neutral: <span id="count-neutral">0</span></li>
+                    <li>Stars: <span id="count-stars">0</span></li>
+                    <li>Heart: <span id="count-heart">0</span></li>
+                    <li>Star: <span id="count-star">0</span></li>
+                    <li>Fly: <span id="count-fly">0</span></li>
+                </ul>
+                <button id="btn-download" disabled>💾 Download JSON Model</button>
+                <button id="btn-clear" class="danger">🗑️ Clear All</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+
+</body>
+
+</html>

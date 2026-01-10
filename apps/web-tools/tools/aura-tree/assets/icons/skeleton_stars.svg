@@ -1,0 +1,28 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+    <!-- Style: Skeleton Gold -->
+    <defs>
+        <style>
+            .bone { stroke: #ffd700; stroke-width: 2; stroke-linecap: round; }
+            .joint { fill: #ffd700; }
+        </style>
+    </defs>
+    
+    <!-- Body -->
+    <line x1="32" y1="20" x2="32" y2="45" class="bone" />
+    
+    <!-- Head -->
+    <circle cx="32" cy="14" r="5" class="bone" fill="none" />
+    
+    <!-- Arms (Spread T-Pose) -->
+    <line x1="32" y1="22" x2="10" y2="22" class="bone" /> <!-- Left Arm -->
+    <line x1="32" y1="22" x2="54" y2="22" class="bone" /> <!-- Right Arm -->
+    
+    <!-- Legs -->
+    <line x1="32" y1="45" x2="22" y2="60" class="bone" />
+    <line x1="32" y1="45" x2="42" y2="60" class="bone" />
+    
+    <!-- Joints -->
+    <circle cx="32" cy="22" r="2" class="joint" />
+    <circle cx="10" cy="22" r="2" class="joint" />
+    <circle cx="54" cy="22" r="2" class="joint" />
+</svg>

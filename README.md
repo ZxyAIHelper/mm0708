@@ -1,96 +1,104 @@
-# AI工具门户
+# Monorepo Project
 
-一个基于Web的AI工具集合，提供多种实用工具，包括AI表情包生成器、进制转换器、URL编解码器、颜色选择器等。
+A Turborepo + pnpm + Hono + D1 Monorepo architecture for web tools and backend services.
 
-## 功能特性
-
-### 核心工具
-- **AI表情包生成器**：支持图片上传、多种风格模式（卡通、科幻）、自定义描述和下载功能
-- **进制转换器**：支持不同进制之间的转换
-- **URL编解码器**：用于URL的编码和解码
-- **颜色选择器**：用于选择和生成颜色值
-- **代码格式化器**：支持多种编程语言的代码格式化
-
-### 设计特点
-- 响应式设计，适配不同屏幕尺寸
-- 现代化的UI设计，简洁易用
-- 模块化架构，便于扩展和维护
-- 支持多种AI API集成
-
-## 目录结构
+## Project Structure
 
 ```
-WebPages/
-├── index.html                # 工具门户首页
-├── deploy.sh                 # 部署脚本
-├── .rulexx                   # 规则文件
-├── .gitmodules               # Git子模块配置
-└── tools/                    # 工具集合
-    ├── ai-meme-generator/    # AI表情包生成器
-    │   ├── index.html
-    │   ├── style.css
-    │   └── script.js
-    ├── base-converter/       # 进制转换器
-    ├── url-encoder/          # URL编解码器
-    ├── color-picker/         # 颜色选择器
-    ├── code-formatter/       # 代码格式化器
-    └── aura-tree/            # Gitee子模块
+.
+├── apps/
+│   ├── web-tools/          # Frontend tools (Cloudflare Pages)
+│   └── my-cloud-hub/       # Backend API (Hono + D1)
+├── packages/
+│   ├── database/           # Shared database schema (Drizzle ORM)
+│   └── shared-types/       # Shared TypeScript types
+├── pnpm-workspace.yaml
+├── turbo.json
+└── package.json
 ```
 
-## 使用方法
+## Getting Started
 
-### 本地开发
+### Prerequisites
 
-#### 方式一：基础静态服务器（不支持 API 函数）
-1. 克隆仓库：`git clone https://gitee.com/asmots/pages.git`
-2. 进入目录：`cd pages`
-3. 启动本地服务器：`python3 -m http.server 8000`
-4. 访问：`http://localhost:8000`
+- Node.js >= 18
+- pnpm >= 9
 
-#### 方式二：Wrangler 开发服务器（支持 API 函数测试）
-1. 确保已安装 Node.js (v18+)。
-2. 创建 `.dev.vars` 文件用于存放本地环境变量（参考 `.dev.vars.example`）：
-   ```bash
-   cp .dev.vars.example .dev.vars
-   # 然后编辑 .dev.vars 填入你的 API Key
-   ```
-3. 启动开发服务器：
-   ```bash
-   npx wrangler pages dev .
-   ```
-4. 访问：`http://localhost:8788`
+### Installation
 
-### 部署到Cloudflare Pages
-1. 使用部署脚本：`./deploy.sh`
-2. 或手动部署：使用Wrangler CLI或Cloudflare Pages控制台
+```bash
+pnpm install
+```
 
-## 开发指南
+### Development
 
-### 添加新工具
-1. 在`tools/`目录下创建新的工具文件夹
-2. 创建必要的HTML、CSS和JavaScript文件
-3. 在首页`index.html`中添加工具卡片
+Run all apps in development mode:
 
-### 代码规范
-- 遵循单一职责原则，每个文件只负责一个功能
-- 使用模块化设计，便于维护和扩展
-- 保持代码风格一致，使用语义化命名
+```bash
+pnpm dev
+```
 
-## 依赖项
+Run specific app:
 
-- 无外部依赖，纯前端实现
-- 可选：Wrangler CLI（用于Cloudflare Pages部署）
+```bash
+cd apps/my-cloud-hub
+pnpm dev
+```
 
-## 许可证
+### Database Management
 
-MIT License
+Generate migrations:
 
-## 贡献
+```bash
+cd packages/database
+pnpm db:generate
+```
 
-欢迎提交Issue和Pull Request！
+Apply migrations locally:
 
-## 联系方式
+```bash
+pnpm db:migrate
+```
 
-如有问题或建议，请通过以下方式联系：
-- GitHub Issues：https://gitee.com/asmots/pages/issues
-- 邮箱：[your-email@example.com]
+Apply migrations to remote:
+
+```bash
+pnpm db:migrate:remote
+```
+
+### Deployment
+
+Deploy all apps:
+
+```bash
+pnpm deploy
+```
+
+Or use the deployment script:
+
+```bash
+bash deploy.sh
+```
+
+## Environment Variables
+
+### Backend (`apps/my-cloud-hub`)
+
+Required in Cloudflare Worker environment:
+
+- `DOUBAO_API_KEY`: Doubao AI API key
+- `DOUBAO_ENDPOINT_ID`: Doubao endpoint ID
+- `WECHAT_APPID`: WeChat test account App ID
+- `WECHAT_SECRET`: WeChat test account secret
+
+### Frontend (`apps/web-tools`)
+
+Configure the backend URL:
+
+```javascript
+window.API_BASE_URL = 'https://your-backend-url.com'
+```
+
+## License
+
+MIT

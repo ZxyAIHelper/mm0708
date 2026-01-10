@@ -1,0 +1,32 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <style>
+            .bone { stroke: #ffd700; stroke-width: 2; stroke-linecap: round; fill: none; }
+            .joint { fill: #ffd700; }
+        </style>
+    </defs>
+    
+    <!-- Body -->
+    <line x1="32" y1="20" x2="32" y2="45" class="bone" />
+    
+    <!-- Head -->
+    <circle cx="32" cy="14" r="5" class="bone" />
+    
+    <!-- Left Arm (Down) -->
+    <line x1="32" y1="22" x2="20" y2="35" class="bone" />
+    
+    <!-- Right Arm (Salute) -->
+    <!-- Shoulder to Elbow -->
+    <line x1="32" y1="22" x2="50" y2="22" class="bone" />
+    <!-- Elbow to Head -->
+    <line x1="50" y1="22" x2="40" y2="10" class="bone" />
+    
+    <!-- Legs -->
+    <line x1="32" y1="45" x2="22" y2="60" class="bone" />
+    <line x1="32" y1="45" x2="42" y2="60" class="bone" />
+    
+    <!-- Joints -->
+    <circle cx="32" cy="22" r="2" class="joint" />
+    <circle cx="50" cy="22" r="2" class="joint" />
+    <circle cx="40" cy="10" r="2" class="joint" />
+</svg>

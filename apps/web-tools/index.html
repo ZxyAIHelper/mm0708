@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工具门户</title>
+    <style>
+        :root {
+            --primary-color: #4f46e5;
+            --secondary-color: #64748b;
+            --accent-color: #06b6d4;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --light-bg: #f8fafc;
+            --dark-bg: #0f172a;
+            --card-bg: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --border-radius: 8px;
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background-color: var(--light-bg);
+        }
+
+        /* 导航栏 */
+        nav {
+            background-color: var(--card-bg);
+            box-shadow: var(--shadow-sm);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 70px;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        /* 主内容布局 */
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        /* 左侧分类栏 */
+        .sidebar {
+            background-color: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-md);
+            padding: 1.5rem;
+            position: sticky;
+            top: 90px;
+            height: fit-content;
+        }
+
+        .sidebar-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .category-list {
+            list-style: none;
+        }
+
+        .category-item {
+            margin-bottom: 0.5rem;
+        }
+
+        .category-link {
+            display: block;
+            padding: 0.75rem 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            border-radius: var(--border-radius);
+            transition: var(--transition);
+            font-weight: 500;
+        }
+
+        .category-link:hover,
+        .category-link.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        /* 右侧内容区 */
+        .content {
+            background-color: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-md);
+            padding: 2rem;
+        }
+
+        /* 搜索框 */
+        .search-container {
+            margin-bottom: 2rem;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--border-color);
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        /* 内容标题 */
+        .content-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .content-subtitle {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+
+        /* 工具网格 */
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 1.5rem;
+        }
+
+        /* 工具卡片 */
+        .tool-card {
+            background-color: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-sm);
+            padding: 1.5rem;
+            text-align: center;
+            transition: var(--transition);
+            border: 1px solid var(--border-color);
+        }
+
+        .tool-card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-md);
+            border-color: var(--primary-color);
+        }
+
+        /* 工具图标 */
+        .tool-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+            font-size: 2rem;
+            color: white;
+        }
+
+        /* 工具标题 */
+        .tool-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        /* 工具描述 */
+        .tool-description {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+
+        /* 页脚 */
+        footer {
+            background-color: var(--dark-bg);
+            color: white;
+            padding: 3rem 20px 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .footer-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .footer-content {
+            margin-bottom: 2rem;
+        }
+
+        .footer-content h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: white;
+        }
+
+        .footer-content p,
+        .footer-content a {
+            color: #94a3b8;
+            text-decoration: none;
+            line-height: 1.8;
+        }
+
+        .footer-content a:hover {
+            color: white;
+        }
+
+        .footer-bottom {
+            border-top: 1px solid #334155;
+            padding-top: 1.5rem;
+            color: #94a3b8;
+            font-size: 0.875rem;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                padding: 1rem;
+                gap: 1rem;
+            }
+
+            .sidebar {
+                position: static;
+            }
+
+            .content {
+                padding: 1.5rem;
+            }
+
+            .tools-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 1rem;
+            }
+
+            .tool-card {
+                padding: 1rem;
+            }
+
+            .tool-icon {
+                width: 60px;
+                height: 60px;
+                font-size: 1.5rem;
+            }
+        }
+
+        /* 加载动画 */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .tool-card {
+            animation: fadeInUp 0.6s ease forwards;
+        }
+
+        .tool-card:nth-child(1) { animation-delay: 0.1s; }
+        .tool-card:nth-child(2) { animation-delay: 0.2s; }
+        .tool-card:nth-child(3) { animation-delay: 0.3s; }
+        .tool-card:nth-child(4) { animation-delay: 0.4s; }
+        .tool-card:nth-child(5) { animation-delay: 0.5s; }
+        .tool-card:nth-child(6) { animation-delay: 0.6s; }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav>
+        <div class="nav-container">
+            <a href="#" class="logo">工具门户</a>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <div class="main-container">
+        <!-- 左侧分类栏 -->
+        <aside class="sidebar">
+            <h3 class="sidebar-title">分类</h3>
+            <ul class="category-list">
+                <li class="category-item">
+                    <a href="#" class="category-link active" data-category="all">全部内容</a>
+                </li>
+                <li class="category-item">
+                    <a href="#" class="category-link" data-category="development">开发工具</a>
+                </li>
+                <li class="category-item">
+                    <a href="#" class="category-link" data-category="design">设计工具</a>
+                </li>
+                <li class="category-item">
+                    <a href="#" class="category-link" data-category="productivity">效率工具</a>
+                </li>
+                <li class="category-item">
+                    <a href="#" class="category-link" data-category="special">特色应用</a>
+                </li>
+            </ul>
+        </aside>
+
+        <!-- 右侧内容区 -->
+        <main class="content">
+            <!-- 搜索框 -->
+            <div class="search-container">
+                <input type="text" class="search-box" placeholder="搜索工具..." id="searchInput">
+            </div>
+
+            <!-- 内容标题 -->
+            <h1 class="content-title">全部内容</h1>
+            <p class="content-subtitle">精心挑选的实用工具和特色应用，提高工作效率，探索有趣体验</p>
+
+            <!-- 特色应用区域 -->
+            <h2 class="content-title" style="font-size: 1.25rem; margin-top: 2rem; margin-bottom: 1rem;">特色应用</h2>
+            <div class="tools-grid" id="specialGrid">
+                <!-- Aura Tree 特色应用 -->
+                <a href="tools/aura-tree/index.html" class="tool-card" data-category="special" style="text-decoration: none; color: inherit;">
+                    <div class="tool-icon">🎄</div>
+                    <h3 class="tool-title">Aura Tree</h3>
+                    <p class="tool-description">基于摄像头姿态检测的3D圣诞树效果，支持多种交互模式</p>
+                </a>
+            </div>
+
+            <!-- 工具网格 -->
+            <h2 class="content-title" style="font-size: 1.25rem; margin-top: 2rem; margin-bottom: 1rem;">实用工具</h2>
+            <div class="tools-grid" id="toolsGrid">
+                <!-- Markdown编辑器 -->
+                <a href="tools/markdown-editor/index.html" class="tool-card" data-category="development" style="text-decoration: none; color: inherit;">
+                    <div class="tool-icon">📝</div>
+                    <h3 class="tool-title">Markdown编辑器</h3>
+                    <p class="tool-description">功能丰富的在线Markdown编辑器，支持实时预览和多种导出格式</p>
+                </a>
+
+                <!-- 进制转换器 -->
+                <a href="tools/base-converter/index.html" class="tool-card" data-category="development" style="text-decoration: none; color: inherit;">
+                    <div class="tool-icon">🔢</div>
+                    <h3 class="tool-title">进制转换器</h3>
+                    <p class="tool-description">支持多种进制之间的转换，包括二进制、十进制、十六进制等</p>
+                </a>
+
+                <!-- JSON格式化 -->
+                <a href="tools/json-formatter/index.html" class="tool-card" data-category="development" style="text-decoration: none; color: inherit;">
+                    <div class="tool-icon">📊</div>
+                    <h3 class="tool-title">JSON格式化</h3>
+                    <p class="tool-description">在线JSON格式化和验证工具，支持语法高亮和错误提示</p>
+                </a>
+
+                <!-- 代码格式化 -->
+                <a href="tools/code-formatter/index.html" class="tool-card" data-category="development" style="text-decoration: none; color: inherit;">
+                    <div class="tool-icon">💻</div>
+                    <h3 class="tool-title">代码格式化</h3>
+                    <p class="tool-description">支持多种编程语言的代码格式化和美化</p>
+                </a>
+
+                <!-- 颜色选择器 -->
+                <a href="tools/color-picker/index.html" class="tool-card" data-category="design" style="text-decoration: none; color: inherit;">
+                    <div class="tool-icon">🎨</div>
+                    <h3 class="tool-title">颜色选择器</h3>
+                    <p class="tool-description">在线颜色选择器，支持RGB、HEX、HSL等多种颜色格式</p>
+                </a>
+
+                <!-- Base64编解码 -->
+                <a href="tools/base64-converter/index.html" class="tool-card" data-category="development" style="text-decoration: none; color: inherit;">
+                    <div class="tool-icon">🔤</div>
+                    <h3 class="tool-title">Base64编解码</h3>
+                    <p class="tool-description">在线Base64编码和解码工具，支持文本转换</p>
+                </a>
+
+                <!-- URL编码解码 -->
+                <a href="tools/url-encoder/index.html" class="tool-card" data-category="development" style="text-decoration: none; color: inherit;">
+                    <div class="tool-icon">🔗</div>
+                    <h3 class="tool-title">URL编码解码</h3>
+                    <p class="tool-description">在线URL编码和解码工具，支持各种特殊字符处理</p>
+                </a>
+
+                <!-- 二维码生成器 -->
+                <a href="tools/qrcode-generator/index.html" class="tool-card" data-category="productivity" style="text-decoration: none; color: inherit;">
+                    <div class="tool-icon">📱</div>
+                    <h3 class="tool-title">二维码生成器</h3>
+                    <p class="tool-description">在线生成二维码，支持自定义尺寸和下载</p>
+                </a>
+
+                <!-- AI表情包生成器 -->
+                <a href="tools/ai-meme-generator/index.html" class="tool-card" data-category="productivity" style="text-decoration: none; color: inherit;">
+                    <div class="tool-icon">🤖</div>
+                    <h3 class="tool-title">AI表情包生成器</h3>
+                    <p class="tool-description">使用AI将图片转换为表情包，支持卡通和科幻风格</p>
+                </a>
+            </div>
+        </main>
+    </div>
+
+    <!-- 页脚 -->
+    <footer>
+        <div class="footer-container">
+            <div class="footer-content">
+                <h3>工具门户</h3>
+                <p>精心挑选的实用工具集合，提高工作效率，解决实际问题</p>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 工具门户. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 获取DOM元素
+            const searchInput = document.getElementById('searchInput');
+            const specialGrid = document.getElementById('specialGrid');
+            const toolsGrid = document.getElementById('toolsGrid');
+            const categoryLinks = document.querySelectorAll('.category-link');
+            
+            // 统一处理所有卡片
+            const getAllToolCards = () => {
+                return document.querySelectorAll('.tool-card');
+            };
+
+            // 搜索功能
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const activeCategory = document.querySelector('.category-link.active').dataset.category;
+                
+                const allCards = getAllToolCards();
+                allCards.forEach(card => {
+                    const title = card.querySelector('.tool-title').textContent.toLowerCase();
+                    const description = card.querySelector('.tool-description').textContent.toLowerCase();
+                    const category = card.dataset.category;
+                    
+                    const matchesSearch = title.includes(searchTerm) || description.includes(searchTerm);
+                    const matchesCategory = activeCategory === 'all' || category === activeCategory;
+                    
+                    card.style.display = (matchesSearch && matchesCategory) ? 'block' : 'none';
+                });
+                
+                // 更新网格显示状态
+                updateGridVisibility();
+            });
+
+            // 分类切换功能
+            categoryLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // 更新活动状态
+                    categoryLinks.forEach(l => l.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    const selectedCategory = this.dataset.category;
+                    const searchTerm = searchInput.value.toLowerCase();
+                    
+                    // 筛选工具卡片
+                    const allCards = getAllToolCards();
+                    allCards.forEach(card => {
+                        const title = card.querySelector('.tool-title').textContent.toLowerCase();
+                        const description = card.querySelector('.tool-description').textContent.toLowerCase();
+                        const category = card.dataset.category;
+                        
+                        const matchesSearch = title.includes(searchTerm) || description.includes(searchTerm);
+                        const matchesCategory = selectedCategory === 'all' || category === selectedCategory;
+                        
+                        card.style.display = (matchesSearch && matchesCategory) ? 'block' : 'none';
+                    });
+                    
+                    // 更新网格显示状态
+                    updateGridVisibility();
+                });
+            });
+            
+            // 更新网格显示状态
+            function updateGridVisibility() {
+                const activeCategory = document.querySelector('.category-link.active').dataset.category;
+                
+                // 当显示全部内容或特色应用分类时，显示特色应用区域
+                const showSpecialGrid = activeCategory === 'all' || activeCategory === 'special';
+                specialGrid.style.display = showSpecialGrid ? 'grid' : 'none';
+                
+                // 当显示全部内容或工具分类时，显示工具区域
+                const showToolsGrid = activeCategory === 'all' || 
+                                     activeCategory === 'development' || 
+                                     activeCategory === 'design' || 
+                                     activeCategory === 'productivity';
+                toolsGrid.style.display = showToolsGrid ? 'grid' : 'none';
+            }
+            
+            // 初始化网格显示
+            updateGridVisibility();
+        });
+    </script>
+</body>
+</html>

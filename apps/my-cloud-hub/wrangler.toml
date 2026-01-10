@@ -1,0 +1,12 @@
+name = "my-cloud-hub"
+compatibility_date = "2024-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "my-db"
+database_id = "0b58d184-7a8d-4711-92a9-30d338a0b418"
+migrations_dir = "../../packages/database/migrations"
+
+[[kv_namespaces]]
+binding = "WECHAT_KV"
+id = "a95d6ea52307466e85bbb150aea487c6"

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anti-Gravity Christmas Tree</title>
+    <link rel="icon" type="image/svg+xml" href="assets/icons/skeleton_stars.svg">
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Import Maps for Three.js (Modern way to handle modules without build tool) -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <!-- MediaPipe Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+</head>
+
+<body>
+    <!-- Title -->
+    <div id="christmas-title">MERRY CHRISTMAS</div>
+
+    <!-- Hidden Video Element for MediaPipe -->
+    <video class="input_video" style="display: none;"></video>
+
+    <!-- Three.js Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <!-- Debug Panel -->
+    <div id="gesture-debug">
+        <canvas id="skeleton-canvas" width="160" height="120"></canvas>
+        <span id="gesture-text">Waiting for gesture...</span>
+    </div>
+    <div id="debug-panel">
+        <button id="btn-reset" class="debug-btn">
+            <img src="assets/icons/skeleton_stand.svg" alt="Stand" class="btn-icon">
+            <span>默认</span>
+        </button>
+        <button id="btn-scatter" class="debug-btn">
+            <img src="assets/icons/skeleton_stars.svg" alt="Stars" class="btn-icon">
+            <span>满天星</span>
+        </button>
+        <button id="btn-heart" class="debug-btn">
+            <img src="assets/icons/skeleton_heart.svg" alt="Heart" class="btn-icon">
+            <span>湖贝里</span>
+        </button>
+        <button id="btn-star" class="debug-btn">
+            <img src="assets/icons/skeleton_star.svg" alt="Star" class="btn-icon">
+            <span>五角星</span>
+        </button>
+
+    </div>
+
+    <!-- Photo Viewer (Bottom Left) -->
+    <div id="photo-viewer" class="photo-viewer hidden">
+        <button id="photo-close" class="photo-close">✕</button>
+        <div id="photo-container" class="photo-container">
+            <img id="photo-image" src="" alt="Photo">
+        </div>
+        <div id="photo-info" class="photo-info">
+            <span id="photo-name">Photo Name</span>
+            <span id="photo-counter">1/29</span>
+        </div>
+    </div>
+
+    <!-- Mute Button -->
+    <button id="btn-mute" class="mute-btn">🔊</button>
+    <button id="btn-debug-toggle" class="mute-btn" style="right: 80px;">⚙️</button>
+    <button id="btn-fullscreen" class="mute-btn" style="right: 130px;">📺</button>
+
+    <script type="module" src="script.js"></script>
+</body>
+
+</html>
