@@ -1,13 +1,19 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import memeRouter from './projects/meme-generator'
+import tasksRouter from './projects/todo/tasks'
+import ragRouter from './projects/todo/rag'
+import chatRouter from './projects/todo/chat'
 import { sendWeChatNotification } from './utils/wechat'
 
 type Bindings = {
     DB: D1Database
     WECHAT_KV: KVNamespace
+    VECTORIZE: VectorizeIndex
+    AI: Ai
     DOUBAO_API_KEY: string
     DOUBAO_ENDPOINT_ID: string
+    DOUBAO_CHAT_ENDPOINT: string
     WECHAT_APPID: string
     WECHAT_SECRET: string
 }
@@ -28,6 +34,9 @@ app.get('/', (c) => {
 
 // 挂载子路由
 app.route('/api/meme', memeRouter)
+app.route('/api/todo/tasks', tasksRouter)
+app.route('/api/todo/rag', ragRouter)
+app.route('/api/todo/chat', chatRouter)
 
 // 全局错误处理
 app.onError(async (err, c) => {

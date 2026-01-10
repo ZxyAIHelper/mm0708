@@ -10,3 +10,7 @@ migrations_dir = "../../packages/database/migrations"
 [[kv_namespaces]]
 binding = "WECHAT_KV"
 id = "a95d6ea52307466e85bbb150aea487c6"
+
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "todo-tasks"

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -293,6 +294,7 @@
                 opacity: 0;
                 transform: translateY(20px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -303,14 +305,32 @@
             animation: fadeInUp 0.6s ease forwards;
         }
 
-        .tool-card:nth-child(1) { animation-delay: 0.1s; }
-        .tool-card:nth-child(2) { animation-delay: 0.2s; }
-        .tool-card:nth-child(3) { animation-delay: 0.3s; }
-        .tool-card:nth-child(4) { animation-delay: 0.4s; }
-        .tool-card:nth-child(5) { animation-delay: 0.5s; }
-        .tool-card:nth-child(6) { animation-delay: 0.6s; }
+        .tool-card:nth-child(1) {
+            animation-delay: 0.1s;
+        }
+
+        .tool-card:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .tool-card:nth-child(3) {
+            animation-delay: 0.3s;
+        }
+
+        .tool-card:nth-child(4) {
+            animation-delay: 0.4s;
+        }
+
+        .tool-card:nth-child(5) {
+            animation-delay: 0.5s;
+        }
+
+        .tool-card:nth-child(6) {
+            animation-delay: 0.6s;
+        }
     </style>
 </head>
+
 <body>
     <!-- 导航栏 -->
     <nav>
@@ -358,7 +378,8 @@
             <h2 class="content-title" style="font-size: 1.25rem; margin-top: 2rem; margin-bottom: 1rem;">特色应用</h2>
             <div class="tools-grid" id="specialGrid">
                 <!-- Aura Tree 特色应用 -->
-                <a href="tools/aura-tree/index.html" class="tool-card" data-category="special" style="text-decoration: none; color: inherit;">
+                <a href="tools/aura-tree/index.html" class="tool-card" data-category="special"
+                    style="text-decoration: none; color: inherit;">
                     <div class="tool-icon">🎄</div>
                     <h3 class="tool-title">Aura Tree</h3>
                     <p class="tool-description">基于摄像头姿态检测的3D圣诞树效果，支持多种交互模式</p>
@@ -369,66 +390,83 @@
             <h2 class="content-title" style="font-size: 1.25rem; margin-top: 2rem; margin-bottom: 1rem;">实用工具</h2>
             <div class="tools-grid" id="toolsGrid">
                 <!-- Markdown编辑器 -->
-                <a href="tools/markdown-editor/index.html" class="tool-card" data-category="development" style="text-decoration: none; color: inherit;">
+                <a href="tools/markdown-editor/index.html" class="tool-card" data-category="development"
+                    style="text-decoration: none; color: inherit;">
                     <div class="tool-icon">📝</div>
                     <h3 class="tool-title">Markdown编辑器</h3>
                     <p class="tool-description">功能丰富的在线Markdown编辑器，支持实时预览和多种导出格式</p>
                 </a>
 
                 <!-- 进制转换器 -->
-                <a href="tools/base-converter/index.html" class="tool-card" data-category="development" style="text-decoration: none; color: inherit;">
+                <a href="tools/base-converter/index.html" class="tool-card" data-category="development"
+                    style="text-decoration: none; color: inherit;">
                     <div class="tool-icon">🔢</div>
                     <h3 class="tool-title">进制转换器</h3>
                     <p class="tool-description">支持多种进制之间的转换，包括二进制、十进制、十六进制等</p>
                 </a>
 
                 <!-- JSON格式化 -->
-                <a href="tools/json-formatter/index.html" class="tool-card" data-category="development" style="text-decoration: none; color: inherit;">
+                <a href="tools/json-formatter/index.html" class="tool-card" data-category="development"
+                    style="text-decoration: none; color: inherit;">
                     <div class="tool-icon">📊</div>
                     <h3 class="tool-title">JSON格式化</h3>
                     <p class="tool-description">在线JSON格式化和验证工具，支持语法高亮和错误提示</p>
                 </a>
 
                 <!-- 代码格式化 -->
-                <a href="tools/code-formatter/index.html" class="tool-card" data-category="development" style="text-decoration: none; color: inherit;">
+                <a href="tools/code-formatter/index.html" class="tool-card" data-category="development"
+                    style="text-decoration: none; color: inherit;">
                     <div class="tool-icon">💻</div>
                     <h3 class="tool-title">代码格式化</h3>
                     <p class="tool-description">支持多种编程语言的代码格式化和美化</p>
                 </a>
 
                 <!-- 颜色选择器 -->
-                <a href="tools/color-picker/index.html" class="tool-card" data-category="design" style="text-decoration: none; color: inherit;">
+                <a href="tools/color-picker/index.html" class="tool-card" data-category="design"
+                    style="text-decoration: none; color: inherit;">
                     <div class="tool-icon">🎨</div>
                     <h3 class="tool-title">颜色选择器</h3>
                     <p class="tool-description">在线颜色选择器，支持RGB、HEX、HSL等多种颜色格式</p>
                 </a>
 
                 <!-- Base64编解码 -->
-                <a href="tools/base64-converter/index.html" class="tool-card" data-category="development" style="text-decoration: none; color: inherit;">
+                <a href="tools/base64-converter/index.html" class="tool-card" data-category="development"
+                    style="text-decoration: none; color: inherit;">
                     <div class="tool-icon">🔤</div>
                     <h3 class="tool-title">Base64编解码</h3>
                     <p class="tool-description">在线Base64编码和解码工具，支持文本转换</p>
                 </a>
 
                 <!-- URL编码解码 -->
-                <a href="tools/url-encoder/index.html" class="tool-card" data-category="development" style="text-decoration: none; color: inherit;">
+                <a href="tools/url-encoder/index.html" class="tool-card" data-category="development"
+                    style="text-decoration: none; color: inherit;">
                     <div class="tool-icon">🔗</div>
                     <h3 class="tool-title">URL编码解码</h3>
                     <p class="tool-description">在线URL编码和解码工具，支持各种特殊字符处理</p>
                 </a>
 
                 <!-- 二维码生成器 -->
-                <a href="tools/qrcode-generator/index.html" class="tool-card" data-category="productivity" style="text-decoration: none; color: inherit;">
+                <a href="tools/qrcode-generator/index.html" class="tool-card" data-category="productivity"
+                    style="text-decoration: none; color: inherit;">
                     <div class="tool-icon">📱</div>
                     <h3 class="tool-title">二维码生成器</h3>
                     <p class="tool-description">在线生成二维码，支持自定义尺寸和下载</p>
                 </a>
 
                 <!-- AI表情包生成器 -->
-                <a href="tools/ai-meme-generator/index.html" class="tool-card" data-category="productivity" style="text-decoration: none; color: inherit;">
+                <a href="tools/ai-meme-generator/index.html" class="tool-card" data-category="productivity"
+                    style="text-decoration: none; color: inherit;">
                     <div class="tool-icon">🤖</div>
                     <h3 class="tool-title">AI表情包生成器</h3>
                     <p class="tool-description">使用AI将图片转换为表情包，支持卡通和科幻风格</p>
+                </a>
+
+                <!-- TODO助手 -->
+                <a href="tools/todo-assistant/index.html" class="tool-card" data-category="productivity"
+                    style="text-decoration: none; color: inherit;">
+                    <div class="tool-icon">📝</div>
+                    <h3 class="tool-title">TODO助手</h3>
+                    <p class="tool-description">AI智能助手帮你管理任务，支持自然语言对话</p>
                 </a>
             </div>
         </main>
@@ -448,88 +486,89 @@
     </footer>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             // 获取DOM元素
             const searchInput = document.getElementById('searchInput');
             const specialGrid = document.getElementById('specialGrid');
             const toolsGrid = document.getElementById('toolsGrid');
             const categoryLinks = document.querySelectorAll('.category-link');
-            
+
             // 统一处理所有卡片
             const getAllToolCards = () => {
                 return document.querySelectorAll('.tool-card');
             };
 
             // 搜索功能
-            searchInput.addEventListener('input', function() {
+            searchInput.addEventListener('input', function () {
                 const searchTerm = this.value.toLowerCase();
                 const activeCategory = document.querySelector('.category-link.active').dataset.category;
-                
+
                 const allCards = getAllToolCards();
                 allCards.forEach(card => {
                     const title = card.querySelector('.tool-title').textContent.toLowerCase();
                     const description = card.querySelector('.tool-description').textContent.toLowerCase();
                     const category = card.dataset.category;
-                    
+
                     const matchesSearch = title.includes(searchTerm) || description.includes(searchTerm);
                     const matchesCategory = activeCategory === 'all' || category === activeCategory;
-                    
+
                     card.style.display = (matchesSearch && matchesCategory) ? 'block' : 'none';
                 });
-                
+
                 // 更新网格显示状态
                 updateGridVisibility();
             });
 
             // 分类切换功能
             categoryLinks.forEach(link => {
-                link.addEventListener('click', function(e) {
+                link.addEventListener('click', function (e) {
                     e.preventDefault();
-                    
+
                     // 更新活动状态
                     categoryLinks.forEach(l => l.classList.remove('active'));
                     this.classList.add('active');
-                    
+
                     const selectedCategory = this.dataset.category;
                     const searchTerm = searchInput.value.toLowerCase();
-                    
+
                     // 筛选工具卡片
                     const allCards = getAllToolCards();
                     allCards.forEach(card => {
                         const title = card.querySelector('.tool-title').textContent.toLowerCase();
                         const description = card.querySelector('.tool-description').textContent.toLowerCase();
                         const category = card.dataset.category;
-                        
+
                         const matchesSearch = title.includes(searchTerm) || description.includes(searchTerm);
                         const matchesCategory = selectedCategory === 'all' || category === selectedCategory;
-                        
+
                         card.style.display = (matchesSearch && matchesCategory) ? 'block' : 'none';
                     });
-                    
+
                     // 更新网格显示状态
                     updateGridVisibility();
                 });
             });
-            
+
             // 更新网格显示状态
             function updateGridVisibility() {
                 const activeCategory = document.querySelector('.category-link.active').dataset.category;
-                
+
                 // 当显示全部内容或特色应用分类时，显示特色应用区域
                 const showSpecialGrid = activeCategory === 'all' || activeCategory === 'special';
                 specialGrid.style.display = showSpecialGrid ? 'grid' : 'none';
-                
+
                 // 当显示全部内容或工具分类时，显示工具区域
-                const showToolsGrid = activeCategory === 'all' || 
-                                     activeCategory === 'development' || 
-                                     activeCategory === 'design' || 
-                                     activeCategory === 'productivity';
+                const showToolsGrid = activeCategory === 'all' ||
+                    activeCategory === 'development' ||
+                    activeCategory === 'design' ||
+                    activeCategory === 'productivity';
                 toolsGrid.style.display = showToolsGrid ? 'grid' : 'none';
             }
-            
+
             // 初始化网格显示
             updateGridVisibility();
         });
     </script>
 </body>
+
 </html>

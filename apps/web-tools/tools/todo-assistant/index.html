@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TODO 助手</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>📝 TODO 助手</h1>
+            <p>用自然语言管理你的任务</p>
+        </header>
+
+        <div class="main">
+            <!-- 任务列表 -->
+            <aside class="tasks-panel">
+                <div class="panel-header">
+                    <h2>任务列表</h2>
+                    <button id="refreshBtn" class="icon-btn" title="刷新">🔄</button>
+                </div>
+
+                <div class="tasks-list" id="tasksList">
+                    <div class="empty-state">暂无任务</div>
+                </div>
+            </aside>
+
+            <!-- 对话区 -->
+            <main class="chat-panel">
+                <div class="messages" id="messages">
+                    <div class="message assistant">
+                        <div class="message-content">
+                            👋 你好！我是你的 TODO 助手。你可以：<br>
+                            • 告诉我任务，比如"明天下午3点开会"<br>
+                            • 问我"有什么任务"<br>
+                            • 说"完成XX"来标记任务<br>
+                            • 说"总结"来记录讨论的任务
+                        </div>
+                    </div>
+                </div>
+
+                <div class="input-area">
+                    <button id="newTopicBtn" class="secondary-btn">新话题</button>
+                    <input type="text" id="userInput" placeholder="输入你的消息..." autocomplete="off">
+                    <button id="sendBtn" class="primary-btn">发送</button>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

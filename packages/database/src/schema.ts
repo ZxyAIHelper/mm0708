@@ -32,3 +32,17 @@ export const checkIns = sqliteTable('check_ins', {
     checkInDate: integer('check_in_date', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
     note: text('note'),
 })
+
+/**
+ * TODO 任务表
+ */
+export const todoTasks = sqliteTable('todo_tasks', {
+    id: text('id').primaryKey(),
+    title: text('title').notNull(),
+    description: text('description'),
+    status: text('status').notNull().$defaultFn(() => 'pending'), // pending/completed
+    dueDate: text('due_date'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+    completedAt: integer('completed_at', { mode: 'timestamp' }),
+    vectorId: text('vector_id'), // Vectorize 向量ID
+})
