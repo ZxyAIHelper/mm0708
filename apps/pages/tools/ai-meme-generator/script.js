@@ -86,7 +86,7 @@ async function generateMeme() {
     if (api === 'doubao') {
         try {
             // Use deployed backend API endpoint
-            const API_BASE_URL = window.API_BASE_URL || 'https://my-cloud-hub.247176265.workers.dev';
+            const API_BASE_URL = window.API_BASE_URL || 'https://api.mm0708.top';
             const response = await fetch(`${API_BASE_URL}/api/meme/generate`, {
                 method: 'POST',
                 headers: {

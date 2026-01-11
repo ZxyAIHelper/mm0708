@@ -15,7 +15,7 @@ e:/WorkSpace/ai/pages/
 │   │   ├── package.json
 │   │   ├── tsconfig.json
 │   │   └── wrangler.toml         # Cloudflare Worker 配置
-│   └── web-tools/                # 前端工具集
+│   └── pages/                    # 前端工具集
 │       ├── index.html
 │       ├── tools/                # 各种工具
 │       ├── functions/            # Cloudflare Pages Functions
@@ -59,7 +59,7 @@ e:/WorkSpace/ai/pages/
   - ✅ 包含 `wrangler.toml` (D1 + KV 绑定)
   - ✅ 使用 Hono 框架
   - ✅ 模块化路由结构 (`projects/`, `utils/`)
-- ✅ `apps/web-tools`: 前端工具集
+- ✅ `apps/pages`: 前端工具集
 
 ### 4. **Packages 目录结构** ✅
 - ✅ `packages/database`: Drizzle ORM 共享包

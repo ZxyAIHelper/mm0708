@@ -1,4 +1,4 @@
-const API_BASE = window.API_BASE_URL || 'https://my-cloud-hub.247176265.workers.dev';
+const API_BASE = window.API_BASE_URL || 'https://api.mm0708.top';
 const MAX_MESSAGES = 10;
 
 let tasks = [];

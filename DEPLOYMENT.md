@@ -95,13 +95,13 @@ https://my-cloud-hub.your-subdomain.workers.dev
 ### 8️⃣ 部署前端 Pages
 
 ```bash
-cd ../web-tools
-npx wrangler pages deploy . --project-name=web-tools --commit-dirty=true
+cd ../pages
+npx wrangler pages deploy . --project-name=pages --branch=main --commit-dirty=true
 ```
 
 ### 9️⃣ 配置前端 API 地址
 
-修改 `apps/web-tools/tools/ai-meme-generator/script.js` 第 88 行：
+修改 `apps/pages/tools/ai-meme-generator/script.js` 第 89 行：
 
 ```javascript
 const API_BASE_URL = window.API_BASE_URL || 'https://your-worker-url.workers.dev';
@@ -128,7 +128,7 @@ curl https://your-worker-url.workers.dev
 
 ### 测试前端
 
-访问 `https://web-tools.pages.dev` 查看工具门户。
+访问 `https://pages-85x.pages.dev` 查看工具门户。
 
 ## 🎉 完成！
 
@@ -144,8 +144,8 @@ cd apps/my-cloud-hub
 pnpm deploy
 
 # 部署前端
-cd ../web-tools
-npx wrangler pages deploy . --project-name=web-tools --commit-dirty=true
+cd ../pages
+npx wrangler pages deploy . --project-name=pages --branch=main --commit-dirty=true
 ```
 
 ## 💡 提示

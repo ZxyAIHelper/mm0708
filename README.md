@@ -7,7 +7,7 @@ A Turborepo + pnpm + Hono + D1 Monorepo architecture for web tools and backend s
 ```
 .
 ├── apps/
-│   ├── web-tools/          # Frontend tools (Cloudflare Pages)
+│   ├── pages/              # Frontend tools (Cloudflare Pages)
 │   └── my-cloud-hub/       # Backend API (Hono + D1)
 ├── packages/
 │   ├── database/           # Shared database schema (Drizzle ORM)
@@ -91,7 +91,7 @@ Required in Cloudflare Worker environment:
 - `WECHAT_APPID`: WeChat test account App ID
 - `WECHAT_SECRET`: WeChat test account secret
 
-### Frontend (`apps/web-tools`)
+### Frontend (`apps/pages`)
 
 Configure the backend URL:
 
@@ -121,7 +121,7 @@ MIT
 │   │   │       └── wechat.ts     # 微信通知
 │   │   ├── wrangler.toml         # Cloudflare Worker 配置
 │   │   └── package.json
-│   └── web-tools/                # 前端工具集 (Cloudflare Pages)
+│   └── pages/                    # 前端工具集 (Cloudflare Pages)
 │       ├── index.html            # 工具门户首页
 │       ├── tools/                # 各种工具
 │       │   ├── todo-assistant/   # TODO 助手 (NEW!)
@@ -148,7 +148,7 @@ MIT
 ### 新增功能说明
 
 #### 🤖 TODO 助手
-- **位置**: `apps/web-tools/tools/todo-assistant/`
+- **位置**: `apps/pages/tools/todo-assistant/`
 - **后端**: `apps/my-cloud-hub/src/projects/todo/`
 - **功能**: 
   - AI 自然语言对话管理任务

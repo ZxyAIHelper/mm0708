@@ -47,7 +47,8 @@ echo ""
 echo "开始部署..."
 
 # 执行部署命令
-npx wrangler@3 pages deploy . --project-name=pages --commit-dirty=true
+# ⚠️ 重要：项目名称必须是 pages，不要修改！
+npx wrangler pages deploy . --project-name=pages --branch=main --commit-dirty=true
 
 deploy_result=$?
 
