@@ -80,15 +80,40 @@ async function updateTask(taskId, updates) {
 
         if (response.ok) {
             await loadTasks();
-            showMessage('assistant', updates.status === 'completed' ? '✅ 任务已完成！' : '🔄 任务已重新打开');
+            return true;
         }
+        return false;
     } catch (error) {
         console.error('更新任务失败:', error);
-        showMessage('assistant', '❌ 更新失败，请重试');
+        return false;
     }
 }
 
-// 发送消息 - 支持流式输出
+// 创建任务
+async function createTask(taskData) {
+    try {
+        const response = await fetch(`${API_BASE}/api/todo/tasks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title: taskData.title,
+                description: taskData.description || '',
+                dueDate: taskData.dueDate || null,
+            }),
+        });
+
+        if (response.ok) {
+            await loadTasks();
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('创建任务失败:', error);
+        return false;
+    }
+}
+
+// 发送消息 - 支持流式输出和思考过程
 async function sendMessage() {
     const input = document.getElementById('userInput');
     const message = input.value.trim();
@@ -110,6 +135,22 @@ async function sendMessage() {
     const aiMessageId = showMessage('assistant', '');
     const aiMessageDiv = document.getElementById(aiMessageId);
     const contentDiv = aiMessageDiv.querySelector('.message-content');
+
+    // 创建思考过程区域 (初始展开)
+    const thinkingId = `thinking-${Date.now()}`;
+    contentDiv.innerHTML = `
+        <div class="final-result" id="result-${aiMessageId}">💭 AI正在思考...</div>
+        <div class="thinking-process">
+            <div class="thinking-header" onclick="toggleThinking('${thinkingId}')">
+                <span class="thinking-icon" id="icon-${thinkingId}">▼</span>
+                <span>思考过程</span>
+            </div>
+            <div class="thinking-content" id="${thinkingId}"></div>
+        </div>
+    `;
+
+    const thinkingContent = document.getElementById(thinkingId);
+    const resultDiv = document.getElementById(`result-${aiMessageId}`);
     let fullContent = '';
 
     try {
@@ -124,7 +165,8 @@ async function sendMessage() {
 
         if (!response.ok) {
             const errorData = await response.json();
-            contentDiv.textContent = `❌ ${errorData.error || '请求失败'}`;
+            resultDiv.textContent = `❌ ${errorData.error || '请求失败'}`;
+            thinkingContent.parentElement.style.display = 'none';
             return;
         }
 
@@ -148,13 +190,15 @@ async function sendMessage() {
                         const json = JSON.parse(data);
                         if (json.content) {
                             fullContent += json.content;
-                            contentDiv.textContent = fullContent;
+                            thinkingContent.textContent = fullContent;
+                            resultDiv.textContent = '💭 思考中...';
                             // 滚动到底部
                             const messagesDiv = document.getElementById('messages');
                             messagesDiv.scrollTop = messagesDiv.scrollHeight;
                         }
                         if (json.error) {
-                            contentDiv.textContent = `❌ ${json.error}`;
+                            resultDiv.textContent = `❌ ${json.error}`;
+                            thinkingContent.parentElement.style.display = 'none';
                             return;
                         }
                     } catch (e) {
@@ -164,6 +208,61 @@ async function sendMessage() {
             }
         }
 
+        // 检查是否包含JSON action
+        const jsonMatch = fullContent.match(/\{[\s\S]*"action"[\s\S]*\}/);
+        if (jsonMatch) {
+            try {
+                const actionData = JSON.parse(jsonMatch[0]);
+
+                if (actionData.action === 'create') {
+                    // 创建任务
+                    const success = await createTask(actionData);
+                    if (success) {
+                        resultDiv.textContent = `✅ 已创建任务：${actionData.title}`;
+                        // 自动折叠思考过程
+                        const content = document.getElementById(thinkingId);
+                        const icon = document.getElementById(`icon-${thinkingId}`);
+                        content.classList.add('hidden');
+                        icon.classList.add('collapsed');
+
+                        conversation.push({
+                            role: 'assistant',
+                            content: `已创建任务：${actionData.title}`
+                        });
+                    } else {
+                        resultDiv.textContent = '❌ 创建任务失败，请重试';
+                    }
+                    return;
+                } else if (actionData.action === 'update') {
+                    // 更新任务（如标记完成）
+                    const success = await updateTask(actionData.taskId, actionData.updates);
+                    if (success) {
+                        const statusText = actionData.updates.status === 'completed' ? '完成' : '更新';
+                        resultDiv.textContent = `✅ 已${statusText}任务：${actionData.title || ''}`;
+                        // 自动折叠思考过程
+                        const content = document.getElementById(thinkingId);
+                        const icon = document.getElementById(`icon-${thinkingId}`);
+                        content.classList.add('hidden');
+                        icon.classList.add('collapsed');
+
+                        conversation.push({
+                            role: 'assistant',
+                            content: `已${statusText}任务`
+                        });
+                    } else {
+                        resultDiv.textContent = '❌ 更新任务失败';
+                    }
+                    return;
+                }
+            } catch (e) {
+                console.error('解析action失败:', e);
+            }
+        }
+
+        // 没有action，直接显示内容
+        resultDiv.textContent = fullContent;
+        thinkingContent.parentElement.style.display = 'none';
+
         // 保存到对话历史
         if (fullContent) {
             conversation.push({ role: 'assistant', content: fullContent });
@@ -171,7 +270,22 @@ async function sendMessage() {
 
     } catch (error) {
         console.error('发送消息失败:', error);
-        contentDiv.textContent = '❌ 发送失败，请重试';
+        resultDiv.textContent = '❌ 发送失败，请重试';
+        thinkingContent.parentElement.style.display = 'none';
+    }
+}
+
+// 切换思考过程显示
+function toggleThinking(thinkingId) {
+    const content = document.getElementById(thinkingId);
+    const icon = document.getElementById(`icon-${thinkingId}`);
+
+    if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        icon.classList.remove('collapsed');
+    } else {
+        content.classList.add('hidden');
+        icon.classList.add('collapsed');
     }
 }
 

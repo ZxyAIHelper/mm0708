@@ -131,6 +131,8 @@ header p {
     flex: 1;
     overflow-y: auto;
     padding: 20px;
+    min-height: 0;
+    /* 重要：允许flex收缩 */
 }
 
 .message {
@@ -161,6 +163,51 @@ header p {
 
 .message.assistant .message-content {
     background: #ecf0f1;
+    color: #2c3e50;
+}
+
+.thinking-process {
+    background: #f8f9fa;
+    border-left: 3px solid #3498db;
+    padding: 10px 12px;
+    margin-top: 8px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: #7f8c8d;
+}
+
+.thinking-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.thinking-header:hover {
+    color: #3498db;
+}
+
+.thinking-icon {
+    transition: transform 0.2s;
+}
+
+.thinking-icon.collapsed {
+    transform: rotate(-90deg);
+}
+
+.thinking-content {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #ddd;
+}
+
+.thinking-content.hidden {
+    display: none;
+}
+
+.final-result {
+    font-weight: 500;
     color: #2c3e50;
 }
 
