@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文本处理工具</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-container">
+            <a href="../../index.html" class="logo">工具门户</a>
+            <ul class="nav-links">
+                <li><a href="../../index.html" class="nav-link">首页</a></li>
+                <li><a href="../json-formatter/index.html" class="nav-link">JSON格式化</a></li>
+                <li><a href="../qrcode-generator/index.html" class="nav-link">二维码生成</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="container">
+        <h1 class="page-title">文本处理工具</h1>
+        <p class="page-subtitle">快速格式化和处理文本数据，支持多种分隔符转换和数据清洗</p>
+
+        <!-- Tool Container -->
+        <div class="tool-container">
+            <!-- Toolbar -->
+            <div class="tool-toolbar">
+                <button class="toolbar-btn primary" id="formatBtn">🔄 格式化</button>
+                <button class="toolbar-btn" id="swapBtn">⇄ 交换</button>
+                <button class="toolbar-btn" id="copyBtn">📋 复制结果</button>
+                <button class="toolbar-btn" id="clearBtn">🗑️ 清空</button>
+            </div>
+
+            <!-- Content -->
+            <div class="tool-content">
+                <!-- Message -->
+                <div class="message" id="message"></div>
+
+                <!-- Options Panel -->
+                <div class="options-panel">
+                    <div class="options-title">⚙️ 处理选项</div>
+
+                    <!-- Output Delimiter -->
+                    <div class="option-group">
+                        <div class="option-group-title">输出分隔符（可多选）</div>
+                        <div class="delimiter-options">
+                            <div class="checkbox-option">
+                                <input type="checkbox" id="outputComma" name="outputDelimiter" value="," checked>
+                                <label for="outputComma">逗号 (,)</label>
+                            </div>
+                            <div class="checkbox-option">
+                                <input type="checkbox" id="outputSemicolon" name="outputDelimiter" value=";">
+                                <label for="outputSemicolon">分号 (;)</label>
+                            </div>
+                            <div class="checkbox-option">
+                                <input type="checkbox" id="outputNewline" name="outputDelimiter" value="
+">
+                                <label for="outputNewline">换行</label>
+                            </div>
+                            <div class="checkbox-option">
+                                <input type="checkbox" id="outputSpace" name="outputDelimiter" value=" ">
+                                <label for="outputSpace">空格</label>
+                            </div>
+                            <div class="checkbox-option">
+                                <input type="checkbox" id="outputCustom" name="outputDelimiter" value="custom">
+                                <label for="outputCustom">自定义:</label>
+                                <input type="text" id="customDelimiter" class="custom-delimiter-input" placeholder="|"
+                                    disabled>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Processing Options -->
+                    <div class="option-group">
+                        <div class="option-group-title">数据处理</div>
+                        <div class="checkbox-options">
+                            <div class="checkbox-option">
+                                <input type="checkbox" id="trimWhitespace" checked>
+                                <label for="trimWhitespace">去除首尾空格</label>
+                            </div>
+                            <div class="checkbox-option">
+                                <input type="checkbox" id="removeEmpty" checked>
+                                <label for="removeEmpty">移除空值</label>
+                            </div>
+                            <div class="checkbox-option">
+                                <input type="checkbox" id="removeDuplicates">
+                                <label for="removeDuplicates">去除重复项</label>
+                            </div>
+                            <div class="checkbox-option">
+                                <input type="checkbox" id="sortAlphabetically">
+                                <label for="sortAlphabetically">按字母排序</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input/Output Areas -->
+                <div class="io-container">
+                    <!-- Input Panel -->
+                    <div class="panel">
+                        <h3 class="panel-title">输入 <span style="color: var(--primary-color);">(<span
+                                    id="inputCount">0</span> 项)</span></h3>
+                        <textarea class="text-area" id="inputText" placeholder="粘贴或输入文本...支持逗号、分号、换行、空格等分隔符
+
+示例：
+apple, banana, cherry
+或
+item1;item2;item3
+或
+第一行
+第二行
+第三行">apple, banana, cherry, date, elderberry</textarea>
+                    </div>
+
+                    <!-- Output Panel -->
+                    <div class="panel">
+                        <h3 class="panel-title">输出 <span style="color: var(--primary-color);">(<span
+                                    id="outputCount">0</span> 项 / <span id="uniqueCount">0</span> 唯一)</span></h3>
+                        <textarea class="text-area" id="outputText" placeholder="处理结果将显示在这里..." readonly></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+
+</html>

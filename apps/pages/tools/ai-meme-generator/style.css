@@ -381,8 +381,13 @@ nav {
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 .loading-text {
@@ -462,9 +467,261 @@ nav {
         align-items: stretch;
     }
 
-    .mode-selector {
-        flex-direction: column;
+    .scene-selector {
+        gap: 0.5rem;
     }
+
+    .scene-option {
+        min-width: 90px;
+    }
+}
+
+/* 输入模式切换器 */
+.input-mode-selector {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    background-color: var(--light-bg);
+    padding: 0.25rem;
+    border-radius: var(--border-radius);
+}
+
+.mode-tab {
+    flex: 1;
+    padding: 0.625rem 1rem;
+    background-color: transparent;
+    border: none;
+    border-radius: calc(var(--border-radius) - 2px);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: var(--transition);
+}
+
+.mode-tab:hover {
+    background-color: rgba(79, 70, 229, 0.1);
+    color: var(--primary-color);
+}
+
+.mode-tab.active {
+    background-color: var(--card-bg);
+    color: var(--primary-color);
+    box-shadow: var(--shadow-sm);
+}
+
+/* 文本输入区域 */
+.text-input {
+    width: 100%;
+    min-height: 200px;
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    font-size: 0.9375rem;
+    font-family: inherit;
+    resize: vertical;
+    background-color: var(--light-bg);
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+.text-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+/* 场景选择器 */
+.scene-selector {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.5rem;
+    /* 隐藏滚动条但保持可滚动 */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) transparent;
+}
+
+.scene-selector::-webkit-scrollbar {
+    height: 6px;
+}
+
+.scene-selector::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.scene-selector::-webkit-scrollbar-thumb {
+    background-color: var(--border-color);
+    border-radius: 3px;
+}
+
+.scene-selector::-webkit-scrollbar-thumb:hover {
+    background-color: var(--text-secondary);
+}
+
+.scene-option {
+    padding: 0.875rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: var(--transition);
+    text-align: center;
+    background-color: var(--light-bg);
+    min-width: 100px;
+    flex-shrink: 0;
+}
+
+.scene-option:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+}
+
+.scene-option.active {
+    border-color: var(--primary-color);
+    background-color: rgba(79, 70, 229, 0.1);
+}
+
+.scene-icon {
+    font-size: 1.75rem;
+    margin-bottom: 0.375rem;
+}
+
+.scene-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.125rem;
+    font-size: 0.8125rem;
+}
+
+.scene-description {
+    font-size: 0.6875rem;
+    color: var(--text-secondary);
+}
+
+/* 快捷提示词 */
+.quick-prompts {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.5rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) transparent;
+}
+
+.quick-prompts::-webkit-scrollbar {
+    height: 6px;
+}
+
+.quick-prompts::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.quick-prompts::-webkit-scrollbar-thumb {
+    background-color: var(--border-color);
+    border-radius: 3px;
+}
+
+.quick-prompts::-webkit-scrollbar-thumb:hover {
+    background-color: var(--text-secondary);
+}
+
+.prompt-quick-btn {
+    padding: 0.375rem 0.75rem;
+    background-color: var(--light-bg);
+    border: 1px solid var(--border-color);
+    border-radius: calc(var(--border-radius) / 2);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 400;
+    transition: var(--transition);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.prompt-quick-btn:hover {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    transform: translateY(-1px);
+}
+
+.prompt-quick-btn:active {
+    transform: translateY(1px);
+}
+
+/* 风格选择器 */
+.style-selector {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.5rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) transparent;
+}
+
+.style-selector::-webkit-scrollbar {
+    height: 6px;
+}
+
+.style-selector::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.style-selector::-webkit-scrollbar-thumb {
+    background-color: var(--border-color);
+    border-radius: 3px;
+}
+
+.style-checkbox {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.5rem 0.75rem;
+    border: 2px solid var(--border-color);
+    border-radius: calc(var(--border-radius) / 2);
+    cursor: pointer;
+    transition: var(--transition);
+    background-color: var(--light-bg);
+    min-width: 70px;
+    flex-shrink: 0;
+}
+
+.style-checkbox input[type="checkbox"] {
+    display: none;
+}
+
+.style-checkbox .style-icon {
+    font-size: 1.25rem;
+}
+
+.style-checkbox .style-name {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.style-checkbox:hover {
+    border-color: var(--primary-color);
+    background-color: rgba(102, 126, 234, 0.05);
+}
+
+.style-checkbox.active {
+    border-color: var(--primary-color);
+    background-color: rgba(102, 126, 234, 0.1);
+}
+
+.style-checkbox.active .style-name {
+    color: var(--primary-color);
+    font-weight: 600;
 }
 
 /* 工具栏增强 */
@@ -504,8 +761,15 @@ nav {
 }
 
 @keyframes modal-in {
-    from { transform: translateY(20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 .modal-header {

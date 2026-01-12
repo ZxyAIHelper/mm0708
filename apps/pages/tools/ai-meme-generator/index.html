@@ -58,42 +58,129 @@
 
                 <!-- 输入输出区域 -->
                 <div class="io-container">
-                    <!-- 输入面板 -->
                     <div class="panel">
                         <h3 class="panel-title">输入设置</h3>
 
-                        <!-- 图片上传 -->
-                        <div class="upload-area" id="uploadArea">
-                            <div class="upload-icon">📁</div>
-                            <div class="upload-text">点击或拖拽图片到此处上传</div>
-                            <div class="upload-hint">支持 JPG、PNG、GIF 格式，大小不超过 5MB</div>
-                            <input type="file" id="fileInput" accept="image/*">
+                        <!-- 输入模式切换 -->
+                        <div class="input-mode-selector">
+                            <button class="mode-tab active" data-input-mode="image">📷 图片模式</button>
+                            <button class="mode-tab" data-input-mode="text">✍️ 文本模式</button>
                         </div>
 
-                        <!-- 图片预览 -->
-                        <div class="preview-area" id="previewArea">
-                            <img id="previewImage" style="display: none;">
+                        <!-- 图片上传容器 -->
+                        <div id="uploadContainer">
+                            <!-- 图片上传 -->
+                            <div class="upload-area" id="uploadArea">
+                                <div class="upload-icon">📁</div>
+                                <div class="upload-text">点击或拖拽图片到此处上传</div>
+                                <div class="upload-hint">支持 JPG、PNG、GIF 格式，大小不超过 5MB</div>
+                                <input type="file" id="fileInput" accept="image/*">
+                            </div>
+
+                            <!-- 图片预览 -->
+                            <div class="preview-area" id="previewArea">
+                                <img id="previewImage" style="display: none;">
+                            </div>
                         </div>
 
-                        <!-- 模式选择 -->
-                        <h4 class="panel-title" style="font-size: 0.875rem; margin-bottom: 0.5rem;">选择风格模式</h4>
-                        <div class="mode-selector">
-                            <div class="mode-option active" data-mode="cartoon">
-                                <div class="mode-icon">🎨</div>
-                                <div class="mode-title">卡通风格</div>
-                                <div class="mode-description">可爱圆润，色彩鲜艳</div>
+                        <!-- 文本输入容器 -->
+                        <div id="textInputArea" style="display: none;">
+                            <textarea class="text-input" id="textInput"
+                                placeholder="描述你想要的表情包，例如：周一早上起床的我，痛苦万分的表情"></textarea>
+                        </div>
+
+                        <!-- 风格选择 -->
+                        <h4 class="panel-title" style="font-size: 0.875rem; margin-bottom: 0.25rem; margin-top: 1rem;">
+                            表情包风格 <span
+                                style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 400;">可多选</span>
+                        </h4>
+                        <div class="style-selector">
+                            <label class="style-checkbox active" data-style="qVersion">
+                                <input type="checkbox" checked>
+                                <span class="style-icon">🎨</span>
+                                <span class="style-name">Q版卡通</span>
+                            </label>
+                            <label class="style-checkbox" data-style="emoji">
+                                <input type="checkbox">
+                                <span class="style-icon">😀</span>
+                                <span class="style-name">Emoji</span>
+                            </label>
+                            <label class="style-checkbox" data-style="sketch">
+                                <input type="checkbox">
+                                <span class="style-icon">✏️</span>
+                                <span class="style-name">简笔画</span>
+                            </label>
+                            <label class="style-checkbox" data-style="anime">
+                                <input type="checkbox">
+                                <span class="style-icon">🌸</span>
+                                <span class="style-name">动漫风</span>
+                            </label>
+                            <label class="style-checkbox" data-style="pixel">
+                                <input type="checkbox">
+                                <span class="style-icon">🎮</span>
+                                <span class="style-name">像素风</span>
+                            </label>
+                            <label class="style-checkbox" data-style="handDrawn">
+                                <input type="checkbox">
+                                <span class="style-icon">🖍️</span>
+                                <span class="style-name">手绘</span>
+                            </label>
+                        </div>
+
+                        <!-- 场景选择 -->
+                        <h4 class="panel-title" style="font-size: 0.875rem; margin-bottom: 0.25rem; margin-top: 1rem;">
+                            选择场景 <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 400;">←
+                                左右滑动 →</span></h4>
+                        <div class="scene-selector">
+                            <div class="scene-option active" data-scene="work">
+                                <div class="scene-icon">💼</div>
+                                <div class="scene-title">上班打工</div>
+                                <div class="scene-description">工作日常</div>
                             </div>
-                            <div class="mode-option" data-mode="sci-fi">
-                                <div class="mode-icon">🚀</div>
-                                <div class="mode-title">科幻风格</div>
-                                <div class="mode-description">未来科技，霓虹效果</div>
+                            <div class="scene-option" data-scene="relax">
+                                <div class="scene-icon">🏖️</div>
+                                <div class="scene-title">放假休息</div>
+                                <div class="scene-description">躺平时光</div>
                             </div>
+                            <div class="scene-option" data-scene="study">
+                                <div class="scene-icon">📚</div>
+                                <div class="scene-title">学习考试</div>
+                                <div class="scene-description">备考刷题</div>
+                            </div>
+                            <div class="scene-option" data-scene="emotion">
+                                <div class="scene-icon">😊</div>
+                                <div class="scene-title">情感表达</div>
+                                <div class="scene-description">喜怒哀乐</div>
+                            </div>
+                            <div class="scene-option" data-scene="social">
+                                <div class="scene-icon">💬</div>
+                                <div class="scene-title">社交互动</div>
+                                <div class="scene-description">聊天吐槽</div>
+                            </div>
+                            <div class="scene-option" data-scene="cartoon">
+                                <div class="scene-icon">🎨</div>
+                                <div class="scene-title">卡通风格</div>
+                                <div class="scene-description">可爱Q版</div>
+                            </div>
+                            <div class="scene-option" data-scene="sci-fi">
+                                <div class="scene-icon">🚀</div>
+                                <div class="scene-title">科幻风格</div>
+                                <div class="scene-description">赛博朋克</div>
+                            </div>
+                        </div>
+
+                        <!-- 快捷提示词 -->
+                        <h4 class="panel-title" style="font-size: 0.875rem; margin-bottom: 0.25rem; margin-top: 1rem;">
+                            快捷提示词 <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 400;">←
+                                左右滑动 →</span></h4>
+                        <div class="quick-prompts" id="quickPromptsContainer">
+                            <!-- 动态生成 -->
                         </div>
 
                         <!-- 提示词显示 -->
                         <div class="prompt-area">
                             <div class="prompt-title">当前提示词</div>
-                            <div class="prompt-text" id="promptText">将图片转换为可爱的卡通风格表情包，色彩鲜艳，表情生动</div>
+                            <div class="prompt-text" id="promptText">周一早上起床的我，痛苦万分的表情</div>
                         </div>
 
                         <!-- 文本描述 -->

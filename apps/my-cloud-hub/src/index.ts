@@ -12,7 +12,7 @@ type Bindings = {
     VECTORIZE: VectorizeIndex
     AI: Ai
     DOUBAO_API_KEY: string
-    DOUBAO_ENDPOINT_ID: string
+    DOUBAO_IMAGE_ENDPOINT_ID: string
     DOUBAO_CHAT_ENDPOINT: string
     WECHAT_APPID: string
     WECHAT_SECRET: string
