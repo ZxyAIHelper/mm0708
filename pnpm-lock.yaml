@@ -17,15 +17,21 @@ importers:
       hono:
         specifier: ^4.0.0
         version: 4.11.3
+      sharp:
+        specifier: ^0.33.0
+        version: 0.33.5
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20240101.0
         version: 4.20260109.0
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.28
       wrangler:
         specifier: ^3.0.0
         version: 3.114.16(@cloudflare/workers-types@4.20260109.0)
 
-  apps/web-tools: {}
+  apps/pages: {}
 
   packages/database:
     dependencies:
@@ -666,6 +672,9 @@ packages:
   '@libsql/core@0.17.0':
     resolution: {integrity: sha512-hnZRnJHiS+nrhHKLGYPoJbc78FE903MSDrFJTbftxo+e52X+E0Y0fHOCVYsKWcg6XgB7BbJYUrz/xEkVTSaipw==}
 
+  '@types/node@20.19.28':
+    resolution: {integrity: sha512-VyKBr25BuFDzBFCK5sUM6ZXiWfqgCTwTAOK8qzGV/m9FCirXYDlmczJ+d5dXBAQALGCdRRdbteKYfJ84NGEusw==}
+
   acorn-walk@8.3.2:
     resolution: {integrity: sha512-cjkyv4OtNCIeqhHrfS81QWXoCBPExR/J62oyEqepVw8WaQeSqpW2uhuLPh1m9eWhDuOo/jUXVTlifvesOWp/4A==}
     engines: {node: '>=0.4.0'}
@@ -994,6 +1003,9 @@ packages:
 
   ufo@1.6.2:
     resolution: {integrity: sha512-heMioaxBcG9+Znsda5Q8sQbWnLJSl98AFDXTO80wELWEzX3hordXsTdxrIfMQoO9IY1MEnoGoPjpoKpMj+Yx0Q==}
+
+  undici-types@6.21.0:
+    resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
   undici@5.29.0:
     resolution: {integrity: sha512-raqeBD6NQK4SkWhQzeYKd1KmIG6dllBOTt55Rmkt4HtI9mwdWtJljnrXjAFUBLTSN67HWrOIZ3EPF4kjUw80Bg==}
@@ -1393,6 +1405,10 @@ snapshots:
       js-base64: 3.7.8
     optional: true
 
+  '@types/node@20.19.28':
+    dependencies:
+      undici-types: 6.21.0
+
   acorn-walk@8.3.2: {}
 
   acorn@8.14.0: {}
@@ -1408,22 +1424,18 @@ snapshots:
   color-convert@2.0.1:
     dependencies:
       color-name: 1.1.4
-    optional: true
 
-  color-name@1.1.4:
-    optional: true
+  color-name@1.1.4: {}
 
   color-string@1.9.1:
     dependencies:
       color-name: 1.1.4
       simple-swizzle: 0.2.4
-    optional: true
 
   color@4.2.3:
     dependencies:
       color-convert: 2.0.1
       color-string: 1.9.1
-    optional: true
 
   cookie@0.7.2: {}
 
@@ -1435,8 +1447,7 @@ snapshots:
 
   defu@6.1.4: {}
 
-  detect-libc@2.1.2:
-    optional: true
+  detect-libc@2.1.2: {}
 
   drizzle-kit@0.27.2:
     dependencies:
@@ -1559,8 +1570,7 @@ snapshots:
 
   hono@4.11.3: {}
 
-  is-arrayish@0.3.4:
-    optional: true
+  is-arrayish@0.3.4: {}
 
   js-base64@3.7.8:
     optional: true
@@ -1616,8 +1626,7 @@ snapshots:
     dependencies:
       estree-walker: 0.6.1
 
-  semver@7.7.3:
-    optional: true
+  semver@7.7.3: {}
 
   sharp@0.33.5:
     dependencies:
@@ -1644,12 +1653,10 @@ snapshots:
       '@img/sharp-wasm32': 0.33.5
       '@img/sharp-win32-ia32': 0.33.5
       '@img/sharp-win32-x64': 0.33.5
-    optional: true
 
   simple-swizzle@0.2.4:
     dependencies:
       is-arrayish: 0.3.4
-    optional: true
 
   source-map-support@0.5.21:
     dependencies:
@@ -1700,6 +1707,8 @@ snapshots:
   typescript@5.9.3: {}
 
   ufo@1.6.2: {}
+
+  undici-types@6.21.0: {}
 
   undici@5.29.0:
     dependencies:
