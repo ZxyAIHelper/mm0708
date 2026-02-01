@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Monitor Configuration</title>
+    <link rel="stylesheet" href="../../style.css">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="tool-header">
+            <a href="../../index.html" class="back-btn"><i class="fas fa-arrow-left"></i> 返回</a>
+            <h1>邮件监控配置</h1>
+        </header>
+
+        <main class="tool-content">
+            <!-- Config Section -->
+            <section class="card config-card">
+                <h2><i class="fas fa-server"></i> 服务配置</h2>
+                <div class="form-group">
+                    <label for="apiBaseUrl">后端 API 地址</label>
+                    <div class="input-group">
+                        <input type="text" id="apiBaseUrl" placeholder="https://api.mm0708.top"
+                            value="https://api.mm0708.top">
+                        <button id="saveApiBtn" class="secondary-btn">更新连接</button>
+                    </div>
+                </div>
+
+                <div class="divider" style="height: 1px; background: #eee; margin: 20px 0;"></div>
+
+                <h2><i class="fab fa-weixin"></i> 企业微信配置</h2>
+                <div class="form-group">
+                    <label for="webhookUrl">群机器人 Webhook URL</label>
+                    <div class="input-group">
+                        <input type="password" id="webhookUrl"
+                            placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=..." autocomplete="off">
+                        <button id="saveConfigBtn" class="primary-btn">保存</button>
+                    </div>
+                    <p class="hint">请在企业微信群设置中获取 webhook 地址。</p>
+                </div>
+                <div class="config-actions">
+                    <button id="testNotifyBtn" class="secondary-btn"><i class="fas fa-paper-plane"></i> 发送测试通知</button>
+                </div>
+            </section>
+
+            <!-- Rules Section -->
+            <section class="card rules-card">
+                <div class="section-header">
+                    <h2><i class="fas fa-filter"></i> 转发规则</h2>
+                    <button id="addRuleBtn" class="primary-btn"><i class="fas fa-plus"></i> 新增规则</button>
+                </div>
+
+                <div id="rulesList" class="rules-list">
+                    <!-- Rules will be loaded here -->
+                    <div class="loading">加载中...</div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Add/Edit Rule Modal -->
+    <div id="ruleModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">新增规则</h3>
+                <button class="close-modal"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="ruleForm">
+                    <div class="form-group">
+                        <label for="ruleName">规则名称</label>
+                        <input type="text" id="ruleName" required placeholder="例如：监控报警邮件">
+                    </div>
+                    <div class="form-group">
+                        <label for="matchType">匹配类型</label>
+                        <select id="matchType">
+                            <option value="sender">发件人 (Sender)</option>
+                            <option value="subject">主题 (Subject)</option>
+                            <option value="all">所有邮件 (All)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="matchValueGroup">
+                        <label for="matchValue">匹配内容</label>
+                        <input type="text" id="matchValue" placeholder="可以使用正则，如 /admin@.*/">
+                        <p class="hint">支持普通字符串包含匹配，或 /regex/ 正则匹配。</p>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="forwardToWecom" checked> 转发到企业微信
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="cancel-btn close-modal">取消</button>
+                <button id="saveRuleBtn" class="primary-btn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

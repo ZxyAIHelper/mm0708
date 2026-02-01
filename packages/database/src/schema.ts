@@ -46,3 +46,25 @@ export const todoTasks = sqliteTable('todo_tasks', {
     completedAt: integer('completed_at', { mode: 'timestamp' }),
     vectorId: text('vector_id'), // Vectorize 向量ID
 })
+
+/**
+ * 邮件转发规则表
+ */
+export const emailRules = sqliteTable('email_rules', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name').notNull(),
+    matchType: text('match_type').notNull(), // 'sender', 'subject', 'all'
+    matchValue: text('match_value'), // Regex or string
+    forwardToWecom: integer('forward_to_wecom', { mode: 'boolean' }).notNull().default(true),
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+})
+
+/**
+ * 企业微信配置表
+ */
+export const wecomConfig = sqliteTable('wecom_config', {
+    key: text('key').primaryKey(), // 'wecom_webhook_url'
+    value: text('value').notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+})
