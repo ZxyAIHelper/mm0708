@@ -112,5 +112,44 @@ For commit message standards, branch naming, PR hygiene, and repository scaffold
 | Bash | `set -euo pipefail`, quote variables, use functions |
 | Docker | Multi-stage builds, non-root user, pinned versions |
 
+## WeChat Mini Program Best Practices
+
+When developing WeChat Mini Programs, apply these specific optimization and configuration rules:
+
+### Performance Optimization (MANDATORY)
+
+- **Enable Lazy Code Loading:** Add `"lazyCodeLoading": "requiredComponents"` in `app.json` to enable on-demand component injection
+- **Enable Code Compression:** Turn on JavaScript, WXML, and WXSS compression in developer tools
+- **Remove Unused Components:** Clean up `usingComponents` declarations that are not actually used on pages
+- **Remove Unused Plugins:** Remove plugin declarations from `app.json` if not in use
+- **Clean Unused Files:** Remove files with no dependencies using the code dependency analysis tool
+
+### Code Package Management
+
+- **Package Size Limits:** Keep individual packages under 1.5M (hard limit is 2M)
+- **Static Assets:** Move images and audio files larger than 200K to CDN
+- **Plugin Size:** Be aware that plugins over 200K significantly impact package size
+- **Subpackage Strategy:** 
+  - Move main package JS/components that are only used by subpackages into those subpackages
+  - Use [subpackage async loading](https://developers.weixin.qq.com/miniprogram/dev/framework/subpackages/async.html) for components only used in subpackages
+
+### Lazy Loading & On-Demand Injection
+
+- **On-Demand Injection (按需注入):** Only injects code for the current page and its declared components
+  - Unused pages and undeclared components won't be loaded or initialized
+  - Remove unused component declarations from page JSON to maximize effectiveness
+  - Avoid declaring low-usage components globally in `app.json` `usingComponents`
+- **Just-In-Time Injection (用时注入):** Configure placeholder components to defer component injection until actual rendering
+  - Components render as placeholders first, then inject and swap after render completes
+  - Requires `lazyCodeLoading: "requiredComponents"` to be enabled
+
+> **Note:** Plugins and extension libraries currently don't support on-demand injection. Consider using subpackage async loading as an alternative.
+
+### References
+
+For detailed performance optimization guidelines, see:
+- [WeChat Mini Program Lazy Loading Documentation](https://developers.weixin.qq.com/miniprogram/dev/framework/ability/lazyload.html)
+- [WeChat Mini Program Performance Optimization Guide](https://developers.weixin.qq.com/community/develop/doc/00040e5a0846706e893dcc24256009)
+
 > "Perfection is achieved not when there is nothing more to add, but when there is nothing left to take away." — Antoine de Saint-Exupéry
 
