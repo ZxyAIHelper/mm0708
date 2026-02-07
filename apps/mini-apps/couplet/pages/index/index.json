@@ -1,0 +1,6 @@
+{
+    "usingComponents": {
+        "card": "../../components/card/card"
+    },
+    "navigationBarTitleText": "你的春联"
+}

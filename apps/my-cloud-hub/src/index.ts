@@ -7,6 +7,7 @@ import chatRouter from './projects/todo/chat'
 import { sendWeChatNotification } from './utils/wechat'
 import emailMonitorRouter from './projects/email-monitor/router'
 import { handleEmail } from './projects/email-monitor/handler'
+import coupletRouter from './projects/couplet/router'
 
 
 type Bindings = {
@@ -41,6 +42,7 @@ app.route('/api/todo/tasks', tasksRouter)
 app.route('/api/todo/rag', ragRouter)
 app.route('/api/todo/chat', chatRouter)
 app.route('/api/email-monitor', emailMonitorRouter)
+app.route('/api/couplet', coupletRouter)
 
 
 

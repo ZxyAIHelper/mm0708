@@ -1,0 +1,6 @@
+{
+    "usingComponents": {
+        "loading": "../../components/loading/loading"
+    },
+    "navigationBarTitleText": "个性化设置"
+}

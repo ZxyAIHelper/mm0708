@@ -1,0 +1,28 @@
+@import "../../styles/theme.wxss";
+
+.loading-spinner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  padding: var(--spacing-4xl) 0;
+}
+
+.loading-text {
+  font-size: 42rpx;
+  text-align: center;
+  line-height: 1.8;
+  color: var(--color-text-primary);
+  font-family: var(--font-family-traditional);
+  letter-spacing: var(--letter-spacing-wide);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}

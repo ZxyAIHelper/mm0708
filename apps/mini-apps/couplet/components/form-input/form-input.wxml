@@ -1,0 +1,12 @@
+<view class="input-group">
+  <text class="label">{{label}}</text>
+  <input 
+    class="input {{long ? 'long' : ''}}"
+    value="{{value}}"
+    placeholder="{{placeholder}}"
+    maxlength="{{maxlength}}"
+    data-field="{{field}}"
+    bindinput="onInput"
+  />
+  <text class="hint" wx:if="{{hint}}">{{hint}}</text>
+</view>

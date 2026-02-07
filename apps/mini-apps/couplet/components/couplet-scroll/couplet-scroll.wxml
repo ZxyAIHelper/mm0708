@@ -1,0 +1,3 @@
+<view class="couplet-scroll {{direction}}">
+  <text class="scroll-text">{{text}}</text>
+</view>

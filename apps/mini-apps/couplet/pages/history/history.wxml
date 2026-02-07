@@ -1,0 +1,7 @@
+<view class="container">
+  <view class="empty-state">
+    <text class="empty-icon">📜</text>
+    <text class="empty-title">暂无历史记录</text>
+    <text class="empty-desc">您的对联历史将显示在这里</text>
+  </view>
+</view>

@@ -1,0 +1,60 @@
+@import "../../styles/theme.wxss";
+
+.couplet-scroll {
+  background: linear-gradient(135deg, var(--color-red-primary) 0%, var(--color-red-dark) 100%);
+  color: var(--color-text-gold);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 
+    0 8rpx 16rpx rgba(0, 0, 0, 0.4),
+    0 0 40rpx rgba(211, 47, 47, 0.3),
+    inset 0 2rpx 4rpx rgba(255, 255, 255, 0.1);
+  font-weight: var(--font-weight-semibold);
+  font-family: var(--font-family-traditional);
+  position: relative;
+  border: 2rpx solid rgba(255, 215, 0, 0.2);
+}
+
+.couplet-scroll::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 10rpx,
+      rgba(0, 0, 0, 0.03) 10rpx,
+      rgba(0, 0, 0, 0.03) 20rpx
+    );
+  pointer-events: none;
+}
+
+.scroll-text {
+  position: relative;
+  z-index: 1;
+  text-shadow: 2rpx 2rpx 4rpx rgba(0, 0, 0, 0.3);
+}
+
+/* Horizontal scroll (top) */
+.horizontal {
+  padding: 28rpx 80rpx;
+  font-size: var(--font-size-2xl);
+  letter-spacing: var(--letter-spacing-widest);
+  border-radius: var(--radius-sm);
+}
+
+/* Vertical scroll (left/right) */
+.vertical {
+  width: 120rpx;
+  height: 100%;
+  padding: 50rpx 0;
+  writing-mode: vertical-lr;
+  font-size: var(--font-size-2xl);
+  letter-spacing: var(--spacing-md);
+  border-radius: var(--radius-sm);
+}

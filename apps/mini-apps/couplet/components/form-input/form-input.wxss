@@ -1,0 +1,47 @@
+@import "../../styles/theme.wxss";
+
+.input-group {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--spacing-2xl);
+  position: relative;
+  justify-content: center;
+}
+
+.label {
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+  width: 220rpx;
+  font-family: var(--font-family-traditional);
+  letter-spacing: var(--letter-spacing-normal);
+}
+
+.input {
+  border: 2rpx solid var(--color-border-dark);
+  width: 240rpx;
+  height: 88rpx;
+  padding-left: var(--spacing-md);
+  font-size: var(--font-size-lg);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-secondary);
+  transition: all var(--transition-base);
+  font-family: var(--font-family-traditional);
+}
+
+.input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 4rpx rgba(212, 165, 116, 0.1);
+}
+
+.input.long {
+  width: 320rpx;
+}
+
+.hint {
+  position: absolute;
+  right: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  width: 140rpx;
+  line-height: 1.4;
+}

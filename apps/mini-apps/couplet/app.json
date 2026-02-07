@@ -1,0 +1,17 @@
+{
+    "pages": [
+        "pages/index/index",
+        "pages/input/input",
+        "pages/result/result",
+        "pages/history/history",
+        "pages/settings/settings"
+    ],
+    "window": {
+        "backgroundTextStyle": "light",
+        "navigationBarBackgroundColor": "#faf8f5",
+        "navigationBarTitleText": "春联生成器",
+        "navigationBarTextStyle": "black",
+        "backgroundColor": "#f5f1ea"
+    },
+    "sitemapLocation": "sitemap.json"
+}

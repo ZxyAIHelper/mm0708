@@ -2,7 +2,9 @@
     "name": "my-cloud-hub",
     "scripts": {
         "dev": "wrangler dev src/index.ts",
-        "deploy": "wrangler deploy --minify src/index.ts"
+        "deploy": "wrangler deploy --minify src/index.ts",
+        "test": "vitest",
+        "test:coverage": "vitest --coverage"
     },
     "dependencies": {
         "hono": "^4.0.0",
@@ -10,6 +12,8 @@
     },
     "devDependencies": {
         "@cloudflare/workers-types": "^4.20240101.0",
-        "wrangler": "^4.61.1"
+        "wrangler": "^4.61.1",
+        "vitest": "^1.2.0",
+        "@cloudflare/vitest-pool-workers": "^0.1.0"
     }
 }

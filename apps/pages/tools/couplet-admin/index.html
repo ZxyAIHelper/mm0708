@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>对联后台管理</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <header>
+        <div class="container">
+            <h1>🏮 对联小程序管理后台</h1>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="tabs">
+            <button class="tab active" data-tab="prompts">AI 提示词管理</button>
+            <button class="tab" data-tab="orders">生成记录</button>
+            <button class="tab" data-tab="users">用户管理（开发中）</button>
+        </div>
+
+        <!-- Prompts Tab -->
+        <div class="tab-content active" id="prompts">
+            <div class="card">
+                <h2>编辑 AI 提示词</h2>
+                <div class="form-group">
+                    <label for="promptType">提示词类型</label>
+                    <select id="promptType">
+                        <option value="system">系统提示词 (System Prompt)</option>
+                        <option value="couple_template">情侣模式模板</option>
+                        <option value="child_template">孩子模式模板</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="promptContent">提示词内容</label>
+                    <textarea id="promptContent" placeholder="输入 AI 提示词..."></textarea>
+                </div>
+                <button onclick="savePrompt()">保存提示词</button>
+                <button class="secondary" onclick="loadCurrentPrompts()">加载当前提示词</button>
+            </div>
+
+            <div class="card">
+                <h2>提示词历史版本</h2>
+                <div class="prompt-list" id="promptHistory">
+                    <div class="empty-state">
+                        <p>暂无历史记录</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Records Tab -->
+        <div class="tab-content" id="orders">
+            <div class="card">
+                <h2>生成记录</h2>
+                <div class="records-filter">
+                    <select id="recordsFilter" onchange="loadRecords()">
+                        <option value="all">全部记录</option>
+                        <option value="new_year">新年春联</option>
+                        <option value="housewarming">乔迁对联</option>
+                    </select>
+                    <button class="secondary" onclick="loadRecords()">刷新</button>
+                </div>
+                <div class="records-table-container">
+                    <table class="records-table" id="recordsTable">
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>用户</th>
+                                <th>类型</th>
+                                <th>模式</th>
+                                <th>名字</th>
+                                <th>生成结果</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recordsBody">
+                            <tr>
+                                <td colspan="6" class="empty-state">加载中...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="pagination"></div>
+            </div>
+        </div>
+
+        <!-- Users Tab -->
+        <div class="tab-content" id="users">
+            <div class="card">
+                <h2>用户管理</h2>
+                <div class="empty-state">
+                    <p>用户管理功能开发中...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

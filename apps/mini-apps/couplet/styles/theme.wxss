@@ -1,0 +1,88 @@
+/* Design System - Theme Variables */
+
+/* Colors */
+page {
+  --color-bg-primary: #faf8f5;
+  --color-bg-secondary: #ffffff;
+  --color-bg-tertiary: #f5f1ea;
+  --color-bg-dark: #1a1512;
+  
+  --color-text-primary: #2a2420;
+  --color-text-secondary: #8b7355;
+  --color-text-gold: #ffd700;
+  
+  --color-accent: #d4a574;
+  --color-accent-hover: #b88d5d;
+  
+  --color-red-primary: #d32f2f;
+  --color-red-dark: #b71c1c;
+  
+  --color-border-light: rgba(42, 36, 32, 0.1);
+  --color-border-medium: rgba(42, 36, 32, 0.2);
+  --color-border-dark: rgba(42, 36, 32, 0.3);
+  
+  /* Typography */
+  --font-family-traditional: -apple-system-font, "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-family-system: -apple-system-font, "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  
+  --font-size-xs: 22rpx;
+  --font-size-sm: 24rpx;
+  --font-size-base: 28rpx;
+  --font-size-md: 32rpx;
+  --font-size-lg: 36rpx;
+  --font-size-xl: 44rpx;
+  --font-size-2xl: 52rpx;
+  
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  
+  --letter-spacing-tight: 2rpx;
+  --letter-spacing-normal: 4rpx;
+  --letter-spacing-wide: 6rpx;
+  --letter-spacing-wider: 8rpx;
+  --letter-spacing-widest: 12rpx;
+  
+  /* Spacing */
+  --spacing-xs: 8rpx;
+  --spacing-sm: 16rpx;
+  --spacing-md: 24rpx;
+  --spacing-lg: 32rpx;
+  --spacing-xl: 40rpx;
+  --spacing-2xl: 48rpx;
+  --spacing-3xl: 60rpx;
+  --spacing-4xl: 80rpx;
+  
+  /* Border Radius */
+  --radius-sm: 8rpx;
+  --radius-md: 12rpx;
+  --radius-lg: 16rpx;
+  --radius-full: 50rpx;
+  
+  /* Shadows */
+  --shadow-sm: 0 4rpx 8rpx rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4rpx 12rpx rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8rpx 16rpx rgba(0, 0, 0, 0.12);
+  --shadow-card: 8rpx 8rpx 0 rgba(212, 165, 116, 0.3);
+  --shadow-card-active: 4rpx 4rpx 0 rgba(212, 165, 116, 0.3);
+  --shadow-button: 6rpx 6rpx 0 rgba(212, 165, 116, 0.3);
+  --shadow-paper: 0 8rpx 16rpx rgba(0, 0, 0, 0.4);
+  
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.3s ease;
+  --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Gradient Backgrounds */
+.gradient-bg-primary {
+  background: linear-gradient(135deg, var(--color-bg-primary) 0%, var(--color-bg-tertiary) 100%);
+}
+
+.gradient-bg-dark {
+  background: linear-gradient(135deg, var(--color-bg-dark) 0%, #2a2420 100%);
+}
+
+.gradient-red-paper {
+  background: linear-gradient(135deg, var(--color-red-primary) 0%, var(--color-red-dark) 100%);
+}

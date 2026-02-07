@@ -1,0 +1,39 @@
+<view class="container">
+  <!-- Hero Section -->
+  <view class="hero">
+    <view class="icon-circle">
+      <text class="icon-text">🏮</text>
+    </view>
+    <view class="hero-title">匠心挥毫 · 墨香传情</view>
+    <view class="hero-subtitle">选择春联场景，开启智慧生成</view>
+  </view>
+
+  <!-- Category Cards -->
+  <view class="cards-container">
+    <card 
+      title="新年春联" 
+      type="new_year" 
+      subtitle="辞旧迎新 · 岁岁平安"
+      icon="✨"
+      iconColor="#D32F2F"
+      active="{{selectedType === 'new_year'}}"
+      bind:select="onSelectType"
+    />
+    <card 
+      title="乔居门联" 
+      type="relocation" 
+      subtitle="喜迁新居 · 门盈五福"
+      icon="🏠"
+      iconColor="#F57C00"
+      active="{{selectedType === 'relocation'}}"
+      bind:select="onSelectType"
+    />
+  </view>
+
+  <!-- Footer -->
+  <view class="footer">
+    <view class="footer-divider"></view>
+    <text class="footer-text">Artfully Crafted</text>
+    <view class="footer-divider"></view>
+  </view>
+</view>

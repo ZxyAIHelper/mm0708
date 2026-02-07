@@ -1,0 +1,7 @@
+<view class="container">
+  <view class="empty-state">
+    <text class="empty-icon">⚙️</text>
+    <text class="empty-title">设置页面</text>
+    <text class="empty-desc">功能建设中...</text>
+  </view>
+</view>

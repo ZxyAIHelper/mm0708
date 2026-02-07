@@ -1,0 +1,89 @@
+<view class="container">
+  <!-- Step Progress -->
+  <view class="progress-bar">
+    <text class="progress-text">步骤 2 / 4</text>
+  </view>
+
+  <!-- Header -->
+  <view class="header-section">
+    <text class="page-title">个性化详情</text>
+    <text class="page-subtitle">让春联更贴近您的生活，融入家人之名</text>
+  </view>
+
+  <!-- Mode Selection -->
+  <view class="mode-selection">
+    <view class="radio-card {{mode === 'couple' ? 'active' : ''}}" bindtap="selectMode" data-mode="couple">
+      <view class="radio-icon couple">
+        <text class="icon-emoji">❤️</text>
+      </view>
+      <view class="radio-content">
+        <text class="radio-title">蕴含 情侣 / 夫妻 名字</text>
+        <text class="radio-desc">适合表达相濡以沫、恩爱绵长</text>
+      </view>
+      <view class="radio-indicator {{mode === 'couple' ? 'checked' : ''}}">
+        <view class="radio-dot"></view>
+      </view>
+    </view>
+
+    <view class="radio-card {{mode === 'child' ? 'active' : ''}}" bindtap="selectMode" data-mode="child">
+      <view class="radio-icon child">
+        <text class="icon-emoji">👶</text>
+      </view>
+      <view class="radio-content">
+        <text class="radio-title">蕴含 孩子 名字</text>
+        <text class="radio-desc">寄托对子女成长的美好祝愿</text>
+      </view>
+      <view class="radio-indicator {{mode === 'child' ? 'checked' : ''}}">
+        <view class="radio-dot"></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- Form Inputs - Couple Mode -->
+  <view class="form-section" wx:if="{{mode === 'couple'}}">
+    <view class="form-row">
+      <view class="form-group">
+        <text class="form-label">一方名字</text>
+        <input class="form-input" placeholder="例：张" maxlength="1" value="{{name1}}" bindinput="onNameInput" data-field="name1"/>
+        <text class="form-hint">仅限1个汉字</text>
+      </view>
+      <view class="form-group">
+        <text class="form-label">另一方名字</text>
+        <input class="form-input" placeholder="例：王" maxlength="1" value="{{name2}}" bindinput="onNameInput" data-field="name2"/>
+        <text class="form-hint">仅限1个汉字</text>
+      </view>
+    </view>
+    <view class="info-box">
+      <text class="info-icon">ℹ️</text>
+      <text class="info-text">为确保对联质量，建议各取名字中的1个汉字。</text>
+    </view>
+  </view>
+
+  <!-- Form Inputs - Child Mode -->
+  <view class="form-section" wx:if="{{mode === 'child'}}">
+    <view class="form-group">
+      <text class="form-label">孩子名字</text>
+      <input class="form-input full" placeholder="例：张三" maxlength="2" value="{{childName}}" bindinput="onChildNameInput"/>
+      <text class="form-hint">建议输入2个汉字</text>
+    </view>
+    <view class="info-box">
+      <text class="info-icon">ℹ️</text>
+      <text class="info-text">为确保对联质量，建议输入2个字。例如：张三 输入 张三，张三丰 输入 三丰。</text>
+    </view>
+  </view>
+
+  <!-- Bottom Button -->
+  <view class="bottom-bar">
+    <button class="generate-btn" bindtap="generateCouplet" disabled="{{loading}}">
+      <text>生成对联</text>
+      <text class="btn-icon">✨</text>
+    </button>
+  </view>
+</view>
+
+<!-- Loading Overlay -->
+<view class="loading-overlay" wx:if="{{loading}}">
+  <view class="loading-animation">
+    <text class="loading-text">对联生成中\n请稍等...</text>
+  </view>
+</view>

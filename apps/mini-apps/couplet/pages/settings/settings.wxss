@@ -1,0 +1,34 @@
+@import "../../styles/theme.wxss";
+
+.container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-primary);
+}
+
+.empty-state {
+  text-align: center;
+  padding: var(--spacing-4xl);
+}
+
+.empty-icon {
+  font-size: 100rpx;
+  display: block;
+  margin-bottom: var(--spacing-xl);
+}
+
+.empty-title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  display: block;
+  margin-bottom: var(--spacing-sm);
+}
+
+.empty-desc {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  display: block;
+}

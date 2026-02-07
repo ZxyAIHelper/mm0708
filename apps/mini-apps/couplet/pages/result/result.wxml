@@ -1,0 +1,71 @@
+<view class="container">
+  <!-- Couplet Display -->
+  <view class="couplet-section">
+    <!-- Horizontal Banner (横批) -->
+    <view class="banner-scroll">
+      <view class="scroll-paper horizontal">
+        <text class="banner-text">
+          <block wx:for="{{bannerChars}}" wx:key="index">
+            <text class="char {{item.highlight ? 'highlight' : ''}}">{{item.char}}</text>
+          </block>
+        </text>
+      </view>
+    </view>
+
+    <!-- Vertical Scrolls -->
+    <view class="scrolls-container">
+      <!-- Upper Scroll (上联) -->
+      <view class="scroll-paper vertical">
+        <text class="couplet-text vertical-text">
+          <block wx:for="{{upperChars}}" wx:key="index">
+            <text class="char {{item.highlight ? 'highlight' : ''}}">{{item.char}}</text>
+          </block>
+        </text>
+      </view>
+
+      <!-- Center Decoration -->
+      <view class="center-decoration">
+        <text class="decoration-icon">✿</text>
+      </view>
+
+      <!-- Lower Scroll (下联) -->
+      <view class="scroll-paper vertical">
+        <text class="couplet-text vertical-text">
+          <block wx:for="{{lowerChars}}" wx:key="index">
+            <text class="char {{item.highlight ? 'highlight' : ''}}">{{item.char}}</text>
+          </block>
+        </text>
+      </view>
+    </view>
+  </view>
+
+  <!-- Explanation Section -->
+  <view class="explanation-section" wx:if="{{couplet.meaning}}">
+    <view class="section-header">
+      <view class="header-line"></view>
+      <text class="section-title">对联说明</text>
+    </view>
+    <view class="explanation-card">
+      <text class="explanation-text">{{couplet.meaning}}</text>
+    </view>
+  </view>
+
+  <!-- Action Buttons -->
+  <view class="action-buttons">
+    <button class="action-btn secondary" bindtap="saveImage">
+      <text class="btn-icon">📥</text>
+      <text>保存图片</text>
+    </button>
+    <button class="action-btn primary" bindtap="shareCouplet">
+      <text class="btn-icon">📤</text>
+      <text>分享喜悦</text>
+    </button>
+  </view>
+
+  <!-- Regenerate Link -->
+  <view class="regenerate-section">
+    <button class="regenerate-btn" bindtap="regenerate">
+      不满意？重新生成
+    </button>
+  </view>
+</view>
