@@ -1,0 +1,4 @@
+assessment_name,assessment_kind,semester_label,subject,class_name,student_no,student_name,question_code,question_prompt,question_type,question_full_score,student_score,knowledge_point_codes,happened_at
+Midterm Exam - Mathematics,MIDTERM,2025-2026 Spring,MATHEMATICS,Grade 9 Class 1,G90101,Li Yutong,Q01,Math task on Linear function modelling,SINGLE_KNOWLEDGE_POINT,8,6.5,MATH-LF-MODEL,2026-04-17
+Midterm Exam - Mathematics,MIDTERM,2025-2026 Spring,MATHEMATICS,Grade 9 Class 1,G90101,Li Yutong,Q02,Math task on Quadratic application problems,COMPREHENSIVE,12,7,MATH-QF-APPLICATION|MATH-LF-GRAPH,2026-04-17
+Midterm Exam - Physics,MIDTERM,2025-2026 Spring,PHYSICS,Grade 9 Class 1,G90101,Li Yutong,Q01,Physics task on Ohm's law basics,SINGLE_KNOWLEDGE_POINT,8,6,PHYS-ELEC-OHM,2026-04-18

@@ -1,0 +1,610 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+  engineType      = "client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+enum SubjectCode {
+  MATHEMATICS
+  PHYSICS
+}
+
+enum TeacherRole {
+  HOMEROOM
+  SUBJECT
+  GRADE_LEAD
+}
+
+enum AssessmentKind {
+  DIAGNOSTIC
+  MONTHLY
+  MIDTERM
+  FINAL
+  QUIZ
+}
+
+enum HomeworkKind {
+  HOMEWORK
+  PRACTICE
+  WEEKEND_REVIEW
+}
+
+enum ProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  REVIEW
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AssessmentQuestionType {
+  SINGLE_KNOWLEDGE_POINT
+  COMPREHENSIVE
+}
+
+model School {
+  id                         String                         @id @default(cuid())
+  code                       String                         @unique
+  name                       String
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+  grades                     GradeLevel[]
+  teachers                   Teacher[]
+  subjects                   Subject[]
+  assessments                Assessment[]
+  homeworkSets               HomeworkSet[]
+  schoolKnowledgePointSnapshots SchoolKnowledgePointSnapshot[]
+  classKnowledgePointSnapshots  ClassKnowledgePointSnapshot[]
+  classAnalysisSnapshots     ClassAnalysisSnapshot[]
+  studentAnalysisSnapshots   StudentAnalysisSnapshot[]
+  schoolSuggestionSnapshots  SchoolSuggestionSnapshot[]
+  classSuggestionSnapshots   ClassSuggestionSnapshot[]
+  studentSuggestionSnapshots StudentSuggestionSnapshot[]
+}
+
+model GradeLevel {
+  id                         String                         @id @default(cuid())
+  schoolId                   String
+  code                       String
+  name                       String
+  sortOrder                  Int
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+  school                      School                         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classes                    SchoolClass[]
+  assessments                Assessment[]
+  schoolKnowledgePointSnapshots SchoolKnowledgePointSnapshot[]
+  classKnowledgePointSnapshots  ClassKnowledgePointSnapshot[]
+  classAnalysisSnapshots     ClassAnalysisSnapshot[]
+  studentAnalysisSnapshots   StudentAnalysisSnapshot[]
+  schoolSuggestionSnapshots  SchoolSuggestionSnapshot[]
+  classSuggestionSnapshots   ClassSuggestionSnapshot[]
+  studentSuggestionSnapshots StudentSuggestionSnapshot[]
+
+  @@unique([schoolId, code])
+  @@index([schoolId, sortOrder])
+}
+
+model SchoolClass {
+  id                         String                         @id @default(cuid())
+  gradeId                    String
+  code                       String
+  name                       String
+  sortOrder                  Int
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+  grade                      GradeLevel                     @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  teacherAssignments         ClassTeacherAssignment[]
+  students                   Student[]
+  homeworkSets               HomeworkSet[]
+  teachingProgressRecords    TeachingProgressRecord[]
+  classKnowledgePointSnapshots  ClassKnowledgePointSnapshot[]
+  classAnalysisSnapshots     ClassAnalysisSnapshot[]
+  studentAnalysisSnapshots   StudentAnalysisSnapshot[]
+  classSuggestionSnapshots   ClassSuggestionSnapshot[]
+  studentSuggestionSnapshots StudentSuggestionSnapshot[]
+
+  @@unique([gradeId, code])
+  @@index([gradeId, sortOrder])
+}
+
+model Teacher {
+  id                         String                         @id @default(cuid())
+  schoolId                   String
+  teacherNo                  String
+  name                       String
+  primarySubject             SubjectCode?
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+  school                     School                         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classAssignments           ClassTeacherAssignment[]
+  homeworkSets               HomeworkSet[]
+  teachingProgressRecords    TeachingProgressRecord[]
+
+  @@unique([schoolId, teacherNo])
+  @@index([schoolId, primarySubject])
+}
+
+model ClassTeacherAssignment {
+  id                         String                         @id @default(cuid())
+  classId                    String
+  teacherId                  String
+  role                       TeacherRole
+  assignmentKey              String
+  subjectCode                SubjectCode?
+  createdAt                  DateTime                       @default(now())
+  schoolClass                SchoolClass                    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  teacher                    Teacher                        @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@unique([classId, assignmentKey])
+  @@index([classId, role])
+  @@index([teacherId, subjectCode])
+}
+
+model Student {
+  id                         String                         @id @default(cuid())
+  classId                    String
+  studentNo                  String
+  name                       String
+  sortNumber                 Int
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+  schoolClass                SchoolClass                    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  assessmentResults          StudentAssessmentResult[]
+  homeworkResults            StudentHomeworkResult[]
+  studentAnalysisSnapshots   StudentAnalysisSnapshot[]
+  studentSuggestionSnapshots StudentSuggestionSnapshot[]
+
+  @@unique([classId, studentNo])
+  @@unique([classId, sortNumber])
+  @@index([classId])
+}
+
+model Subject {
+  id                         String                         @id @default(cuid())
+  schoolId                   String
+  code                       SubjectCode
+  name                       String
+  sortOrder                  Int
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+  school                     School                         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  chapters                   CurriculumChapter[]
+  knowledgePoints            KnowledgePoint[]
+  assessments                Assessment[]
+  homeworkSets               HomeworkSet[]
+  schoolKnowledgePointSnapshots SchoolKnowledgePointSnapshot[]
+  classKnowledgePointSnapshots  ClassKnowledgePointSnapshot[]
+  classAnalysisSnapshots     ClassAnalysisSnapshot[]
+  studentAnalysisSnapshots   StudentAnalysisSnapshot[]
+  schoolSuggestionSnapshots  SchoolSuggestionSnapshot[]
+  classSuggestionSnapshots   ClassSuggestionSnapshot[]
+  studentSuggestionSnapshots StudentSuggestionSnapshot[]
+
+  @@unique([schoolId, code])
+  @@index([schoolId, sortOrder])
+}
+
+model CurriculumChapter {
+  id                         String                         @id @default(cuid())
+  subjectId                  String
+  code                       String
+  name                       String
+  sequence                   Int
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+  subject                    Subject                        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  knowledgePoints            KnowledgePoint[]
+
+  @@unique([subjectId, code])
+  @@index([subjectId, sequence])
+}
+
+model KnowledgePoint {
+  id                         String                         @id @default(cuid())
+  subjectId                  String
+  chapterId                  String
+  code                       String
+  name                       String
+  sequence                   Int
+  difficulty                 Int
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+  subject                    Subject                        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  chapter                    CurriculumChapter              @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  assessmentQuestionMaps     AssessmentQuestionKnowledgePointMap[]
+  homeworkQuestionMaps       HomeworkQuestionKnowledgePointMap[]
+  teachingProgressRecords    TeachingProgressRecord[]
+  schoolKnowledgePointSnapshots SchoolKnowledgePointSnapshot[]
+  classKnowledgePointSnapshots  ClassKnowledgePointSnapshot[]
+
+  @@unique([subjectId, code])
+  @@index([chapterId, sequence])
+}
+
+model Assessment {
+  id                         String                         @id @default(cuid())
+  schoolId                   String
+  gradeId                    String
+  subjectId                  String
+  seriesKey                  String
+  name                       String
+  kind                       AssessmentKind
+  semesterLabel              String
+  weekIndex                  Int
+  happenedAt                 DateTime
+  fullScore                  Float
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+  school                     School                         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  grade                      GradeLevel                     @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  subject                    Subject                        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  questions                  AssessmentQuestion[]
+  studentResults             StudentAssessmentResult[]
+
+  @@unique([gradeId, subjectId, seriesKey])
+  @@index([gradeId, subjectId, happenedAt])
+}
+
+model AssessmentQuestion {
+  id                         String                         @id @default(cuid())
+  assessmentId               String
+  code                       String
+  prompt                     String
+  sequence                   Int
+  fullScore                  Float
+  difficulty                 Int
+  questionType               AssessmentQuestionType
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+  assessment                 Assessment                     @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  knowledgePointMaps         AssessmentQuestionKnowledgePointMap[]
+  studentScores              StudentAssessmentQuestionScore[]
+
+  @@unique([id, assessmentId])
+  @@unique([assessmentId, code])
+  @@index([assessmentId, sequence])
+}
+
+model AssessmentQuestionKnowledgePointMap {
+  id                         String                         @id @default(cuid())
+  questionId                 String
+  knowledgePointId           String
+  weight                     Float
+  question                   AssessmentQuestion             @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  knowledgePoint             KnowledgePoint                 @relation(fields: [knowledgePointId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, knowledgePointId])
+  @@index([knowledgePointId])
+}
+
+model StudentAssessmentResult {
+  id                         String                         @id @default(cuid())
+  assessmentId               String
+  studentId                  String
+  totalScore                 Float
+  normalizedScore            Float
+  rankInClass                Int?
+  percentile                 Float?
+  absent                     Boolean                        @default(false)
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+  assessment                 Assessment                     @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  student                    Student                        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  questionScores             StudentAssessmentQuestionScore[]
+
+  @@unique([id, assessmentId])
+  @@unique([assessmentId, studentId])
+  @@index([studentId, assessmentId])
+}
+
+model StudentAssessmentQuestionScore {
+  id                         String                         @id @default(cuid())
+  resultId                   String
+  questionId                 String
+  assessmentId               String
+  score                      Float
+  fullScore                  Float
+  scoreRate                  Float
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+  result                     StudentAssessmentResult        @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  question                   AssessmentQuestion             @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([resultId, questionId])
+  @@index([assessmentId, questionId])
+}
+
+model HomeworkSet {
+  id                         String                         @id @default(cuid())
+  schoolId                   String
+  classId                    String
+  teacherId                  String
+  subjectId                  String
+  name                       String
+  kind                       HomeworkKind
+  weekIndex                  Int
+  assignedAt                 DateTime
+  dueAt                      DateTime
+  fullScore                  Float
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+  school                     School                         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolClass                SchoolClass                    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  teacher                    Teacher                        @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subject                    Subject                        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  questions                  HomeworkQuestion[]
+  studentResults             StudentHomeworkResult[]
+
+  @@index([classId, subjectId, assignedAt])
+  @@index([teacherId, assignedAt])
+}
+
+model HomeworkQuestion {
+  id                         String                         @id @default(cuid())
+  homeworkSetId              String
+  code                       String
+  prompt                     String
+  sequence                   Int
+  fullScore                  Float
+  difficulty                 Int
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+  homeworkSet                HomeworkSet                    @relation(fields: [homeworkSetId], references: [id], onDelete: Cascade)
+  knowledgePointMaps         HomeworkQuestionKnowledgePointMap[]
+  studentScores              StudentHomeworkQuestionScore[]
+
+  @@unique([id, homeworkSetId])
+  @@unique([homeworkSetId, code])
+  @@index([homeworkSetId, sequence])
+}
+
+model HomeworkQuestionKnowledgePointMap {
+  id                         String                         @id @default(cuid())
+  questionId                 String
+  knowledgePointId           String
+  weight                     Float
+  question                   HomeworkQuestion               @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  knowledgePoint             KnowledgePoint                 @relation(fields: [knowledgePointId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, knowledgePointId])
+  @@index([knowledgePointId])
+}
+
+model StudentHomeworkResult {
+  id                         String                         @id @default(cuid())
+  homeworkSetId              String
+  studentId                  String
+  totalScore                 Float
+  completionRate             Float
+  submittedAt                DateTime?
+  isLate                     Boolean                        @default(false)
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+  homeworkSet                HomeworkSet                    @relation(fields: [homeworkSetId], references: [id], onDelete: Cascade)
+  student                    Student                        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  questionScores             StudentHomeworkQuestionScore[]
+
+  @@unique([id, homeworkSetId])
+  @@unique([homeworkSetId, studentId])
+  @@index([studentId, homeworkSetId])
+}
+
+model StudentHomeworkQuestionScore {
+  id                         String                         @id @default(cuid())
+  resultId                   String
+  questionId                 String
+  homeworkSetId              String
+  score                      Float
+  fullScore                  Float
+  scoreRate                  Float
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+  result                     StudentHomeworkResult          @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  question                   HomeworkQuestion               @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([resultId, questionId])
+  @@index([homeworkSetId, questionId])
+}
+
+model TeachingProgressRecord {
+  id                         String                         @id @default(cuid())
+  classId                    String
+  knowledgePointId           String
+  teacherId                  String
+  lessonTitle                String
+  weekIndex                  Int
+  taughtAt                   DateTime
+  status                     ProgressStatus
+  coverageRate               Float
+  expectedMasteryRate        Float
+  observedMasteryRate        Float
+  gapRate                    Float
+  notes                      String?
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+  schoolClass                SchoolClass                    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  knowledgePoint             KnowledgePoint                 @relation(fields: [knowledgePointId], references: [id], onDelete: Cascade)
+  teacher                    Teacher                        @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@index([classId, knowledgePointId, taughtAt])
+  @@index([classId, weekIndex])
+  @@index([knowledgePointId, weekIndex])
+  @@index([teacherId, taughtAt])
+}
+
+model SchoolKnowledgePointSnapshot {
+  id                         String                         @id @default(cuid())
+  schoolId                   String
+  gradeId                    String
+  subjectId                  String
+  knowledgePointId           String
+  capturedAt                 DateTime
+  sourceLabel                String
+  assessmentCount            Int
+  questionCount              Int
+  averageScoreRate           Float
+  masteryRate                Float
+  trendDelta                 Float
+  riskLevel                  RiskLevel
+  createdAt                  DateTime                       @default(now())
+  school                     School                         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  grade                      GradeLevel                     @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  subject                    Subject                        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  knowledgePoint             KnowledgePoint                 @relation(fields: [knowledgePointId], references: [id], onDelete: Cascade)
+
+  @@index([gradeId, subjectId, capturedAt])
+  @@index([subjectId, capturedAt])
+}
+
+model ClassKnowledgePointSnapshot {
+  id                         String                         @id @default(cuid())
+  schoolId                   String
+  gradeId                    String
+  classId                    String
+  subjectId                  String
+  knowledgePointId           String
+  capturedAt                 DateTime
+  sourceLabel                String
+  assessmentCount            Int
+  questionCount              Int
+  averageScoreRate           Float
+  masteryRate                Float
+  trendDelta                 Float
+  riskLevel                  RiskLevel
+  createdAt                  DateTime                       @default(now())
+  school                     School                         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  grade                      GradeLevel                     @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  schoolClass                SchoolClass                    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject                    Subject                        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  knowledgePoint             KnowledgePoint                 @relation(fields: [knowledgePointId], references: [id], onDelete: Cascade)
+
+  @@index([classId, subjectId, capturedAt])
+  @@index([subjectId, capturedAt])
+}
+
+model ClassAnalysisSnapshot {
+  id                         String                         @id @default(cuid())
+  schoolId                   String
+  gradeId                    String
+  classId                    String
+  subjectId                  String
+  capturedAt                 DateTime
+  sourceLabel                String
+  assessmentCount            Int
+  averageScore               Float
+  passRate                   Float
+  excellenceRate             Float
+  masteryRate                Float
+  progressRate               Float
+  taughtCount                Int
+  taughtMasteredCount        Int
+  weakestKnowledgePointCode  String?
+  weakestKnowledgePointName  String?
+  riskLevel                  RiskLevel
+  createdAt                  DateTime                       @default(now())
+  school                     School                         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  grade                      GradeLevel                     @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  schoolClass                SchoolClass                    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject                    Subject                        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@index([classId, subjectId, capturedAt])
+  @@index([riskLevel, subjectId])
+}
+
+model StudentAnalysisSnapshot {
+  id                         String                         @id @default(cuid())
+  schoolId                   String
+  gradeId                    String
+  classId                    String
+  studentId                  String
+  subjectId                  String
+  capturedAt                 DateTime
+  sourceLabel                String
+  averageScore               Float
+  masteryRate                Float
+  trendDelta                 Float
+  persistentWeakPointCount   Int
+  overdueHomeworkCount       Int
+  riskLevel                  RiskLevel
+  createdAt                  DateTime                       @default(now())
+  school                     School                         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  grade                      GradeLevel                     @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  schoolClass                SchoolClass                    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  student                    Student                        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject                    Subject                        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, subjectId, capturedAt])
+  @@index([classId, subjectId, riskLevel])
+}
+
+model SchoolSuggestionSnapshot {
+  id                         String                         @id @default(cuid())
+  schoolId                   String
+  gradeId                    String
+  subjectId                  String
+  capturedAt                 DateTime
+  priority                   Int
+  title                      String
+  summary                    String
+  rationale                  String
+  createdAt                  DateTime                       @default(now())
+  school                     School                         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  grade                      GradeLevel                     @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  subject                    Subject                        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@index([subjectId, capturedAt])
+}
+
+model ClassSuggestionSnapshot {
+  id                         String                         @id @default(cuid())
+  schoolId                   String
+  gradeId                    String
+  classId                    String
+  subjectId                  String
+  capturedAt                 DateTime
+  priority                   Int
+  title                      String
+  summary                    String
+  rationale                  String
+  createdAt                  DateTime                       @default(now())
+  school                     School                         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  grade                      GradeLevel                     @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  schoolClass                SchoolClass                    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject                    Subject                        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@index([classId, subjectId, capturedAt])
+}
+
+model StudentSuggestionSnapshot {
+  id                         String                         @id @default(cuid())
+  schoolId                   String
+  gradeId                    String
+  classId                    String
+  studentId                  String
+  subjectId                  String
+  capturedAt                 DateTime
+  priority                   Int
+  title                      String
+  summary                    String
+  rationale                  String
+  createdAt                  DateTime                       @default(now())
+  school                     School                         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  grade                      GradeLevel                     @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  schoolClass                SchoolClass                    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  student                    Student                        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject                    Subject                        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, subjectId, capturedAt])
+}

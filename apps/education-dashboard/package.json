@@ -1,0 +1,46 @@
+{
+  "name": "education-dashboard-demo",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv ./cloudflare-env.d.ts",
+    "lint": "eslint .",
+    "db:push": "prisma db push",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:dump:demo": "./scripts/export-demo-sql.sh",
+    "setup:demo": "pnpm db:push && pnpm db:seed"
+  },
+  "dependencies": {
+    "@opennextjs/cloudflare": "^1.19.9",
+    "@prisma/adapter-d1": "6.19.2",
+    "@prisma/client": "6.19.2",
+    "date-fns": "4.3.0",
+    "next": "15.5.18",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "recharts": "3.8.1",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@next/eslint-plugin-next": "15.5.18",
+    "@types/node": "25.9.1",
+    "@types/react": "19.2.15",
+    "@types/react-dom": "19.2.3",
+    "@typescript-eslint/eslint-plugin": "8.60.0",
+    "@typescript-eslint/parser": "8.60.0",
+    "autoprefixer": "10.5.0",
+    "eslint": "^9.0.0",
+    "postcss": "8.5.15",
+    "prisma": "6.19.2",
+    "tailwindcss": "3.4.19",
+    "tsx": "4.22.3",
+    "typescript": "5.9.3",
+    "wrangler": "^4.95.0"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

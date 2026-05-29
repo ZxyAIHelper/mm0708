@@ -1,0 +1,4 @@
+homework_name,homework_kind,subject,class_name,student_no,student_name,question_code,question_prompt,question_full_score,student_score,completion_rate,is_late,knowledge_point_codes,assigned_at,due_at,submitted_at
+Week 7 Mathematics Practice,HOMEWORK,MATHEMATICS,Grade 9 Class 1,G90101,Li Yutong,H01,Practice: Similar triangle criteria,8,6.5,0.95,false,MATH-SIM-CRITERIA,2026-04-02,2026-04-04,2026-04-03T18:00:00Z
+Week 7 Mathematics Practice,HOMEWORK,MATHEMATICS,Grade 9 Class 1,G90101,Li Yutong,H02,Practice: Quadratic application problems,10,5.5,0.95,false,MATH-QF-APPLICATION,2026-04-02,2026-04-04,2026-04-03T18:00:00Z
+Week 7 Physics Practice,PRACTICE,PHYSICS,Grade 9 Class 1,G90101,Li Yutong,H01,Practice: Circuit fault diagnosis,8,4.5,0.88,true,PHYS-ELEC-FAULT,2026-04-02,2026-04-04,2026-04-05T10:00:00Z
