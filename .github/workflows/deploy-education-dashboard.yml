@@ -1,5 +1,8 @@
 name: Deploy Education Dashboard
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
   push:
