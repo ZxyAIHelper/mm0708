@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Block Duel</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <main class="app">
+        <section id="homeView" class="view home-view">
+            <div class="home-content">
+                <div class="brand">
+                    <p class="eyebrow">online arena</p>
+                    <h1>Block Duel</h1>
+                    <p class="subtitle">选择房间，坐下开打。拖动挡板击碎对方后方砖块。</p>
+                </div>
+
+                <div class="player-card">
+                    <label for="playerName">昵称</label>
+                    <div class="name-row">
+                        <input id="playerName" type="text" maxlength="18" autocomplete="off">
+                        <button id="randomNameBtn" type="button">随机</button>
+                    </div>
+                </div>
+
+                <section class="rooms-panel" aria-labelledby="roomsTitle">
+                    <div class="section-header">
+                        <h2 id="roomsTitle">选择房间</h2>
+                        <button id="refreshRoomsBtn" class="icon-button" type="button" title="刷新房间">↻</button>
+                    </div>
+                    <div id="roomsList" class="rooms-list"></div>
+                </section>
+            </div>
+        </section>
+
+        <section id="gameView" class="view game-view hidden">
+            <header class="game-topbar">
+                <button id="backHomeBtn" class="ghost-button" type="button">房间</button>
+                <div>
+                    <p id="connectionText" class="connection-text">未连接</p>
+                    <h2 id="roomTitle">房间</h2>
+                </div>
+                <button id="resetBtn" class="ghost-button" type="button" disabled>重开</button>
+            </header>
+
+            <div class="seat-bar">
+                <button id="sitTopBtn" type="button" disabled>坐上方</button>
+                <button id="sitBottomBtn" type="button" disabled>坐下方</button>
+            </div>
+
+            <div class="canvas-wrap">
+                <canvas id="gameCanvas" width="720" height="1040"></canvas>
+                <div id="overlay" class="overlay">
+                    <strong>Block Duel</strong>
+                    <span>选择座位或观战</span>
+                </div>
+            </div>
+
+            <div class="score-strip">
+                <div>
+                    <span>上方砖块</span>
+                    <strong id="topBricks">24</strong>
+                </div>
+                <div>
+                    <span>状态</span>
+                    <strong id="gameStatus">等待</strong>
+                </div>
+                <div>
+                    <span>下方砖块</span>
+                    <strong id="bottomBricks">24</strong>
+                </div>
+            </div>
+
+            <div id="touchPad" class="touch-pad">
+                <button id="moveLeftBtn" class="move-button" type="button">←</button>
+                <span>拖动或按住按钮控制挡板</span>
+                <button id="moveRightBtn" class="move-button" type="button">→</button>
+            </div>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

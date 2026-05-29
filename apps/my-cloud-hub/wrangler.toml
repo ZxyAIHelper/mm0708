@@ -14,3 +14,11 @@ id = "a95d6ea52307466e85bbb150aea487c6"
 [[vectorize]]
 binding = "VECTORIZE"
 index_name = "todo-tasks"
+
+[[durable_objects.bindings]]
+name = "BLOCK_DUEL_ROOM"
+class_name = "BlockDuelRoom"
+
+[[migrations]]
+tag = "v1_block_duel_room"
+new_sqlite_classes = [ "BlockDuelRoom" ]

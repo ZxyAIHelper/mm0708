@@ -1,0 +1,39 @@
+name: Deploy My Cloud Hub Worker
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/my-cloud-hub/**"
+      - "packages/database/migrations/**"
+      - ".github/workflows/deploy-my-cloud-hub.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        working-directory: apps/my-cloud-hub
+        run: npm ci
+
+      - name: Deploy Worker
+        working-directory: apps/my-cloud-hub
+        run: npx wrangler deploy --minify src/index.ts
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

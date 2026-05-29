@@ -8,6 +8,8 @@ import { sendWeChatNotification } from './utils/wechat'
 import emailMonitorRouter from './projects/email-monitor/router'
 import { handleEmail } from './projects/email-monitor/handler'
 import coupletRouter from './projects/couplet/router'
+import blockDuelRouter from './projects/block-duel/router'
+export { BlockDuelRoom } from './projects/block-duel/room'
 
 
 type Bindings = {
@@ -20,6 +22,7 @@ type Bindings = {
     DOUBAO_CHAT_ENDPOINT: string
     WECHAT_APPID: string
     WECHAT_SECRET: string
+    BLOCK_DUEL_ROOM: DurableObjectNamespace
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -43,6 +46,7 @@ app.route('/api/todo/rag', ragRouter)
 app.route('/api/todo/chat', chatRouter)
 app.route('/api/email-monitor', emailMonitorRouter)
 app.route('/api/couplet', coupletRouter)
+app.route('/api/block-duel', blockDuelRouter)
 
 
 
