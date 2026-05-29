@@ -186,4 +186,48 @@ describe('block duel game state', () => {
 
         expect(Math.hypot(state.balls[0].vx, state.balls[0].vy)).toBeLessThan(originalSpeed * 0.75)
     })
+
+    it('fire ball splashes nearby bricks', () => {
+        const state = createGameState()
+        const topBefore = state.bricks.top.filter((brick) => brick.alive).length
+        state.status = 'playing'
+
+        applyPowerUp(state, { type: 'fire', x: 100, y: 100, vy: 120, target: 'bottom' })
+        state.balls[0].x = state.bricks.top[9].x + state.bricks.top[9].width / 2
+        state.balls[0].y = state.bricks.top[9].y + state.bricks.top[9].height / 2
+        stepGame(state, 0.016)
+
+        expect(state.bricks.top.filter((brick) => brick.alive).length).toBeLessThan(topBefore - 1)
+    })
+
+    it('pierce ball passes through brick without reversing', () => {
+        const state = createGameState()
+        state.status = 'playing'
+        applyPowerUp(state, { type: 'pierce', x: 100, y: 100, vy: 120, target: 'bottom' })
+        state.balls[0].x = state.bricks.top[0].x + state.bricks.top[0].width / 2
+        state.balls[0].y = state.bricks.top[0].y + state.bricks.top[0].height / 2
+        state.balls[0].vy = -320
+
+        stepGame(state, 0.016)
+
+        expect(state.balls[0].vy).toBe(-320)
+        expect(state.bricks.top[0].alive).toBe(false)
+    })
+
+    it('turret power up fires bullets that destroy opponent bricks', () => {
+        const state = createGameState()
+        joinSeat(state, 'client-a', 'Player A', 'bottom')
+        joinSeat(state, 'client-b', 'Player B', 'top')
+        state.status = 'playing'
+        const topBefore = state.bricks.top.filter((brick) => brick.alive).length
+
+        applyPowerUp(state, { type: 'turret', x: 100, y: 100, vy: 120, target: 'bottom' })
+        stepGame(state, 0.5)
+
+        expect(state.bullets.length).toBeGreaterThan(0)
+        for (let i = 0; i < 60; i += 1) {
+            stepGame(state, 0.05)
+        }
+        expect(state.bricks.top.filter((brick) => brick.alive).length).toBeLessThan(topBefore)
+    })
 })

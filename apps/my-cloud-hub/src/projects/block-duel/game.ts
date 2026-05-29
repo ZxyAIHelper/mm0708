@@ -40,6 +40,15 @@ export type PowerUpType =
     | 'zap'
     | 'chaos'
     | 'split'
+    | 'gravity'
+    | 'pierce'
+    | 'fire'
+    | 'magnet'
+    | 'shield'
+    | 'turret'
+    | 'chain'
+    | 'berserk'
+    | 'blackhole'
 
 export type PowerUp = {
     type: PowerUpType
@@ -55,6 +64,26 @@ export type Ball = {
     radius: number
     vx: number
     vy: number
+    expiresAt?: number
+    gravityUntil?: number
+    pierceUntil?: number
+    fireUntil?: number
+    magnetUntil?: number
+    berserkUntil?: number
+}
+
+export type Bullet = {
+    x: number
+    y: number
+    vy: number
+    owner: Seat
+}
+
+export type BlackHole = {
+    x: number
+    y: number
+    until: number
+    explodeAt: number
 }
 
 export type GameState = {
@@ -70,7 +99,9 @@ export type GameState = {
     balls: Ball[]
     bricks: Record<Seat, Brick[]>
     powerUps: PowerUp[]
-    effects: Record<Seat, { reverseUntil: number; zapUntil: number; nextZapAt: number }>
+    bullets: Bullet[]
+    blackHoles: BlackHole[]
+    effects: Record<Seat, { reverseUntil: number; zapUntil: number; nextZapAt: number; shield: number; turretUntil: number; nextShotAt: number }>
     elapsed: number
     pressureLevel: number
     nextBrickDecayAt: number
@@ -127,9 +158,11 @@ export function createGameState(): GameState {
             bottom: createBricks('bottom'),
         },
         powerUps: [],
+        bullets: [],
+        blackHoles: [],
         effects: {
-            top: { reverseUntil: 0, zapUntil: 0, nextZapAt: 0 },
-            bottom: { reverseUntil: 0, zapUntil: 0, nextZapAt: 0 },
+            top: { reverseUntil: 0, zapUntil: 0, nextZapAt: 0, shield: 0, turretUntil: 0, nextShotAt: 0 },
+            bottom: { reverseUntil: 0, zapUntil: 0, nextZapAt: 0, shield: 0, turretUntil: 0, nextShotAt: 0 },
         },
         elapsed: 0,
         pressureLevel: 0,
@@ -247,7 +280,10 @@ export function stepGame(state: GameState, dt: number): void {
 
     updatePressure(state, dt)
     updateAttackEffects(state)
+    updateTurrets(state)
+    updateBlackHoles(state)
     moveBalls(state, dt)
+    moveBullets(state, dt)
     movePowerUps(state, dt)
     state.updatedAt = Date.now()
 }
@@ -332,13 +368,21 @@ function movePaddles(state: GameState, dt: number): void {
 }
 
 function moveBalls(state: GameState, dt: number): void {
+    state.balls = state.balls.filter((ball, index) => index === 0 || !ball.expiresAt || state.elapsed < ball.expiresAt)
     state.balls.forEach((ball) => {
         moveBall(state, ball, dt)
     })
+    if (state.balls.length === 0) {
+        state.balls.push(createBall())
+    }
     state.ball = state.balls[0]
 }
 
 function moveBall(state: GameState, ball: Ball, dt: number): void {
+    if (ball.gravityUntil && state.elapsed < ball.gravityUntil) {
+        ball.vy += 170 * dt
+    }
+    applyBlackHolePull(state, ball, dt)
     ball.x += ball.vx * dt
     ball.y += ball.vy * dt
 
@@ -357,6 +401,10 @@ function moveBall(state: GameState, ball: Ball, dt: number): void {
         ball.vy = -Math.abs(ball.vy)
     }
 
+    collideShield(state, 'top', ball, 1)
+    collideShield(state, 'bottom', ball, -1)
+    applyMagnet(state, 'top', ball, dt)
+    applyMagnet(state, 'bottom', ball, dt)
     collidePaddle(state.paddles.top, ball, 1)
     collidePaddle(state.paddles.bottom, ball, -1)
     collideBricks(state, ball, 'top')
@@ -390,6 +438,56 @@ function updateAttackEffects(state: GameState): void {
     })
 }
 
+function updateTurrets(state: GameState): void {
+    ;(['top', 'bottom'] as Seat[]).forEach((seat) => {
+        const effect = state.effects[seat]
+        if (state.elapsed >= effect.turretUntil || state.elapsed < effect.nextShotAt) {
+            return
+        }
+        const paddle = state.paddles[seat]
+        state.bullets.push({
+            x: paddle.x + paddle.width / 2,
+            y: seat === 'top' ? paddle.y + paddle.height + 6 : paddle.y - 6,
+            vy: seat === 'top' ? 520 : -520,
+            owner: seat,
+        })
+        effect.nextShotAt = state.elapsed + 0.28
+    })
+}
+
+function updateBlackHoles(state: GameState): void {
+    const active: BlackHole[] = []
+    state.blackHoles.forEach((hole) => {
+        if (state.elapsed >= hole.explodeAt) {
+            destroyNearestBricks(state, 'top', hole.x, hole.y, 3)
+            destroyNearestBricks(state, 'bottom', hole.x, hole.y, 3)
+            return
+        }
+        if (state.elapsed < hole.until) {
+            active.push(hole)
+        }
+    })
+    state.blackHoles = active
+}
+
+function moveBullets(state: GameState, dt: number): void {
+    const remaining: Bullet[] = []
+    state.bullets.forEach((bullet) => {
+        bullet.y += bullet.vy * dt
+        const targetSide = opponentOf(bullet.owner)
+        const hit = state.bricks[targetSide].find((brick) => brick.alive && pointInRect(bullet.x, bullet.y, brick))
+        if (hit) {
+            hit.alive = false
+            maybeSpawnPowerUp(state, hit, targetSide)
+            return
+        }
+        if (bullet.y > -20 && bullet.y < state.height + 20) {
+            remaining.push(bullet)
+        }
+    })
+    state.bullets = remaining
+}
+
 function shrinkPaddlesForPressure(state: GameState, levels: number): void {
     ;(['top', 'bottom'] as Seat[]).forEach((seat) => {
         const paddle = state.paddles[seat]
@@ -420,6 +518,37 @@ function collidePaddle(paddle: Paddle, ball: Ball, verticalDirection: 1 | -1): v
     ball.y = verticalDirection === 1 ? paddle.y + paddle.height + ball.radius : paddle.y - ball.radius
 }
 
+function collideShield(state: GameState, seat: Seat, ball: Ball, verticalDirection: 1 | -1): void {
+    if (state.effects[seat].shield <= 0) {
+        return
+    }
+    const paddle = state.paddles[seat]
+    const shield: Paddle = {
+        x: paddle.x + paddle.width * 0.12,
+        y: seat === 'top' ? paddle.y + 34 : paddle.y - 34,
+        width: paddle.width * 0.76,
+        height: 8,
+    }
+    if (!circleIntersectsRect(ball, shield)) {
+        return
+    }
+    state.effects[seat].shield -= 1
+    ball.vy = Math.abs(ball.vy) * verticalDirection
+}
+
+function applyMagnet(state: GameState, seat: Seat, ball: Ball, dt: number): void {
+    if (!ball.magnetUntil || state.elapsed >= ball.magnetUntil) {
+        return
+    }
+    const paddle = state.paddles[seat]
+    const center = paddle.x + paddle.width / 2
+    const nearY = Math.abs(ball.y - paddle.y) < 150
+    if (!nearY) {
+        return
+    }
+    ball.vx += clamp(center - ball.x, -120, 120) * dt * 2.2
+}
+
 function collideBricks(state: GameState, ball: Ball, side: Seat): void {
     for (const brick of state.bricks[side]) {
         if (!brick.alive || !circleIntersectsRect(ball, brick)) {
@@ -427,7 +556,15 @@ function collideBricks(state: GameState, ball: Ball, side: Seat): void {
         }
 
         brick.alive = false
-        ball.vy *= -1
+        if (ball.fireUntil && state.elapsed < ball.fireUntil) {
+            splashBricks(state, side, brick)
+        }
+        if (ball.berserkUntil && state.elapsed < ball.berserkUntil) {
+            destroyNearestBricks(state, side, brick.x + brick.width / 2, brick.y + brick.height / 2, 1)
+        }
+        if (!(ball.pierceUntil && state.elapsed < ball.pierceUntil)) {
+            ball.vy *= -1
+        }
         maybeSpawnPowerUp(state, brick, side)
 
         if (state.bricks[side].every((item) => !item.alive)) {
@@ -470,6 +607,50 @@ export function applyPowerUp(state: GameState, powerUp: PowerUp): void {
     if (powerUp.type === 'split') {
         splitBalls(state)
     }
+    if (powerUp.type === 'gravity') {
+        state.balls.forEach((ball) => {
+            ball.gravityUntil = state.elapsed + 10
+        })
+    }
+    if (powerUp.type === 'pierce') {
+        state.balls.forEach((ball) => {
+            ball.pierceUntil = state.elapsed + 8
+        })
+    }
+    if (powerUp.type === 'fire') {
+        state.balls.forEach((ball) => {
+            ball.fireUntil = state.elapsed + 8
+        })
+    }
+    if (powerUp.type === 'magnet') {
+        state.balls.forEach((ball) => {
+            ball.magnetUntil = state.elapsed + 10
+        })
+    }
+    if (powerUp.type === 'shield') {
+        state.effects[powerUp.target].shield = Math.min(3, state.effects[powerUp.target].shield + 1)
+    }
+    if (powerUp.type === 'turret') {
+        state.effects[powerUp.target].turretUntil = state.elapsed + 8
+        state.effects[powerUp.target].nextShotAt = state.elapsed
+    }
+    if (powerUp.type === 'chain') {
+        destroyNearestBricks(state, opponent, powerUp.x, powerUp.y, 5)
+    }
+    if (powerUp.type === 'berserk') {
+        scaleBallSpeed(state, 1.7)
+        state.balls.forEach((ball) => {
+            ball.berserkUntil = state.elapsed + 8
+        })
+    }
+    if (powerUp.type === 'blackhole') {
+        state.blackHoles.push({
+            x: state.width / 2,
+            y: state.height / 2,
+            until: state.elapsed + 5,
+            explodeAt: state.elapsed + 5,
+        })
+    }
 
     paddle.x = clamp(paddle.x, 0, state.width - paddle.width)
 }
@@ -479,7 +660,26 @@ function maybeSpawnPowerUp(state: GameState, brick: Brick, side: Seat): void {
         return
     }
 
-    const types: PowerUpType[] = ['grow', 'shrink', 'speed', 'slow', 'reverse', 'bomb', 'zap', 'chaos', 'split']
+    const types: PowerUpType[] = [
+        'grow',
+        'shrink',
+        'speed',
+        'slow',
+        'reverse',
+        'bomb',
+        'zap',
+        'chaos',
+        'split',
+        'gravity',
+        'pierce',
+        'fire',
+        'magnet',
+        'shield',
+        'turret',
+        'chain',
+        'berserk',
+        'blackhole',
+    ]
     const type = types[Math.floor(Math.random() * types.length)]
     const target = side === 'top' ? 'bottom' : 'top'
     state.powerUps.push({
@@ -536,10 +736,59 @@ function splitBalls(state: GameState): void {
             ...ball,
             vx: -ball.vx * 0.9 + 90,
             vy: ball.vy * 0.95,
+            expiresAt: state.elapsed + 10,
         })
+        if (state.balls.length + additions.length < 5) {
+            additions.push({
+                ...ball,
+                vx: ball.vx * 0.55 - 140,
+                vy: ball.vy * 1.02,
+                expiresAt: state.elapsed + 10,
+            })
+        }
     })
     state.balls.push(...additions)
     state.ball = state.balls[0]
+}
+
+function splashBricks(state: GameState, side: Seat, origin: Brick): void {
+    const cx = origin.x + origin.width / 2
+    const cy = origin.y + origin.height / 2
+    state.bricks[side].forEach((brick) => {
+        if (!brick.alive) {
+            return
+        }
+        const bx = brick.x + brick.width / 2
+        const by = brick.y + brick.height / 2
+        if (Math.hypot(bx - cx, by - cy) < 96) {
+            brick.alive = false
+        }
+    })
+}
+
+function destroyNearestBricks(state: GameState, side: Seat, x: number, y: number, amount: number): void {
+    state.bricks[side]
+        .filter((brick) => brick.alive)
+        .sort((a, b) => distanceToBrick(a, x, y) - distanceToBrick(b, x, y))
+        .slice(0, amount)
+        .forEach((brick) => {
+            brick.alive = false
+        })
+
+    if (state.bricks[side].every((brick) => !brick.alive)) {
+        finish(state, opponentOf(side))
+    }
+}
+
+function applyBlackHolePull(state: GameState, ball: Ball, dt: number): void {
+    state.blackHoles.forEach((hole) => {
+        const dx = hole.x - ball.x
+        const dy = hole.y - ball.y
+        const distance = Math.max(80, Math.hypot(dx, dy))
+        const force = 6800 / distance
+        ball.vx += (dx / distance) * force * dt
+        ball.vy += (dy / distance) * force * dt
+    })
 }
 
 function destroyBricks(state: GameState, side: Seat, amount: number): void {
@@ -553,6 +802,10 @@ function destroyBricks(state: GameState, side: Seat, amount: number): void {
     if (state.bricks[side].every((brick) => !brick.alive)) {
         finish(state, opponentOf(side))
     }
+}
+
+function distanceToBrick(brick: Brick, x: number, y: number): number {
+    return Math.hypot(brick.x + brick.width / 2 - x, brick.y + brick.height / 2 - y)
 }
 
 function opponentOf(seat: Seat): Seat {
@@ -579,6 +832,10 @@ function circleIntersectsRect(circle: Ball, rect: Brick | Paddle): boolean {
 
 function rectsIntersect(a: { x: number; y: number; width: number; height: number }, b: Paddle): boolean {
     return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
+}
+
+function pointInRect(x: number, y: number, rect: Brick): boolean {
+    return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height
 }
 
 function clamp(value: number, min: number, max: number): number {
