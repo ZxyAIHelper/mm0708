@@ -27,6 +27,10 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install dependencies
+        working-directory: apps/my-cloud-hub
+        run: npm install --package-lock=false
+
       - name: Deploy Worker
         working-directory: apps/my-cloud-hub
         run: npx wrangler@4 deploy --minify src/index.ts
