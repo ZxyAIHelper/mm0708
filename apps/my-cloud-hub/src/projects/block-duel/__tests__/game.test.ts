@@ -26,6 +26,12 @@ describe('block duel game state', () => {
         expect(state.status).toBe('countdown')
     })
 
+    it('starts the ball at a faster baseline speed', () => {
+        const state = createGameState()
+
+        expect(Math.hypot(state.balls[0].vx, state.balls[0].vy)).toBeGreaterThanOrEqual(430)
+    })
+
     it('rejects a taken seat', () => {
         const state = createGameState()
 

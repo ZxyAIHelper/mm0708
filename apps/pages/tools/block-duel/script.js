@@ -35,10 +35,16 @@ let previousState = null;
 let clientId = null;
 let keys = { left: false, right: false };
 let dragState = null;
+let targetX = null;
+let lastInputSentAt = 0;
+let queuedInput = null;
+let lastFrameAt = performance.now();
 let particles = [];
 let ballTrail = [];
 let screenShake = 0;
 let arenaFlash = 0;
+const INPUT_SEND_MS = 50;
+const LOCAL_PADDLE_SPEED = 920;
 
 init();
 
@@ -51,6 +57,7 @@ function init() {
         if (!selectedRoom) loadRooms();
     }, 5000);
     drawEmptyArena();
+    requestAnimationFrame(animationLoop);
 }
 
 function bindEvents() {
@@ -138,6 +145,9 @@ function showHome() {
     clientId = null;
     keys = { left: false, right: false };
     dragState = null;
+    targetX = null;
+    queuedInput = null;
+    lastInputSentAt = 0;
     setSeatButtons(false);
     els.connectionText.textContent = '未连接';
     els.homeView.classList.remove('hidden');
@@ -155,6 +165,9 @@ function connectRoom(roomId) {
     currentState = null;
     previousState = null;
     keys = { left: false, right: false };
+    targetX = null;
+    queuedInput = null;
+    lastInputSentAt = 0;
     els.roomTitle.textContent = `房间 ${roomId}`;
     els.connectionText.textContent = '连接中';
     setSeatButtons(false);
@@ -195,7 +208,6 @@ function handleServerMessage(message) {
         collectVisualEvents(previousState, message.state);
         currentState = message.state;
         previousState = cloneState(message.state);
-        renderGame(currentState);
         updateHud(currentState);
     }
 
@@ -215,7 +227,8 @@ function setKey(key, isDown) {
 
     if (next.left !== keys.left || next.right !== keys.right) {
         keys = next;
-        send({ type: 'input', ...keys });
+        targetX = null;
+        sendInput({ left: keys.left, right: keys.right, targetX: undefined }, true);
     }
 }
 
@@ -241,7 +254,8 @@ function bindDragControl(target) {
         if (!dragState || dragState.pointerId !== event.pointerId) return;
 
         dragState = null;
-        send({ type: 'input', left: false, right: false });
+        targetX = null;
+        sendInput({ left: false, right: false, targetX: undefined }, true);
         event.preventDefault();
     };
 
@@ -252,11 +266,12 @@ function bindDragControl(target) {
 function sendTargetInput(clientX) {
     const rect = canvas.getBoundingClientRect();
     const x = ((clientX - rect.left) / rect.width) * canvas.width;
-    send({
-        type: 'input',
+    targetX = Math.max(0, Math.min(canvas.width, x));
+    keys = { left: false, right: false };
+    sendInput({
         left: false,
         right: false,
-        targetX: Math.max(0, Math.min(canvas.width, x)),
+        targetX,
     });
 }
 
@@ -286,7 +301,33 @@ function sendDirectionalInput(direction) {
         left: direction < 0,
         right: direction > 0,
     };
-    send({ type: 'input', ...keys });
+    targetX = null;
+    sendInput({ left: keys.left, right: keys.right, targetX: undefined }, true);
+}
+
+function sendInput(input, force = false) {
+    queuedInput = {
+        type: 'input',
+        left: Boolean(input.left),
+        right: Boolean(input.right),
+    };
+    if (typeof input.targetX === 'number') {
+        queuedInput.targetX = input.targetX;
+    }
+
+    const now = performance.now();
+    if (!force && now - lastInputSentAt < INPUT_SEND_MS) {
+        return;
+    }
+
+    flushQueuedInput(now);
+}
+
+function flushQueuedInput(now = performance.now()) {
+    if (!queuedInput) return;
+    send(queuedInput);
+    queuedInput = null;
+    lastInputSentAt = now;
 }
 
 function send(payload) {
@@ -327,6 +368,43 @@ function updateHud(state) {
         els.overlay.innerHTML = `<strong>${seatText(state.winner)}获胜</strong><span>玩家可按 R 或点击重开</span>`;
     } else {
         els.overlay.classList.add('hidden');
+    }
+}
+
+function animationLoop(now) {
+    const dt = Math.min(0.05, (now - lastFrameAt) / 1000);
+    lastFrameAt = now;
+
+    if (queuedInput && now - lastInputSentAt >= INPUT_SEND_MS) {
+        flushQueuedInput(now);
+    }
+
+    if (currentState) {
+        applyLocalPrediction(currentState, dt);
+        renderGame(currentState);
+    }
+
+    requestAnimationFrame(animationLoop);
+}
+
+function applyLocalPrediction(state, dt) {
+    const seat = findMySeat(state);
+    if (!seat || state.status === 'finished') return;
+
+    const paddle = state.paddles?.[seat];
+    if (!paddle) return;
+
+    if (typeof targetX === 'number') {
+        const desired = Math.max(0, Math.min(state.width - paddle.width, targetX - paddle.width / 2));
+        const delta = desired - paddle.x;
+        const maxStep = LOCAL_PADDLE_SPEED * dt;
+        paddle.x += Math.abs(delta) <= maxStep ? delta : Math.sign(delta) * maxStep;
+        return;
+    }
+
+    const direction = Number(keys.right) - Number(keys.left);
+    if (direction !== 0) {
+        paddle.x = Math.max(0, Math.min(state.width - paddle.width, paddle.x + direction * LOCAL_PADDLE_SPEED * dt));
     }
 }
 

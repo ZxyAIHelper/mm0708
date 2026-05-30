@@ -25,12 +25,18 @@ type ClientMessage =
     | { type: 'reset' }
 
 const TICK_MS = 33
+const BROADCAST_MS = 50
+
+export function shouldBroadcastState(now: number, lastBroadcastAt: number): boolean {
+    return lastBroadcastAt <= 0 || now <= lastBroadcastAt || now - lastBroadcastAt >= BROADCAST_MS
+}
 
 export class BlockDuelRoom {
     private game = createGameState()
     private sockets = new Map<WebSocket, Client>()
     private tickTimer: ReturnType<typeof setInterval> | null = null
     private lastTick = Date.now()
+    private lastBroadcastAt = 0
     private roomId: RoomId = '1'
 
     constructor(private readonly state: DurableObjectState) {
@@ -168,12 +174,16 @@ export class BlockDuelRoom {
         }
 
         this.lastTick = Date.now()
+        this.lastBroadcastAt = 0
         this.tickTimer = setInterval(() => {
             const now = Date.now()
             const dt = Math.min(0.05, (now - this.lastTick) / 1000)
             this.lastTick = now
             stepGame(this.game, dt)
-            this.broadcastState()
+            if (shouldBroadcastState(now, this.lastBroadcastAt)) {
+                this.lastBroadcastAt = now
+                this.broadcastState()
+            }
         }, TICK_MS)
     }
 

@@ -122,8 +122,8 @@ const WIDTH = 720
 const HEIGHT = 1040
 const PADDLE_WIDTH = 132
 const PADDLE_HEIGHT = 18
-const PADDLE_SPEED = 430
-const BALL_SPEED = 360
+const PADDLE_SPEED = 500
+const BALL_SPEED = 430
 
 export function createGameState(): GameState {
     const state: GameState = {
@@ -718,7 +718,7 @@ function movePowerUps(state: GameState, dt: number): void {
 function scaleBallSpeed(state: GameState, factor: number): void {
     state.balls.forEach((ball) => {
         const speed = Math.hypot(ball.vx, ball.vy)
-        const nextSpeed = clamp(speed * factor, 220, 760)
+        const nextSpeed = clamp(speed * factor, 260, 860)
         const ratio = nextSpeed / speed
         ball.vx *= ratio
         ball.vy *= ratio
