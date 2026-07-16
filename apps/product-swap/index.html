@@ -4,10 +4,182 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>一键换产品</title>
+    <meta
+        name="description"
+        content="上传样图和产品图，使用 AI 自动替换样图中的菜品或商品。"
+    >
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <main id="app"></main>
+    <main class="product-swap-shell">
+        <button
+            class="back-button"
+            id="backButton"
+            type="button"
+        >← 返回</button>
+
+        <header class="intro">
+            <h1>一键换产品</h1>
+            <p>
+                上传一张满意的样图（目标图），再传你的产品图或场景图，自动换成你的产品。
+            </p>
+            <p class="tip">
+                提示：样图尽量避免含文字、品牌或水印，可能被 AI 安全系统拒绝。
+            </p>
+        </header>
+
+        <section
+            class="example-card"
+            aria-labelledby="exampleTitle"
+        >
+            <p id="exampleTitle">
+                效果示例 · 样图换成你的产品
+            </p>
+            <div class="example-equation">
+                <figure>
+                    <img
+                        src="/assets/example-template.jpg"
+                        alt="样图模板"
+                    >
+                    <figcaption>① 样图模板</figcaption>
+                </figure>
+                <span aria-hidden="true">+</span>
+                <figure>
+                    <img
+                        src="/assets/example-product.jpg"
+                        alt="你的产品"
+                    >
+                    <figcaption>② 你的产品</figcaption>
+                </figure>
+                <span aria-hidden="true">=</span>
+                <figure>
+                    <img
+                        src="/assets/example-result.jpg"
+                        alt="换好的效果"
+                    >
+                    <figcaption>③ 换好的效果</figcaption>
+                </figure>
+            </div>
+        </section>
+
+        <form id="swapForm" novalidate>
+            <section class="upload-field" data-slot="target">
+                <label for="targetInput">
+                    目标图（样图模板）
+                    <span aria-hidden="true">*</span>
+                </label>
+                <input
+                    id="targetInput"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    hidden
+                >
+                <button
+                    class="upload-box"
+                    data-input="targetInput"
+                    type="button"
+                >
+                    <span>点击上传</span>
+                </button>
+                <button
+                    class="remove-image"
+                    data-remove="target"
+                    type="button"
+                    hidden
+                >删除</button>
+            </section>
+
+            <section class="upload-field" data-slot="product">
+                <label for="productInput">
+                    产品图
+                    <small>（选填）</small>
+                </label>
+                <input
+                    id="productInput"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    hidden
+                >
+                <button
+                    class="upload-box"
+                    data-input="productInput"
+                    type="button"
+                >
+                    <span>点击上传</span>
+                </button>
+                <button
+                    class="remove-image"
+                    data-remove="product"
+                    type="button"
+                    hidden
+                >删除</button>
+            </section>
+
+            <section class="upload-field" data-slot="scene">
+                <label for="sceneInput">
+                    场景图
+                    <small>（选填）</small>
+                </label>
+                <input
+                    id="sceneInput"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    hidden
+                >
+                <button
+                    class="upload-box dashed"
+                    data-input="sceneInput"
+                    type="button"
+                >
+                    <span>点击上传</span>
+                </button>
+                <button
+                    class="remove-image"
+                    data-remove="scene"
+                    type="button"
+                    hidden
+                >删除</button>
+            </section>
+
+            <textarea
+                id="requirementsInput"
+                maxlength="200"
+                placeholder="额外要求（选填，仅微调风格/细节，最多200字）"
+            ></textarea>
+
+            <p
+                id="formError"
+                class="form-error"
+                role="alert"
+                hidden
+            ></p>
+
+            <button
+                id="generateButton"
+                class="generate-button"
+                type="submit"
+            >生成（消耗 3 豆额度）</button>
+        </form>
+
+        <section
+            id="resultSection"
+            class="result-card"
+            hidden
+        >
+            <img id="resultImage" alt="换品结果">
+            <div class="result-actions">
+                <button
+                    id="regenerateButton"
+                    type="button"
+                >再次生成</button>
+                <button
+                    id="downloadButton"
+                    type="button"
+                >下载图片</button>
+            </div>
+        </section>
+    </main>
     <script src="/script.js"></script>
 </body>
 </html>
