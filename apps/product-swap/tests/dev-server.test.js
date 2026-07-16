@@ -1,0 +1,67 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { once } = require('node:events');
+
+const {
+    createProductSwapServer,
+} = require('../server/dev-server');
+
+const tinyPng = 'data:image/png;base64,iVBORw0KGgo=';
+
+test('serves the app and returns an injected generated image', async (t) => {
+    const server = createProductSwapServer({
+        provider: async () => ({
+            imageBuffer: Buffer.from('result'),
+            mimeType: 'image/png',
+            provider: 'fake',
+        }),
+    });
+
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    t.after(() => server.close());
+
+    const { port } = server.address();
+    const page = await fetch(`http://127.0.0.1:${port}/`);
+    assert.equal(page.status, 200);
+    assert.match(await page.text(), /一键换产品/);
+
+    const response = await fetch(
+        `http://127.0.0.1:${port}/api/product-swap/generate`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetImage: tinyPng }),
+        },
+    );
+    const data = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(data.success, true);
+    assert.equal(data.provider, 'fake');
+    assert.match(data.imageUrl, /^data:image\/png;base64,/);
+});
+
+test('returns stable validation errors', async (t) => {
+    const server = createProductSwapServer({
+        provider: async () => null,
+    });
+
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    t.after(() => server.close());
+
+    const { port } = server.address();
+    const response = await fetch(
+        `http://127.0.0.1:${port}/api/product-swap/generate`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
+        },
+    );
+    const data = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(data.error.code, 'INVALID_INPUT');
+});
