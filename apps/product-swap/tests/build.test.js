@@ -18,6 +18,7 @@ test('build emits only deployable public assets', async () => {
         'history.html',
         'history.js',
         'index.html',
+        'local-history.js',
         'script.js',
         'style.css',
     ]);

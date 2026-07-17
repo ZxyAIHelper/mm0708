@@ -9,6 +9,7 @@ const publicEntries = [
     'history.html',
     'style.css',
     'api-client.js',
+    'local-history.js',
     'script.js',
     'history.js',
     'assets',
