@@ -53,6 +53,27 @@ export type ProductSwapTaskArchive = {
     ): Promise<ProductSwapArchiveHandle>
 }
 
+export async function archiveProductSwapInputs(
+    service: Pick<CloudflareTaskHistoryService, 'archiveRemoteImage'>,
+    task: TaskRecord,
+    input: ProductSwapArchiveInput,
+): Promise<void> {
+    const images: Array<[
+        'target' | 'product' | 'scene' | 'previous',
+        string | undefined,
+    ]> = [
+        ['target', input.targetImage],
+        ['product', input.productImage],
+        ['scene', input.sceneImage],
+        ['previous', input.previousImage],
+    ]
+    for (const [role, source] of images) {
+        if (source) {
+            await service.archiveRemoteImage(task, role, source)
+        }
+    }
+}
+
 const defaultTaskArchive: ProductSwapTaskArchive = {
     async start(c, input) {
         const user = await ensureAnonymousSession(c)
@@ -65,21 +86,8 @@ const defaultTaskArchive: ProductSwapTaskArchive = {
                 isRefinement: Boolean(input.previousImage),
             },
         })
-        const images: Array<[
-            'target' | 'product' | 'scene' | 'previous',
-            string | undefined,
-        ]> = [
-            ['target', input.targetImage],
-            ['product', input.productImage],
-            ['scene', input.sceneImage],
-            ['previous', input.previousImage],
-        ]
         try {
-            for (const [role, source] of images) {
-                if (source) {
-                    await service.archiveDataUrl(task, role, source)
-                }
-            }
+            await archiveProductSwapInputs(service, task, input)
         } catch (error) {
             await service.failTask(
                 task.id,

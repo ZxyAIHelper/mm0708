@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { describe, expect, it, vi } from 'vitest'
 import {
+    archiveProductSwapInputs,
     createProductSwapRouter,
     type ProductSwapTaskArchive,
 } from '../router'
@@ -32,6 +33,30 @@ function createApp(
 }
 
 describe('product swap router', () => {
+    it('archives a previous result URL as an image source', async () => {
+        const archived: Array<[string, string]> = []
+        const service = {
+            archiveRemoteImage: async (
+                _task: unknown,
+                role: string,
+                source: string,
+            ) => {
+                archived.push([role, source])
+            },
+        }
+
+        await archiveProductSwapInputs(service as any, {} as any, {
+            targetImage,
+            previousImage: 'https://example.com/previous.png',
+            requirements: '',
+        })
+
+        expect(archived).toContainEqual([
+            'previous',
+            'https://example.com/previous.png',
+        ])
+    })
+
     it('requires a target image', async () => {
         const provider: ProductSwapProvider = {
             name: 'fake',
