@@ -11,11 +11,14 @@ import coupletRouter from './projects/couplet/router'
 import blockDuelRouter from './projects/block-duel/router'
 import pushRouter from './projects/push/router'
 import productSwapRouter from './projects/product-swap/router'
+import taskHistoryRouter from './projects/task-history/router'
+import { CloudflareTaskHistoryService } from './projects/task-history/service'
+import { runExpiredAssetCleanup } from './projects/task-history/cleanup'
 export { BlockDuelRoom } from './projects/block-duel/room'
-
 
 type Bindings = {
     DB: D1Database
+    TASK_ASSETS: R2Bucket
     WECHAT_KV: KVNamespace
     VECTORIZE: VectorizeIndex
     AI: Ai
@@ -30,61 +33,108 @@ type Bindings = {
     BLOCK_DUEL_ROOM: DurableObjectNamespace
 }
 
-const app = new Hono<{ Bindings: Bindings }>()
+export function isTrustedOrigin(origin: string) {
+    if (/^https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)*\.mm0708\.top$/i
+        .test(origin)) {
+        return true
+    }
+    try {
+        const url = new URL(origin)
+        return (url.hostname === 'localhost'
+            || url.hostname === '127.0.0.1')
+            && (url.protocol === 'http:' || url.protocol === 'https:')
+    } catch {
+        return false
+    }
+}
 
-// 全局 CORS
-app.use('/*', cors())
+export function createApp() {
+    const app = new Hono<{ Bindings: Bindings }>()
 
-// 根路由
-app.get('/', (c) => {
-    return c.json({
+    app.use('/*', cors({
+        origin: (origin) => isTrustedOrigin(origin)
+            ? origin
+            : null,
+        allowMethods: [
+            'GET',
+            'HEAD',
+            'POST',
+            'DELETE',
+            'OPTIONS',
+        ],
+        allowHeaders: ['Content-Type'],
+        exposeHeaders: ['ETag'],
+        credentials: true,
+        maxAge: 86400,
+    }))
+
+    app.get('/', (c) => c.json({
         name: 'My Cloud Hub',
         version: '1.0.0',
         status: 'running',
-    })
-})
+    }))
 
-// 挂载子路由
-app.route('/api/meme', memeRouter)
-app.route('/api/todo/tasks', tasksRouter)
-app.route('/api/todo/rag', ragRouter)
-app.route('/api/todo/chat', chatRouter)
-app.route('/api/email-monitor', emailMonitorRouter)
-app.route('/api/couplet', coupletRouter)
-app.route('/api/block-duel', blockDuelRouter)
-app.route('/api/push', pushRouter)
-app.route('/api/product-swap', productSwapRouter)
+    app.route('/api/meme', memeRouter)
+    app.route('/api/todo/tasks', tasksRouter)
+    app.route('/api/todo/rag', ragRouter)
+    app.route('/api/todo/chat', chatRouter)
+    app.route('/api/email-monitor', emailMonitorRouter)
+    app.route('/api/couplet', coupletRouter)
+    app.route('/api/block-duel', blockDuelRouter)
+    app.route('/api/push', pushRouter)
+    app.route('/api/tasks', taskHistoryRouter)
+    app.route('/api/product-swap', productSwapRouter)
 
+    app.onError(async (err, c) => {
+        console.error(JSON.stringify({
+            event: 'worker_request_error',
+            message: err.message,
+        }))
 
-
-// 全局错误处理
-app.onError(async (err, c) => {
-    console.error(`[Error] ${err.message}`, err)
-
-    // 尝试发送微信通知 (如果配置了)
-    if (c.env.WECHAT_APPID && c.env.WECHAT_SECRET) {
-        try {
-            await sendWeChatNotification(
-                c.env,
-                `Backend Error: ${err.message}`
-            )
-        } catch (notifyError) {
-            console.error('Failed to send WeChat notification', notifyError)
+        if (c.env.WECHAT_APPID && c.env.WECHAT_SECRET) {
+            try {
+                await sendWeChatNotification(
+                    c.env,
+                    `Backend Error: ${err.message}`,
+                )
+            } catch (notifyError) {
+                console.error(JSON.stringify({
+                    event: 'worker_error_notification_failed',
+                    message: notifyError instanceof Error
+                        ? notifyError.message
+                        : 'unknown',
+                }))
+            }
         }
-    }
 
-    return c.json(
-        {
+        return c.json({
             error: 'Internal Server Error',
             message: err.message,
-        },
-        500
-    )
-})
+        }, 500)
+    })
 
+    return app
+}
+
+const app = createApp()
 
 export default {
     fetch: app.fetch,
-    email: handleEmail
+    email: handleEmail,
+    scheduled(
+        controller: ScheduledController,
+        env: Bindings,
+        ctx: ExecutionContext,
+    ) {
+        const service = new CloudflareTaskHistoryService(env)
+        ctx.waitUntil(
+            runExpiredAssetCleanup(service, controller.scheduledTime)
+                .then((deleted) => {
+                    console.log(JSON.stringify({
+                        event: 'task_asset_cleanup_completed',
+                        deleted,
+                    }))
+                }),
+        )
+    },
 }
-
