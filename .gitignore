@@ -29,8 +29,14 @@ build/
 Thumbs.db
 
 # Environment variables
+.dev.vars
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Local visual verification artifacts
+poster-maker-*-test.js
+poster-maker-layout.png
+apps/pages/tools/candy-reef-td/verification-*.png

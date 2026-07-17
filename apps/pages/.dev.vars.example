@@ -1,0 +1,6 @@
+DOUBAO_API_KEY=replace-with-your-api-key
+DOUBAO_ENDPOINT_ID=replace-with-your-endpoint-id
+DOUBAO_IMAGE_ENDPOINT_ID=replace-with-your-image-endpoint-id
+OPENAI_API_KEY=replace-with-your-api-key
+OPENAI_COMPAT_BASE_URL=https://api.openai.com
+OPENAI_IMAGE_MODEL=gpt-image-1
