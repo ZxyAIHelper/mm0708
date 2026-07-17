@@ -1,7 +1,6 @@
 import { Hono } from 'hono'
 import { describe, expect, it, vi } from 'vitest'
 import {
-    archiveProductSwapInputs,
     createProductSwapRouter,
     type ProductSwapTaskArchive,
 } from '../router'
@@ -33,35 +32,24 @@ function createApp(
 }
 
 describe('product swap router', () => {
-    it('only fetches a previous URL after ownership validation', async () => {
-        const archived: Array<[string, string]> = []
-        const service = {
-            archiveDataUrl: async (
-                _task: unknown,
-                role: string,
-                source: string,
-            ) => {
-                archived.push([role, source])
-            },
-            archiveOwnedResult: async (
-                _task: unknown,
-                source: string,
-            ) => {
-                archived.push(['owned-previous', source])
-            },
+    it('generates without any task storage bindings by default', async () => {
+        const provider: ProductSwapProvider = {
+            name: 'fake',
+            generate: async () => ({ imageUrl: targetImage }),
         }
-
-        await archiveProductSwapInputs(service as any, {} as any, {
-            targetImage,
-            previousImage: 'https://example.com/previous.png',
-            requirements: '',
+        const app = new Hono()
+        app.route(
+            '/api/product-swap',
+            createProductSwapRouter(() => provider),
+        )
+        const response = await app.request('/api/product-swap/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetImage }),
         })
 
-        expect(archived).toContainEqual(['target', targetImage])
-        expect(archived).toContainEqual([
-            'owned-previous',
-            'https://example.com/previous.png',
-        ])
+        expect(response.status).toBe(200)
+        expect((await response.json() as any).success).toBe(true)
     })
 
     it('requires a target image', async () => {

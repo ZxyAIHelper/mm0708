@@ -11,14 +11,10 @@ import coupletRouter from './projects/couplet/router'
 import blockDuelRouter from './projects/block-duel/router'
 import pushRouter from './projects/push/router'
 import productSwapRouter from './projects/product-swap/router'
-import taskHistoryRouter from './projects/task-history/router'
-import { CloudflareTaskHistoryService } from './projects/task-history/service'
-import { runExpiredAssetCleanup } from './projects/task-history/cleanup'
 export { BlockDuelRoom } from './projects/block-duel/room'
 
 type Bindings = {
     DB: D1Database
-    TASK_ASSETS: R2Bucket
     WECHAT_KV: KVNamespace
     VECTORIZE: VectorizeIndex
     AI: Ai
@@ -65,7 +61,6 @@ export function createApp() {
         }
         await next()
     }
-    app.use('/api/tasks/*', protectPrivateOrigin)
     app.use('/api/product-swap/*', protectPrivateOrigin)
 
     app.use('/*', cors({
@@ -79,7 +74,7 @@ export function createApp() {
             'DELETE',
             'OPTIONS',
         ],
-        allowHeaders: ['Content-Type', 'X-Browser-Session'],
+        allowHeaders: ['Content-Type'],
         exposeHeaders: ['ETag'],
         credentials: true,
         maxAge: 86400,
@@ -99,7 +94,6 @@ export function createApp() {
     app.route('/api/couplet', coupletRouter)
     app.route('/api/block-duel', blockDuelRouter)
     app.route('/api/push', pushRouter)
-    app.route('/api/tasks', taskHistoryRouter)
     app.route('/api/product-swap', productSwapRouter)
 
     app.onError(async (err, c) => {
@@ -138,20 +132,4 @@ const app = createApp()
 export default {
     fetch: app.fetch,
     email: handleEmail,
-    scheduled(
-        controller: ScheduledController,
-        env: Bindings,
-        ctx: ExecutionContext,
-    ) {
-        const service = new CloudflareTaskHistoryService(env)
-        ctx.waitUntil(
-            runExpiredAssetCleanup(service, controller.scheduledTime)
-                .then((deleted) => {
-                    console.log(JSON.stringify({
-                        event: 'task_asset_cleanup_completed',
-                        deleted,
-                    }))
-                }),
-        )
-    },
 }

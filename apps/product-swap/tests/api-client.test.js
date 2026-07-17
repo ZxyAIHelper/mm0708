@@ -1,12 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const {
     resolveApiBase,
     apiFetch,
     apiJson,
-    ensureSession,
-    assetUrl,
 } = require('../api-client');
 
 test('resolves local and production API bases', () => {
@@ -29,25 +29,19 @@ test('always includes browser credentials', async () => {
 
     assert.equal(captured.url, 'https://api.example/api/tasks');
     assert.equal(captured.init.credentials, 'include');
+    assert.equal(
+        new Headers(captured.init.headers).get('X-Browser-Session'),
+        null,
+    );
 });
 
-test('shares a stable browser session header from local storage', async () => {
-    const values = new Map();
-    const storage = {
-        getItem: (key) => values.get(key) || null,
-        setItem: (key, value) => values.set(key, value),
-    };
-    const headers = [];
-    const fetchImpl = async (_url, init) => {
-        headers.push(new Headers(init.headers).get('X-Browser-Session'));
-        return new Response('{}');
-    };
-
-    await apiFetch('/first', {}, { fetchImpl, storage });
-    await apiFetch('/second', {}, { fetchImpl, storage });
-
-    assert.match(headers[0], /^[A-Za-z0-9_-]{43}$/);
-    assert.equal(headers[1], headers[0]);
+test('does not send a remote browser identity header', () => {
+    const source = fs.readFileSync(
+        path.join(__dirname, '..', 'api-client.js'),
+        'utf8',
+    );
+    assert.doesNotMatch(source, /X-Browser-Session/);
+    assert.doesNotMatch(source, /ensureSession/);
 });
 
 test('maps JSON API failures to a stable error', async () => {
@@ -67,21 +61,3 @@ test('maps JSON API failures to a stable error', async () => {
     );
 });
 
-test('bootstraps a session and builds protected asset paths', async () => {
-    let path;
-    const session = await ensureSession('', {
-        fetchImpl: async (url) => {
-            path = url;
-            return new Response(JSON.stringify({ userId: 'anon_1' }), {
-                headers: { 'Content-Type': 'application/json' },
-            });
-        },
-    });
-
-    assert.equal(path, '/api/tasks/session');
-    assert.equal(session.userId, 'anon_1');
-    assert.equal(
-        assetUrl('', 'task_1', 'asset_1'),
-        '/api/tasks/task_1/assets/asset_1',
-    );
-});

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { createApp, isTrustedOrigin } from './index'
 
-describe('worker task history wiring', () => {
+describe('worker product swap wiring', () => {
     it('accepts owned domains and local development origins', () => {
         expect(isTrustedOrigin(
             'https://product-swap.mm0708.top',
@@ -16,7 +17,7 @@ describe('worker task history wiring', () => {
 
     it('returns credentialed CORS headers for a trusted origin', async () => {
         const response = await createApp().request(
-            '/api/tasks/session',
+            '/api/product-swap/generate',
             {
                 method: 'OPTIONS',
                 headers: {
@@ -42,7 +43,8 @@ describe('worker task history wiring', () => {
     })
 
     it('blocks untrusted sibling origins only on private task routes', async () => {
-        const privateResponse = await createApp().request('/api/tasks', {
+        const privateResponse = await createApp().request(
+            '/api/product-swap/generate', {
             headers: { Origin: 'https://untrusted.mm0708.top' },
         })
         const legacyResponse = await createApp().request('/', {
@@ -54,5 +56,15 @@ describe('worker task history wiring', () => {
             .toBeNull()
         expect(legacyResponse.headers.get('Access-Control-Allow-Origin'))
             .toBe('https://untrusted.mm0708.top')
+    })
+
+    it('does not expose remote task storage or R2 bindings', async () => {
+        expect((await createApp().request('/api/tasks')).status).toBe(404)
+        const config = readFileSync(
+            new URL('../wrangler.toml', import.meta.url),
+            'utf8',
+        )
+        expect(config).not.toContain('TASK_ASSETS')
+        expect(config).not.toContain('[triggers]')
     })
 })

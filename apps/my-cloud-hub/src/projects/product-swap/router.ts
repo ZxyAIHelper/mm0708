@@ -6,14 +6,8 @@ import {
     type ProductSwapProvider,
 } from './provider'
 import { volcanoProductSwapProvider } from './volcano-provider'
-import { ensureAnonymousSession } from '../task-history/session'
-import { CloudflareTaskHistoryService } from '../task-history/service'
-import type {
-    TaskHistoryEnv,
-    TaskRecord,
-} from '../task-history/types'
 
-type Bindings = ProductSwapEnv & TaskHistoryEnv
+type Bindings = ProductSwapEnv
 
 type GenerateBody = {
     targetImage?: unknown
@@ -53,110 +47,14 @@ export type ProductSwapTaskArchive = {
     ): Promise<ProductSwapArchiveHandle>
 }
 
-export async function archiveProductSwapInputs(
-    service: Pick<
-        CloudflareTaskHistoryService,
-        'archiveDataUrl' | 'archiveOwnedResult'
-    >,
-    task: TaskRecord,
-    input: ProductSwapArchiveInput,
-): Promise<void> {
-    const images: Array<[
-        'target' | 'product' | 'scene' | 'previous',
-        string | undefined,
-    ]> = [
-        ['target', input.targetImage],
-        ['product', input.productImage],
-        ['scene', input.sceneImage],
-        ['previous', input.previousImage],
-    ]
-    for (const [role, source] of images) {
-        if (!source) {
-            continue
-        }
-        if (role === 'previous' && !source.startsWith('data:')) {
-            await service.archiveOwnedResult(task, source)
-        } else {
-            await service.archiveDataUrl(task, role, source)
-        }
-    }
-}
-
 const defaultTaskArchive: ProductSwapTaskArchive = {
-    async start(c, input) {
-        const user = await ensureAnonymousSession(c)
-        const service = new CloudflareTaskHistoryService(c.env)
-        const task = await service.startTask(user.id, {
-            taskType: 'product_swap',
-            title: '一键换产品',
-            input: {
-                requirements: input.requirements,
-                isRefinement: Boolean(input.previousImage),
-            },
-        })
-        try {
-            await archiveProductSwapInputs(service, task, input)
-        } catch (error) {
-            await service.failTask(
-                task.id,
-                'TASK_ARCHIVE_FAILED',
-                '输入图片保存失败',
-            ).catch(() => undefined)
-            throw error
+    async start() {
+        return {
+            taskId: '',
+            complete: async () => null,
+            fail: async () => undefined,
         }
-        return createArchiveHandle(task, service)
     },
-}
-
-function createArchiveHandle(
-    task: TaskRecord,
-    service: CloudflareTaskHistoryService,
-): ProductSwapArchiveHandle {
-    return {
-        taskId: task.id,
-        async complete(result) {
-            let warning: string | null = null
-            try {
-                await service.archiveRemoteImage(
-                    task,
-                    'output',
-                    result.imageUrl,
-                )
-            } catch (error) {
-                warning = '生成成功，但图片暂未保存到任务记录'
-                console.error(JSON.stringify({
-                    event: 'product_swap_output_archive_failed',
-                    taskId: task.id,
-                    error: error instanceof Error
-                        ? error.message
-                        : 'unknown',
-                }))
-            }
-            try {
-                await service.completeTask(task.id, {
-                    imageUrl: result.imageUrl,
-                    provider: result.provider,
-                    conversationId: result.conversationId,
-                    assistantMessage: result.assistantMessage ?? '',
-                    archiveWarning: warning,
-                })
-            } catch (error) {
-                warning = warning
-                    ?? '生成成功，但任务记录暂未更新'
-                console.error(JSON.stringify({
-                    event: 'product_swap_task_complete_failed',
-                    taskId: task.id,
-                    error: error instanceof Error
-                        ? error.message
-                        : 'unknown',
-                }))
-            }
-            return warning
-        },
-        async fail(code, message) {
-            await service.failTask(task.id, code, message)
-        },
-    }
 }
 
 function optionalString(value: unknown): string | undefined {
