@@ -178,6 +178,28 @@
                     type="button"
                 >下载图片</button>
             </div>
+            <div class="refinement-panel">
+                <div class="refinement-heading">
+                    <h2>继续对话修改</h2>
+                    <span>AI 会基于上一版继续调整</span>
+                </div>
+                <div
+                    id="chatTimeline"
+                    class="chat-timeline"
+                    aria-live="polite"
+                ></div>
+                <form id="refineForm" class="refine-form">
+                    <textarea
+                        id="refineInput"
+                        maxlength="500"
+                        placeholder="例如：盘子改成白色，菜品和构图都不要变"
+                    ></textarea>
+                    <button
+                        id="refineButton"
+                        type="submit"
+                    >发送并生成新版本</button>
+                </form>
+            </div>
         </section>
     </main>
     <script src="/script.js"></script>

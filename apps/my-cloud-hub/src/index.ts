@@ -9,6 +9,7 @@ import emailMonitorRouter from './projects/email-monitor/router'
 import { handleEmail } from './projects/email-monitor/handler'
 import coupletRouter from './projects/couplet/router'
 import blockDuelRouter from './projects/block-duel/router'
+import productSwapRouter from './projects/product-swap/router'
 export { BlockDuelRoom } from './projects/block-duel/room'
 
 
@@ -19,6 +20,7 @@ type Bindings = {
     AI: Ai
     DOUBAO_API_KEY: string
     DOUBAO_IMAGE_ENDPOINT_ID: string
+    DOUBAO_PRODUCT_SWAP_ENDPOINT_ID?: string
     DOUBAO_CHAT_ENDPOINT: string
     WECHAT_APPID: string
     WECHAT_SECRET: string
@@ -47,6 +49,7 @@ app.route('/api/todo/chat', chatRouter)
 app.route('/api/email-monitor', emailMonitorRouter)
 app.route('/api/couplet', coupletRouter)
 app.route('/api/block-duel', blockDuelRouter)
+app.route('/api/product-swap', productSwapRouter)
 
 
 

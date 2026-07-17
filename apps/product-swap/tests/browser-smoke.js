@@ -1,6 +1,10 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { once } = require('node:events');
 const puppeteer = require('puppeteer-core');
+const {
+    createProductSwapServer,
+} = require('../server/dev-server');
 
 const appRoot = path.resolve(__dirname, '..');
 const targetPath = path.join(
@@ -24,6 +28,15 @@ const resultDataUrl =
     }`;
 
 (async () => {
+    const server = createProductSwapServer({
+        provider: async () => ({
+            imageBuffer: Buffer.from('unused'),
+            mimeType: 'image/png',
+            provider: 'browser-smoke',
+        }),
+    });
+    server.listen(8791, '127.0.0.1');
+    await once(server, 'listening');
     const browser = await puppeteer.launch({
         executablePath:
             'C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -32,6 +45,7 @@ const resultDataUrl =
     });
     const page = await browser.newPage();
     const errors = [];
+    let generationCount = 0;
 
     try {
         await page.setViewport({
@@ -50,6 +64,7 @@ const resultDataUrl =
                     '/api/product-swap/generate',
                 )
             ) {
+                generationCount += 1;
                 request.respond({
                     status: 200,
                     contentType: 'application/json',
@@ -58,6 +73,10 @@ const resultDataUrl =
                         imageUrl: resultDataUrl,
                         provider: 'browser-smoke',
                         requestId: 'swap_browser_smoke',
+                        conversationId: 'conversation_browser_smoke',
+                        assistantMessage: generationCount === 1
+                            ? '已完成第一版。'
+                            : '已完成新一版修正。',
                     }),
                 });
                 return;
@@ -87,6 +106,11 @@ const resultDataUrl =
         await page.waitForSelector(
             '#resultSection:not([hidden])',
         );
+        await page.type('#refineInput', '盘子改成白色');
+        await page.click('#refineButton');
+        await page.waitForFunction(() =>
+            document.querySelectorAll('.chat-message').length >= 4,
+        );
 
         const state = await page.evaluate(() => ({
             title:
@@ -114,6 +138,8 @@ const resultDataUrl =
                     ?.getAttribute('src')
                     ?.startsWith('data:image/')
                 || false,
+            chatMessages:
+                document.querySelectorAll('.chat-message').length,
         }));
 
         await page.screenshot({
@@ -135,10 +161,13 @@ const resultDataUrl =
             || !state.productPreview
             || !state.resultVisible
             || !state.resultSource
+            || state.chatMessages < 4
+            || generationCount !== 2
         ) {
             process.exitCode = 1;
         }
     } finally {
         await browser.close();
+        await new Promise((resolve) => server.close(resolve));
     }
 })();

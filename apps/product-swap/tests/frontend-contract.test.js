@@ -8,6 +8,7 @@ const {
     resolveApiBase,
     validateClientFileMeta,
     buildGeneratePayload,
+    buildRefinePayload,
     mapErrorCode,
 } = require('../script');
 
@@ -24,12 +25,35 @@ test('page exposes the screenshot-matching controls', () => {
         'requirementsInput',
         'generateButton',
         'resultImage',
+        'chatTimeline',
+        'refineInput',
+        'refineButton',
     ]) {
         assert.match(html, new RegExp(`id="${id}"`));
     }
 
     assert.match(html, /生成（消耗 3 豆额度）/);
     assert.match(html, /最多200字/);
+});
+
+test('builds a bounded conversational refinement payload', () => {
+    const payload = buildRefinePayload({
+        target: 'target',
+        product: 'product',
+        scene: '',
+        result: 'previous',
+        conversationId: 'conversation_1',
+        messages: Array.from({ length: 8 }, (_, index) => ({
+            role: index % 2 ? 'assistant' : 'user',
+            content: `message ${index}`,
+        })),
+    }, ' 盘子改成白色 ');
+
+    assert.equal(payload.previousImage, 'previous');
+    assert.equal(payload.conversationId, 'conversation_1');
+    assert.equal(payload.requirements, '盘子改成白色');
+    assert.equal(payload.messages.length, 6);
+    assert.equal(payload.messages[0].content, 'message 2');
 });
 
 test('uses same-origin locally and the shared API in production', () => {

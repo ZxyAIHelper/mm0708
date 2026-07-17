@@ -6,7 +6,6 @@ const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const {
-    createSerialQueue,
     generateWithCodex,
 } = require('./codex-cli-provider');
 
@@ -27,8 +26,6 @@ const STATIC_MIME_TYPES = {
     '.png': 'image/png',
     '.webp': 'image/webp',
 };
-const enqueueGeneration = createSerialQueue();
-
 class ProductSwapError extends Error {
     constructor(code, message, status = 400) {
         super(message);
@@ -86,7 +83,7 @@ function validateGenerateRequest(body = {}) {
 
     const requirements = String(body.requirements || '').trim();
 
-    if (requirements.length > 200) {
+    if (requirements.length > (body.previousImage ? 500 : 200)) {
         throw new ProductSwapError(
             'INVALID_INPUT',
             '额外要求不能超过 200 字',
@@ -100,6 +97,9 @@ function validateGenerateRequest(body = {}) {
             : null,
         sceneImage: body.sceneImage
             ? decodeImageDataUrl(body.sceneImage, 'sceneImage')
+            : null,
+        previousImage: body.previousImage
+            ? decodeImageDataUrl(body.previousImage, 'previousImage')
             : null,
         requirements,
     };
@@ -187,6 +187,13 @@ function mapServerError(error) {
                 message: 'Codex 没有生成结果图片',
             },
         ],
+        [
+            'AGENT_LOOP_GUARD',
+            {
+                status: 409,
+                message: '检测到嵌套生成请求，已阻止 agent 循环',
+            },
+        ],
     ]);
     const code = knownErrors.has(error?.code)
         ? error.code
@@ -211,13 +218,11 @@ async function handleGenerate(request, response, provider) {
             path.join(os.tmpdir(), 'product-swap-'),
         );
 
-        const imagePaths = [
-            await writeInputImage(
-                taskDir,
-                'target',
-                input.targetImage,
-            ),
-        ];
+        const targetPath = await writeInputImage(
+            taskDir,
+            'target',
+            input.targetImage,
+        );
         const productPath = await writeInputImage(
             taskDir,
             'product',
@@ -228,6 +233,14 @@ async function handleGenerate(request, response, provider) {
             'scene',
             input.sceneImage,
         );
+        const previousPath = await writeInputImage(
+            taskDir,
+            'previous',
+            input.previousImage,
+        );
+        const imagePaths = previousPath
+            ? [previousPath, targetPath]
+            : [targetPath];
 
         if (productPath) {
             imagePaths.push(productPath);
@@ -236,19 +249,21 @@ async function handleGenerate(request, response, provider) {
             imagePaths.push(scenePath);
         }
 
-        const result = await enqueueGeneration(() =>
-            provider({
-                taskDir,
-                imagePaths,
-                requirements: input.requirements,
-                requestId,
-            }),
-        );
+        const result = await provider({
+            taskDir,
+            imagePaths,
+            hasProductImage: Boolean(productPath),
+            hasSceneImage: Boolean(scenePath),
+            hasPreviousImage: Boolean(previousPath),
+            requirements: input.requirements,
+            requestId,
+        });
 
         sendJson(response, 200, {
             success: true,
             imageUrl: `data:${result.mimeType};base64,${result.imageBuffer.toString('base64')}`,
             provider: result.provider,
+            assistantMessage: result.assistantMessage,
             requestId,
         });
     } catch (error) {
@@ -329,11 +344,14 @@ async function serveStatic(request, response) {
 function createProductSwapServer({
     provider = generateWithCodex,
 } = {}) {
+    let generationActive = false;
+
     return http.createServer(async (request, response) => {
         response.setHeader('Access-Control-Allow-Origin', '*');
         response.setHeader(
             'Access-Control-Allow-Headers',
             'Content-Type',
+            'X-Product-Swap-Agent-Depth',
         );
         response.setHeader(
             'Access-Control-Allow-Methods',
@@ -356,7 +374,27 @@ function createProductSwapServer({
                 === '/api/product-swap/generate'
             && request.method === 'POST'
         ) {
-            await handleGenerate(request, response, provider);
+            const requestedDepth = Number(
+                request.headers['x-product-swap-agent-depth'] || 0,
+            );
+
+            if (generationActive || requestedDepth > 0) {
+                sendJson(response, 409, {
+                    success: false,
+                    error: {
+                        code: 'AGENT_LOOP_GUARD',
+                        message: '检测到嵌套生成请求，已阻止 agent 循环',
+                    },
+                });
+                return;
+            }
+
+            generationActive = true;
+            try {
+                await handleGenerate(request, response, provider);
+            } finally {
+                generationActive = false;
+            }
             return;
         }
 

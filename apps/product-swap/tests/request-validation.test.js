@@ -37,6 +37,17 @@ test('rejects requirements longer than 200 characters', () => {
     );
 });
 
+test('allows a longer correction when refining a previous result', () => {
+    const value = validateGenerateRequest({
+        targetImage: tinyPng,
+        previousImage: tinyPng,
+        requirements: '调整'.repeat(200),
+    });
+
+    assert.equal(value.requirements.length, 400);
+    assert.ok(value.previousImage);
+});
+
 test('decodes supported Data URLs and rejects unsupported MIME types', () => {
     const decoded = decodeImageDataUrl(tinyPng, 'targetImage');
     assert.equal(decoded.mimeType, 'image/png');

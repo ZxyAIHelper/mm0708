@@ -1,5 +1,19 @@
 name = "my-cloud-hub"
-compatibility_date = "2026-05-29"
+compatibility_date = "2026-07-17"
+compatibility_flags = [ "nodejs_compat" ]
+
+[vars]
+DOUBAO_CHAT_ENDPOINT = "ep-20260716231326-d56zl"
+DOUBAO_IMAGE_ENDPOINT_ID = "ep-20260107231748-q2sw8"
+DOUBAO_PRODUCT_SWAP_ENDPOINT_ID = "ep-20260107231748-q2sw8"
+DOUBAO_ARK_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3"
+
+[secrets]
+required = [ "DOUBAO_API_KEY" ]
+
+[observability]
+enabled = true
+head_sampling_rate = 1
 
 [[d1_databases]]
 binding = "DB"

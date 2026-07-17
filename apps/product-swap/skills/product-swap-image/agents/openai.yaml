@@ -1,0 +1,4 @@
+interface:
+  display_name: "商品换品生图"
+  short_description: "Generate and refine commercial product replacement images"
+  default_prompt: "Use $product-swap-image to replace the product in my template image and refine the result."
