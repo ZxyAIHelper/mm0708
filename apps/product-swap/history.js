@@ -1,11 +1,7 @@
 'use strict';
 
 (function bootTaskHistory() {
-    const api = window.ProductSwapApi;
-    const apiBase = api.resolveApiBase(
-        window.API_BASE_URL || '',
-        window.location.hostname,
-    );
+    const history = window.LocalTaskHistory;
     const elements = {
         filters: document.getElementById('taskTypeFilters'),
         list: document.getElementById('taskList'),
@@ -60,9 +56,7 @@
     }
 
     function assetExpired(asset) {
-        return !asset
-            || Boolean(asset.deletedAt)
-            || Number(asset.expiresAt) <= Date.now();
+        return !asset || history.isExpired(asset);
     }
 
     function revokeAll(group) {
@@ -87,7 +81,7 @@
 
     async function loadProtectedImage(
         container,
-        taskId,
+        _taskId,
         asset,
         urlGroup,
     ) {
@@ -98,26 +92,23 @@
         const image = container.querySelector('img');
         const placeholder = container.querySelector('.asset-placeholder');
         try {
-            const response = await api.apiFetch(
-                `/api/tasks/${encodeURIComponent(taskId)}`
-                    + `/assets/${encodeURIComponent(asset.id)}`,
-                {},
-                { apiBase },
-            );
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                if (errorData?.error?.code === 'ASSET_EXPIRED') {
-                    showExpired(container);
-                    return null;
-                }
-                throw new Error('IMAGE_LOAD_FAILED');
+            let imageUrl = asset.sourceUrl || '';
+            if (asset.blob) {
+                const blobUrl = URL.createObjectURL(asset.blob);
+                urlGroup.add(blobUrl);
+                imageUrl = blobUrl;
             }
-            const blobUrl = URL.createObjectURL(await response.blob());
-            urlGroup.add(blobUrl);
-            image.src = blobUrl;
+            if (!imageUrl) {
+                showExpired(container);
+                return null;
+            }
+            image.addEventListener('error', () => {
+                showExpired(container);
+            }, { once: true });
+            image.src = imageUrl;
             image.hidden = false;
             placeholder.hidden = true;
-            return blobUrl;
+            return imageUrl;
         } catch {
             showExpired(container, '图片暂时无法加载');
             return null;
@@ -142,11 +133,7 @@
             return;
         }
         try {
-            await api.apiJson(
-                `/api/tasks/${encodeURIComponent(taskId)}`,
-                { method: 'DELETE' },
-                { apiBase },
-            );
+            await history.deleteTask(taskId);
             state.tasks.delete(taskId);
             card?.remove();
             if (!state.tasks.size) {
@@ -230,19 +217,12 @@
         elements.error.hidden = true;
         elements.empty.hidden = true;
         elements.loadMore.hidden = true;
-        const query = new URLSearchParams({ limit: '30' });
-        if (state.taskType) {
-            query.set('type', state.taskType);
-        }
-        if (state.cursor) {
-            query.set('cursor', state.cursor);
-        }
         try {
-            const data = await api.apiJson(
-                `/api/tasks?${query.toString()}`,
-                {},
-                { apiBase },
-            );
+            const data = await history.listTasks({
+                taskType: state.taskType,
+                cursor: state.cursor,
+                limit: 30,
+            });
             for (const task of data.tasks || []) {
                 state.tasks.set(task.id, task);
                 elements.list.appendChild(createTaskCard(task));
@@ -369,12 +349,11 @@
         document.body.classList.add('detail-open');
         elements.detailClose.focus();
         try {
-            const data = await api.apiJson(
-                `/api/tasks/${encodeURIComponent(taskId)}`,
-                {},
-                { apiBase },
-            );
-            renderDetail(data.task);
+            const task = await history.getTask(taskId);
+            if (!task) {
+                throw new Error('TASK_NOT_FOUND');
+            }
+            renderDetail(task);
         } catch {
             elements.detailContent.textContent = '任务详情加载失败，请关闭后重试。';
         }
@@ -416,7 +395,7 @@
         revokeAll(detailBlobUrls);
     });
 
-    api.ensureSession(apiBase)
+    history.cleanupExpiredAssets()
         .then(() => loadTasks({ reset: true }))
         .catch(() => {
             elements.loading.hidden = true;

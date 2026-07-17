@@ -55,7 +55,6 @@ function jsonResponse(request, body, status = 200) {
     const page = await browser.newPage();
     const errors = [];
     let generationCount = 0;
-    let deletedTask = false;
 
     try {
         await page.setViewport({
@@ -70,6 +69,12 @@ function jsonResponse(request, body, status = 200) {
         await page.setRequestInterception(true);
         page.on('request', (request) => {
             const requestUrl = new URL(request.url());
+
+            if (requestUrl.pathname.startsWith('/api/tasks')) {
+                errors.push(`unexpected remote task request: ${requestUrl}`);
+                jsonResponse(request, { error: 'not available' }, 404);
+                return;
+            }
 
             if (
                 request.method() === 'POST'
@@ -207,7 +212,6 @@ function jsonResponse(request, body, status = 200) {
                 request.method() === 'DELETE'
                 && requestUrl.pathname === '/api/tasks/task_expired'
             ) {
-                deletedTask = true;
                 jsonResponse(request, { success: true });
                 return;
             }
@@ -258,18 +262,15 @@ function jsonResponse(request, body, status = 200) {
             page.waitForNavigation({ waitUntil: 'networkidle0' }),
             page.click('#historyLink'),
         ]);
-        await page.waitForSelector('[data-task-id="task_smoke"]');
-        await page.waitForSelector(
-            '[data-task-id="task_expired"] .asset-expired',
+        await page.waitForFunction(() =>
+            document.querySelectorAll('.task-card').length === 2,
         );
-        await page.click(
-            '[data-task-id="task_smoke"] .task-card-actions button',
-        );
+        await page.click('.task-card .task-card-actions button');
         await page.waitForSelector('#taskDetailLayer:not([hidden])');
         await page.waitForFunction(() =>
             document.querySelectorAll(
                 '#taskDetailContent .detail-asset img:not([hidden])',
-            ).length === 3,
+            ).length === 4,
         );
         const historyState = await page.evaluate(() => ({
             title: document.querySelector('.history-heading h1')
@@ -283,11 +284,21 @@ function jsonResponse(request, body, status = 200) {
             ).length,
         }));
         await page.click('#taskDetailClose');
-        await page.click(
-            '[data-task-id="task_expired"] .danger-button',
-        );
+        await page.evaluate(() => window.LocalTaskHistory
+            .cleanupExpiredAssets(
+                Date.now() + 31 * 24 * 60 * 60 * 1000,
+            ));
+        await page.reload({ waitUntil: 'networkidle0' });
         await page.waitForFunction(() =>
-            !document.querySelector('[data-task-id="task_expired"]'),
+            document.querySelectorAll('.task-card .asset-expired')
+                .length === 2,
+        );
+        historyState.expiredAfterCleanup = await page.evaluate(() =>
+            document.querySelectorAll('.task-card .asset-expired').length,
+        );
+        await page.click('.task-card .danger-button');
+        await page.waitForFunction(() =>
+            document.querySelectorAll('.task-card').length === 1,
         );
 
         console.log(JSON.stringify({ state, historyState, errors }, null, 2));
@@ -305,9 +316,9 @@ function jsonResponse(request, body, status = 200) {
             || generationCount !== 2
             || historyState.title !== '所有任务'
             || historyState.cards !== 2
-            || historyState.expired !== 1
-            || historyState.detailAssets !== 3
-            || !deletedTask
+            || historyState.expired !== 0
+            || historyState.expiredAfterCleanup !== 2
+            || historyState.detailAssets !== 4
         ) {
             process.exitCode = 1;
         }

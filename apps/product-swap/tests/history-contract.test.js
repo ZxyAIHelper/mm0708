@@ -34,14 +34,24 @@ test('task center exposes list, filters, states, pagination and detail', () => {
     assert.match(html, /一键换产品/);
 });
 
-test('task center handles protected blobs, expiry and deletion', () => {
+test('task center reads local blobs, urls, expiry and deletion', () => {
+    const html = fs.readFileSync(
+        path.join(root, 'history.html'),
+        'utf8',
+    );
     const script = fs.readFileSync(
         path.join(root, 'history.js'),
         'utf8',
     );
+    assert.match(html, /local-history\.js/);
+    assert.doesNotMatch(script, /\/api\/tasks/);
+    assert.match(script, /LocalTaskHistory/);
+    assert.match(script, /history\.listTasks/);
+    assert.match(script, /history\.getTask/);
+    assert.match(script, /history\.deleteTask/);
     assert.match(script, /URL\.createObjectURL/);
     assert.match(script, /URL\.revokeObjectURL/);
-    assert.match(script, /ASSET_EXPIRED/);
-    assert.match(script, /method:\s*'DELETE'/);
+    assert.match(script, /history\.isExpired/);
+    assert.match(script, /sourceUrl/);
     assert.match(script, /cursor/);
 });
