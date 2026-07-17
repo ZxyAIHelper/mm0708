@@ -423,4 +423,3 @@
             elements.error.hidden = false;
         });
 }());
-

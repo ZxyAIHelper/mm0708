@@ -11,7 +11,6 @@ export type SessionRepository = {
     create(user: AnonymousUser, hash: string): Promise<void>
     touch(userId: string, now: number): Promise<void>
 }
-
 function bytesToBase64Url(bytes: Uint8Array) {
     let binary = ''
     for (const byte of bytes) {
@@ -132,4 +131,3 @@ export async function ensureAnonymousSession(
     })
     return user
 }
-

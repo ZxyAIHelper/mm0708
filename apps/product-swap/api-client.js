@@ -9,7 +9,6 @@ function resolveApiBase(explicitBase, hostname) {
     }
     return 'https://api.mm0708.top';
 }
-
 class ApiClientError extends Error {
     constructor(code, message, status) {
         super(message);
@@ -82,4 +81,3 @@ if (typeof window !== 'undefined') {
 if (typeof module !== 'undefined') {
     module.exports = client;
 }
-

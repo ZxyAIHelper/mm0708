@@ -34,7 +34,6 @@ type TaskRow = {
     created_at: number
     completed_at: number | null
 }
-
 type AssetRow = {
     id: string
     task_id: string
@@ -559,4 +558,3 @@ implements TaskHistoryService {
         return rows.length
     }
 }
-

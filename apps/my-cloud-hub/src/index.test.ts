@@ -38,4 +38,3 @@ describe('worker task history wiring', () => {
             .toBeNull()
     })
 })
-

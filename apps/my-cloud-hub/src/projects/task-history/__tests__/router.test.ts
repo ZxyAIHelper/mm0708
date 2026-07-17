@@ -115,4 +115,3 @@ describe('task history router', () => {
         expect(deletion.status).toBe(404)
     })
 })
-
