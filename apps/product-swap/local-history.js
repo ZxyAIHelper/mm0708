@@ -4,6 +4,7 @@ const DB_NAME = 'product_swap_history_v1';
 const DB_VERSION = 1;
 const USER_KEY = 'product_swap_local_user_id';
 const ASSET_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const PROCESSING_STALE_MS = 15 * 60 * 1000;
 
 function randomId(prefix) {
     const value = globalThis.crypto?.randomUUID
@@ -122,6 +123,20 @@ function assetFromSource(taskId, role, source, createdAt) {
     };
 }
 
+function previewAssetFromAsset(asset) {
+    if (!asset) {
+        return null;
+    }
+    const { blob, ...preview } = asset;
+    return preview;
+}
+
+function isStaleProcessingTask(task, now = Date.now()) {
+    const lastActivity = Number(task?.updatedAt || task?.createdAt || 0);
+    return task?.status === 'processing'
+        && lastActivity + PROCESSING_STALE_MS <= now;
+}
+
 async function startTask({
     taskType = 'product_swap',
     title = taskTitle(taskType),
@@ -141,7 +156,9 @@ async function startTask({
         errorCode: null,
         errorMessage: null,
         createdAt,
+        updatedAt: createdAt,
         completedAt: null,
+        previewAsset: null,
     };
     const assets = images
         .filter((image) => image?.source)
@@ -160,45 +177,57 @@ async function startTask({
         transaction.objectStore('assets').put(asset);
     }
     await transactionDone(transaction);
-    return { ...task, assets };
+    return task;
 }
 
 async function updateTask(taskId, updater) {
     const database = await openDatabase();
     const transaction = database.transaction('tasks', 'readwrite');
     const store = transaction.objectStore('tasks');
+    const done = transactionDone(transaction);
     const task = await requestValue(store.get(taskId));
     if (!task) {
         transaction.abort();
         throw new Error('TASK_NOT_FOUND');
     }
-    const updated = updater(task);
+    const updated = { ...updater(task), updatedAt: Date.now() };
     store.put(updated);
-    await transactionDone(transaction);
+    await done;
     return updated;
 }
 
 async function completeTask(taskId, result) {
     const completedAt = Date.now();
-    const task = await updateTask(taskId, (current) => ({
+    const outputAsset = result?.imageUrl
+        ? assetFromSource(taskId, 'output', result.imageUrl, completedAt)
+        : null;
+    const database = await openDatabase();
+    const transaction = database.transaction(
+        ['tasks', 'assets'],
+        'readwrite',
+    );
+    const done = transactionDone(transaction);
+    const taskStore = transaction.objectStore('tasks');
+    const current = await requestValue(taskStore.get(taskId));
+    if (!current) {
+        transaction.abort();
+        throw new Error('TASK_NOT_FOUND');
+    }
+    const task = {
         ...current,
         status: 'completed',
         result,
         errorCode: null,
         errorMessage: null,
+        updatedAt: completedAt,
         completedAt,
-    }));
-    if (result?.imageUrl) {
-        const database = await openDatabase();
-        const transaction = database.transaction('assets', 'readwrite');
-        transaction.objectStore('assets').put(assetFromSource(
-            taskId,
-            'output',
-            result.imageUrl,
-            completedAt,
-        ));
-        await transactionDone(transaction);
+        previewAsset: previewAssetFromAsset(outputAsset),
+    };
+    if (outputAsset) {
+        transaction.objectStore('assets').put(outputAsset);
     }
+    taskStore.put(task);
+    await done;
     return task;
 }
 
@@ -244,63 +273,154 @@ async function listTasks({ taskType = '', cursor, limit = 30 } = {}) {
         .sort((left, right) => right.createdAt - left.createdAt
             || right.id.localeCompare(left.id));
     const offset = Math.max(0, Number(cursor) || 0);
-    const selected = filtered.slice(offset, offset + limit);
-    const tasks = await Promise.all(selected.map(async (task) => {
-        const assets = await assetsForTask(database, task.id);
-        const previewAsset = [...assets].reverse()
-            .find((asset) => asset.role === 'output')
-            || assets.find((asset) => asset.role === 'target')
-            || null;
-        return { ...task, previewAsset };
-    }));
+    const tasks = filtered.slice(offset, offset + limit);
     return {
         tasks,
-        nextCursor: offset + selected.length < filtered.length
-            ? String(offset + selected.length)
+        nextCursor: offset + tasks.length < filtered.length
+            ? String(offset + tasks.length)
             : null,
     };
 }
 
+function deleteKeysFromIndex(index, range, store) {
+    return new Promise((resolve, reject) => {
+        const request = index.openKeyCursor(range);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+            const cursor = request.result;
+            if (!cursor) {
+                resolve();
+                return;
+            }
+            store.delete(cursor.primaryKey);
+            cursor.continue();
+        };
+    });
+}
+
 async function deleteTask(taskId) {
-    const task = await getTask(taskId);
-    if (!task) {
-        return false;
-    }
     const database = await openDatabase();
     const transaction = database.transaction(
         ['tasks', 'assets'],
         'readwrite',
     );
-    transaction.objectStore('tasks').delete(taskId);
-    for (const asset of task.assets) {
-        transaction.objectStore('assets').delete(asset.id);
+    const done = transactionDone(transaction);
+    const taskStore = transaction.objectStore('tasks');
+    const task = await requestValue(taskStore.get(taskId));
+    if (!task || task.userId !== ensureUserId()) {
+        transaction.abort();
+        await done.catch(() => undefined);
+        return false;
     }
-    await transactionDone(transaction);
+    taskStore.delete(taskId);
+    const assetStore = transaction.objectStore('assets');
+    await deleteKeysFromIndex(
+        assetStore.index('taskId'),
+        IDBKeyRange.only(taskId),
+        assetStore,
+    );
+    await done;
     return true;
 }
 
 async function cleanupExpiredAssets(now = Date.now()) {
     const database = await openDatabase();
-    const transaction = database.transaction('assets', 'readwrite');
+    const transaction = database.transaction(
+        ['tasks', 'assets'],
+        'readwrite',
+    );
+    const taskStore = transaction.objectStore('tasks');
     const store = transaction.objectStore('assets');
-    const assets = await requestValue(store.getAll());
+    const done = transactionDone(transaction);
     let cleaned = 0;
-    for (const asset of assets) {
-        if (!asset.deletedAt && Number(asset.expiresAt) <= now) {
-            store.put({ ...asset, blob: null, sourceUrl: '', deletedAt: now });
-            cleaned += 1;
+    await new Promise((resolve, reject) => {
+        const cursorRequest = store.index('expiresAt').openKeyCursor(
+            IDBKeyRange.upperBound(now),
+        );
+        cursorRequest.onerror = () => reject(cursorRequest.error);
+        cursorRequest.onsuccess = () => {
+            const cursor = cursorRequest.result;
+            if (!cursor) {
+                resolve();
+                return;
+            }
+            const assetRequest = store.get(cursor.primaryKey);
+            assetRequest.onerror = () => reject(assetRequest.error);
+            assetRequest.onsuccess = () => {
+                const asset = assetRequest.result;
+                if (asset && !asset.deletedAt) {
+                    store.put({
+                        ...asset,
+                        blob: null,
+                        sourceUrl: '',
+                        deletedAt: now,
+                    });
+                    cleaned += 1;
+                    if (asset.role === 'output') {
+                        const taskRequest = taskStore.get(asset.taskId);
+                        taskRequest.onerror = () => reject(taskRequest.error);
+                        taskRequest.onsuccess = () => {
+                            const task = taskRequest.result;
+                            if (task?.previewAsset?.id === asset.id) {
+                                taskStore.put({
+                                    ...task,
+                                    result: task.result
+                                        ? { ...task.result, imageUrl: '' }
+                                        : task.result,
+                                    previewAsset: {
+                                        ...task.previewAsset,
+                                        sourceUrl: '',
+                                        deletedAt: now,
+                                    },
+                                });
+                            }
+                            cursor.continue();
+                        };
+                        return;
+                    }
+                }
+                cursor.continue();
+            };
+        };
+    });
+    await done;
+    return cleaned;
+}
+
+async function recoverInterruptedTasks(now = Date.now()) {
+    const database = await openDatabase();
+    const transaction = database.transaction('tasks', 'readwrite');
+    const done = transactionDone(transaction);
+    const store = transaction.objectStore('tasks');
+    const tasks = await requestValue(store.getAll());
+    let recovered = 0;
+    for (const task of tasks) {
+        if (task.userId === ensureUserId()
+            && isStaleProcessingTask(task, now)) {
+            store.put({
+                ...task,
+                status: 'failed',
+                errorCode: 'GENERATION_INTERRUPTED',
+                errorMessage: '页面关闭或刷新，生成任务已中断',
+                updatedAt: now,
+                completedAt: now,
+            });
+            recovered += 1;
         }
     }
-    await transactionDone(transaction);
-    return cleaned;
+    await done;
+    return recovered;
 }
 
 const localHistory = {
     ASSET_TTL_MS,
+    PROCESSING_STALE_MS,
     taskTitle,
     isExpired,
     dataUrlToBlob,
     ensureUserId,
+    previewAssetFromAsset,
+    isStaleProcessingTask,
     startTask,
     completeTask,
     failTask,
@@ -308,6 +428,7 @@ const localHistory = {
     getTask,
     deleteTask,
     cleanupExpiredAssets,
+    recoverInterruptedTasks,
 };
 
 if (typeof window !== 'undefined') {

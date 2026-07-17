@@ -65,6 +65,20 @@ function buildRefinePayload(state, requirements) {
     };
 }
 
+function historyInputFromPayload(payload, isRefinement = false) {
+    return {
+        requirements: String(payload?.requirements || '').trim(),
+        isRefinement: Boolean(isRefinement),
+        conversationId: String(payload?.conversationId || ''),
+        messages: Array.isArray(payload?.messages)
+            ? payload.messages.map((message) => ({
+                role: String(message?.role || ''),
+                content: String(message?.content || ''),
+            }))
+            : [],
+    };
+}
+
 const ERROR_MESSAGES = {
     INVALID_INPUT: '请检查上传图片和额外要求',
     FILE_TOO_LARGE: '单张图片不能超过 10MB',
@@ -153,22 +167,22 @@ function boot() {
         archiveNotice.hidden = !message;
     }
 
-    localHistory.cleanupExpiredAssets().catch(() => undefined);
+    Promise.all([
+        localHistory.cleanupExpiredAssets(),
+        localHistory.recoverInterruptedTasks(),
+    ]).catch(() => undefined);
 
-    async function startLocalTask(requirements, previousImage = '') {
+    async function startLocalTask(payload, isRefinement = false) {
         try {
             return await localHistory.startTask({
                 taskType: 'product_swap',
                 title: '一键换产品',
-                input: {
-                    requirements,
-                    isRefinement: Boolean(previousImage),
-                },
+                input: historyInputFromPayload(payload, isRefinement),
                 images: [
-                    { role: 'target', source: state.target },
-                    { role: 'product', source: state.product },
-                    { role: 'scene', source: state.scene },
-                    { role: 'previous', source: previousImage },
+                    { role: 'target', source: payload.targetImage },
+                    { role: 'product', source: payload.productImage },
+                    { role: 'scene', source: payload.sceneImage },
+                    { role: 'previous', source: payload.previousImage },
                 ],
             });
         } catch {
@@ -328,9 +342,8 @@ function boot() {
         let localTask = null;
 
         try {
-            localTask = await startLocalTask(
-                state.requirements.trim(),
-            );
+            const payload = buildGeneratePayload(state);
+            localTask = await startLocalTask(payload);
             const response = await apiClient.apiFetch(
                 '/api/product-swap/generate',
                 {
@@ -338,9 +351,7 @@ function boot() {
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(
-                        buildGeneratePayload(state),
-                    ),
+                    body: JSON.stringify(payload),
                 },
                 { apiBase },
             );
@@ -436,7 +447,8 @@ function boot() {
         let localTask = null;
 
         try {
-            localTask = await startLocalTask(correction, state.result);
+            const payload = buildRefinePayload(state, correction);
+            localTask = await startLocalTask(payload, true);
             const response = await apiClient.apiFetch(
                 '/api/product-swap/generate',
                 {
@@ -444,9 +456,7 @@ function boot() {
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(
-                        buildRefinePayload(state, correction),
-                    ),
+                    body: JSON.stringify(payload),
                 },
                 { apiBase },
             );
@@ -540,6 +550,7 @@ if (typeof module !== 'undefined') {
         validateClientFileMeta,
         buildGeneratePayload,
         buildRefinePayload,
+        historyInputFromPayload,
         mapErrorCode,
     };
 }

@@ -17,15 +17,6 @@ const productPath = path.join(
     'assets',
     'example-product.jpg',
 );
-const resultPath = path.join(
-    appRoot,
-    'assets',
-    'example-result.jpg',
-);
-const resultBuffer = fs.readFileSync(resultPath);
-const resultDataUrl =
-    `data:image/jpeg;base64,${resultBuffer.toString('base64')}`;
-
 function jsonResponse(request, body, status = 200) {
     request.respond({
         status,
@@ -90,7 +81,7 @@ function jsonResponse(request, body, status = 200) {
                 generationCount += 1;
                 jsonResponse(request, {
                     success: true,
-                    imageUrl: resultDataUrl,
+                    imageUrl: `${appUrl}/assets/example-result.jpg`,
                     provider: 'browser-smoke',
                     requestId: 'swap_browser_smoke',
                     conversationId: 'conversation_browser_smoke',
@@ -254,7 +245,9 @@ function jsonResponse(request, body, status = 200) {
             )?.getAttribute('src')?.startsWith('data:image/') || false,
             resultVisible: !document.getElementById('resultSection')?.hidden,
             resultSource: document.getElementById('resultImage')
-                ?.getAttribute('src')?.startsWith('data:image/') || false,
+                ?.getAttribute('src')?.endsWith(
+                    '/assets/example-result.jpg',
+                ) || false,
             chatMessages: document.querySelectorAll('.chat-message').length,
         }));
 
@@ -288,6 +281,12 @@ function jsonResponse(request, body, status = 200) {
             .cleanupExpiredAssets(
                 Date.now() + 31 * 24 * 60 * 60 * 1000,
             ));
+        historyState.outputUrlAfterCleanup = await page.evaluate(async () => {
+            const { tasks } = await window.LocalTaskHistory.listTasks();
+            const completed = tasks.find((task) => task.status === 'completed');
+            const detail = await window.LocalTaskHistory.getTask(completed.id);
+            return detail.result.imageUrl;
+        });
         await page.reload({ waitUntil: 'networkidle0' });
         await page.waitForFunction(() =>
             document.querySelectorAll('.task-card .asset-expired')
@@ -300,6 +299,20 @@ function jsonResponse(request, body, status = 200) {
         await page.waitForFunction(() =>
             document.querySelectorAll('.task-card').length === 1,
         );
+        historyState.recoveredTask = await page.evaluate(async () => {
+            const task = await window.LocalTaskHistory.startTask({
+                taskType: 'product_swap',
+                input: { requirements: 'interrupted test' },
+            });
+            await window.LocalTaskHistory.recoverInterruptedTasks(
+                Date.now() + window.LocalTaskHistory.PROCESSING_STALE_MS,
+            );
+            const recovered = await window.LocalTaskHistory.getTask(task.id);
+            return {
+                status: recovered.status,
+                errorCode: recovered.errorCode,
+            };
+        });
 
         console.log(JSON.stringify({ state, historyState, errors }, null, 2));
 
@@ -319,6 +332,10 @@ function jsonResponse(request, body, status = 200) {
             || historyState.expired !== 0
             || historyState.expiredAfterCleanup !== 2
             || historyState.detailAssets !== 4
+            || historyState.outputUrlAfterCleanup !== ''
+            || historyState.recoveredTask.status !== 'failed'
+            || historyState.recoveredTask.errorCode
+                !== 'GENERATION_INTERRUPTED'
         ) {
             process.exitCode = 1;
         }

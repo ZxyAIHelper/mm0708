@@ -298,12 +298,40 @@
             summary.append(eyebrow, heading, requirements);
         }
 
+        const conversation = document.createElement('section');
+        conversation.className = 'detail-section history-conversation';
+        const conversationHeading = document.createElement('h3');
+        conversationHeading.textContent = '输入对话';
+        conversation.appendChild(conversationHeading);
+        const messages = Array.isArray(task.input?.messages)
+            ? task.input.messages
+            : [];
+        if (messages.length) {
+            for (const message of messages) {
+                const item = document.createElement('p');
+                item.className = `chat-message ${message.role}`;
+                item.textContent = message.content;
+                conversation.appendChild(item);
+            }
+        } else {
+            const emptyConversation = document.createElement('p');
+            emptyConversation.className = 'muted-copy';
+            emptyConversation.textContent = '本次任务没有前置对话。';
+            conversation.appendChild(emptyConversation);
+        }
+
         const output = document.createElement('section');
         output.className = 'detail-section';
         const outputHeading = document.createElement('h3');
         outputHeading.textContent = '输出';
         const outputGrid = document.createElement('div');
         outputGrid.className = 'detail-assets output-assets';
+        let response = null;
+        if (task.result?.assistantMessage) {
+            response = document.createElement('p');
+            response.className = 'detail-response';
+            response.textContent = task.result.assistantMessage;
+        }
         const outputs = task.assets.filter((asset) => asset.role === 'output');
         for (const asset of outputs) {
             outputGrid.appendChild(createDetailAsset(task, asset));
@@ -316,7 +344,11 @@
                 : '结果图片不可用。';
             outputGrid.appendChild(missing);
         }
-        output.append(outputHeading, outputGrid);
+        output.append(outputHeading);
+        if (response) {
+            output.append(response);
+        }
+        output.append(outputGrid);
 
         const inputs = document.createElement('section');
         inputs.className = 'detail-section';
@@ -339,7 +371,13 @@
             );
             deleteTask(task.id, card);
         });
-        elements.detailContent.append(summary, output, inputs, deleteButton);
+        elements.detailContent.append(
+            summary,
+            conversation,
+            output,
+            inputs,
+            deleteButton,
+        );
     }
 
     async function openDetail(taskId) {
@@ -395,7 +433,8 @@
         revokeAll(detailBlobUrls);
     });
 
-    history.cleanupExpiredAssets()
+    history.recoverInterruptedTasks()
+        .then(() => history.cleanupExpiredAssets())
         .then(() => loadTasks({ reset: true }))
         .catch(() => {
             elements.loading.hidden = true;

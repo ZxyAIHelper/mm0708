@@ -9,6 +9,7 @@ const {
     validateClientFileMeta,
     buildGeneratePayload,
     buildRefinePayload,
+    historyInputFromPayload,
     mapErrorCode,
 } = require('../script');
 
@@ -115,6 +116,27 @@ test('generation does not initialize a remote task session', () => {
 
     assert.doesNotMatch(source, /apiClient\.ensureSession/);
     assert.doesNotMatch(source, /await sessionReady/);
+});
+
+test('preserves the complete non-image refinement input in history', () => {
+    const payload = buildRefinePayload({
+        target: 'data:image/png;base64,dGFyZ2V0',
+        product: 'data:image/png;base64,cHJvZHVjdA==',
+        scene: '',
+        result: 'https://example.com/previous.png',
+        conversationId: 'conversation_1',
+        messages: [{ role: 'user', content: 'first request' }],
+    }, 'make it white');
+    const input = historyInputFromPayload(payload, true);
+
+    assert.deepEqual(input, {
+        requirements: 'make it white',
+        isRefinement: true,
+        conversationId: 'conversation_1',
+        messages: [{ role: 'user', content: 'first request' }],
+    });
+    assert.equal('targetImage' in input, false);
+    assert.equal('previousImage' in input, false);
 });
 
 test('generation records task lifecycle in local history', () => {

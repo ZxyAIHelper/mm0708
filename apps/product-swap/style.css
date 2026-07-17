@@ -766,6 +766,16 @@ button {
     margin-top: 24px;
 }
 
+.history-conversation .chat-message {
+    margin: 8px 0;
+}
+
+.detail-response {
+    margin: 0 0 14px;
+    color: var(--muted);
+    line-height: 1.6;
+}
+
 .detail-assets {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

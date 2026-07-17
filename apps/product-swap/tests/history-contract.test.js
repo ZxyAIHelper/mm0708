@@ -54,4 +54,7 @@ test('task center reads local blobs, urls, expiry and deletion', () => {
     assert.match(script, /history\.isExpired/);
     assert.match(script, /sourceUrl/);
     assert.match(script, /cursor/);
+    assert.match(script, /input\?\.messages/);
+    assert.match(script, /result\?\.assistantMessage/);
+    assert.match(script, /history-conversation/);
 });
