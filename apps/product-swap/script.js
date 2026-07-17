@@ -109,6 +109,7 @@ function boot() {
         window.location.hostname,
     );
     const apiClient = window.ProductSwapApi;
+    const localHistory = window.LocalTaskHistory;
     const form = document.getElementById('swapForm');
     const generateButton =
         document.getElementById('generateButton');
@@ -152,8 +153,29 @@ function boot() {
         archiveNotice.hidden = !message;
     }
 
-    const sessionReady = apiClient.ensureSession(apiBase)
-        .catch(() => undefined);
+    localHistory.cleanupExpiredAssets().catch(() => undefined);
+
+    async function startLocalTask(requirements, previousImage = '') {
+        try {
+            return await localHistory.startTask({
+                taskType: 'product_swap',
+                title: '一键换产品',
+                input: {
+                    requirements,
+                    isRefinement: Boolean(previousImage),
+                },
+                images: [
+                    { role: 'target', source: state.target },
+                    { role: 'product', source: state.product },
+                    { role: 'scene', source: state.scene },
+                    { role: 'previous', source: previousImage },
+                ],
+            });
+        } catch {
+            showArchiveNotice('生成会继续，但本次任务无法保存到浏览器');
+            return null;
+        }
+    }
 
     function setGenerating(value) {
         state.isGenerating = value;
@@ -303,9 +325,12 @@ function boot() {
         showError('');
         showArchiveNotice('');
         setGenerating(true);
+        let localTask = null;
 
         try {
-            await sessionReady;
+            localTask = await startLocalTask(
+                state.requirements.trim(),
+            );
             const response = await apiClient.apiFetch(
                 '/api/product-swap/generate',
                 {
@@ -356,12 +381,28 @@ function boot() {
             resultImage.src = state.result;
             resultSection.hidden = false;
             showArchiveNotice(data.archiveWarning || '');
+            if (localTask) {
+                await localHistory.completeTask(localTask.id, {
+                    imageUrl: data.imageUrl,
+                    conversationId: data.conversationId || '',
+                    assistantMessage: data.assistantMessage || '',
+                }).catch(() => {
+                    showArchiveNotice('图片已生成，但任务记录更新失败');
+                });
+            }
             renderMessages();
             resultSection.scrollIntoView({
                 behavior: 'smooth',
                 block: 'start',
             });
         } catch (error) {
+            if (localTask) {
+                await localHistory.failTask(
+                    localTask.id,
+                    error.code,
+                    error.message,
+                ).catch(() => undefined);
+            }
             showError(
                 error.message || mapErrorCode(error.code),
             );
@@ -392,9 +433,10 @@ function boot() {
         showError('');
         showArchiveNotice('');
         setRefining(true);
+        let localTask = null;
 
         try {
-            await sessionReady;
+            localTask = await startLocalTask(correction, state.result);
             const response = await apiClient.apiFetch(
                 '/api/product-swap/generate',
                 {
@@ -435,6 +477,15 @@ function boot() {
                 || state.conversationId;
             resultImage.src = state.result;
             showArchiveNotice(data.archiveWarning || '');
+            if (localTask) {
+                await localHistory.completeTask(localTask.id, {
+                    imageUrl: data.imageUrl,
+                    conversationId: data.conversationId || '',
+                    assistantMessage: data.assistantMessage || '',
+                }).catch(() => {
+                    showArchiveNotice('图片已生成，但任务记录更新失败');
+                });
+            }
             refineInput.value = '';
             renderMessages();
             resultImage.scrollIntoView({
@@ -442,6 +493,13 @@ function boot() {
                 block: 'center',
             });
         } catch (error) {
+            if (localTask) {
+                await localHistory.failTask(
+                    localTask.id,
+                    error.code,
+                    error.message,
+                ).catch(() => undefined);
+            }
             showError(error.message || mapErrorCode(error.code));
         } finally {
             setRefining(false);

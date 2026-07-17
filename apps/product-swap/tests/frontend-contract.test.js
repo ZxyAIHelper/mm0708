@@ -107,15 +107,30 @@ test('builds the stable request and maps provider errors', () => {
     );
 });
 
-test('generation waits for anonymous session initialization', () => {
+test('generation does not initialize a remote task session', () => {
     const source = fs.readFileSync(
         path.join(root, 'script.js'),
         'utf8',
     );
 
-    assert.match(source, /const sessionReady\s*=\s*apiClient\.ensureSession/);
-    assert.equal(
-        (source.match(/await sessionReady;/g) || []).length,
-        2,
+    assert.doesNotMatch(source, /apiClient\.ensureSession/);
+    assert.doesNotMatch(source, /await sessionReady/);
+});
+
+test('generation records task lifecycle in local history', () => {
+    const html = fs.readFileSync(
+        path.join(root, 'index.html'),
+        'utf8',
     );
+    const source = fs.readFileSync(
+        path.join(root, 'script.js'),
+        'utf8',
+    );
+
+    assert.ok(
+        html.indexOf('/local-history.js') < html.indexOf('/script.js'),
+    );
+    assert.match(source, /localHistory\.startTask/);
+    assert.match(source, /localHistory\.completeTask/);
+    assert.match(source, /localHistory\.failTask/);
 });
