@@ -6,8 +6,11 @@ const appRoot = path.dirname(fileURLToPath(import.meta.url));
 const distRoot = path.join(appRoot, 'dist');
 const publicEntries = [
     'index.html',
+    'history.html',
     'style.css',
+    'api-client.js',
     'script.js',
+    'history.js',
     'assets',
 ];
 

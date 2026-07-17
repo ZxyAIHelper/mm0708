@@ -13,7 +13,10 @@ test('build emits only deployable public assets', async () => {
         path.join(appRoot, 'dist'),
     );
     assert.deepEqual(entries.sort(), [
+        'api-client.js',
         'assets',
+        'history.html',
+        'history.js',
         'index.html',
         'script.js',
         'style.css',

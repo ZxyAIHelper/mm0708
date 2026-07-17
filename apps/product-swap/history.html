@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>所有任务 · AI 产品工具</title>
+    <meta name="description" content="查看当前浏览器创建的所有 AI 产品任务。">
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body class="task-history-page">
+    <main class="product-swap-shell history-shell">
+        <nav class="top-nav" aria-label="任务导航">
+            <a class="back-button" href="/">← 返回生成</a>
+        </nav>
+
+        <header class="history-heading">
+            <p class="history-eyebrow">AI PRODUCT TASKS</p>
+            <h1>所有任务</h1>
+            <p>当前浏览器的生成记录，图片保留 30 天，任务文字长期保留。</p>
+        </header>
+
+        <div id="taskTypeFilters" class="task-filters" aria-label="任务类型">
+            <button class="active" type="button" data-task-type="">全部</button>
+            <button type="button" data-task-type="product_swap">一键换产品</button>
+        </div>
+
+        <p id="historyLoading" class="history-state" role="status">正在加载任务…</p>
+        <section id="historyError" class="history-state state-card" hidden>
+            <h2>任务加载失败</h2>
+            <p>请检查网络后重试。</p>
+            <button id="historyRetry" type="button">重新加载</button>
+        </section>
+        <section id="historyEmpty" class="history-state state-card" hidden>
+            <h2>还没有任务记录</h2>
+            <p>完成一次生成后，输入和结果会自动出现在这里。</p>
+            <a class="primary-link" href="/">去生成</a>
+        </section>
+
+        <section id="taskList" class="task-grid" aria-live="polite"></section>
+        <button id="loadMoreButton" class="load-more" type="button" hidden>
+            加载更多
+        </button>
+
+        <p class="history-footnote">
+            记录属于当前浏览器。清除浏览器站点数据后，将无法找回匿名身份。
+        </p>
+    </main>
+
+    <div
+        id="taskDetailLayer"
+        class="task-detail-layer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="taskDetailTitle"
+        hidden
+    >
+        <div class="task-detail-panel">
+            <div class="task-detail-toolbar">
+                <h2 id="taskDetailTitle">任务详情</h2>
+                <button id="taskDetailClose" type="button" aria-label="关闭详情">×</button>
+            </div>
+            <div id="taskDetailContent" class="task-detail-content"></div>
+        </div>
+    </div>
+
+    <script src="/api-client.js"></script>
+    <script src="/history.js"></script>
+</body>
+</html>
+
