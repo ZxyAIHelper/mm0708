@@ -1,5 +1,7 @@
 # Browser Anonymous User Task History Implementation Plan
 
+> Superseded by `2026-07-17-browser-local-task-history.md`; the deployed runtime no longer uses D1/R2 task storage.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give each browser an automatic anonymous identity and persist generic generation tasks, their text, and 30-day input/output images for a reusable task center.
