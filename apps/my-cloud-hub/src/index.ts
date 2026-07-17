@@ -9,6 +9,7 @@ import emailMonitorRouter from './projects/email-monitor/router'
 import { handleEmail } from './projects/email-monitor/handler'
 import coupletRouter from './projects/couplet/router'
 import blockDuelRouter from './projects/block-duel/router'
+import pushRouter from './projects/push/router'
 import productSwapRouter from './projects/product-swap/router'
 export { BlockDuelRoom } from './projects/block-duel/room'
 
@@ -24,6 +25,8 @@ type Bindings = {
     DOUBAO_CHAT_ENDPOINT: string
     WECHAT_APPID: string
     WECHAT_SECRET: string
+    WECHAT_TEMPLATE_APPID?: string
+    WECHAT_TEMPLATE_SECRET?: string
     BLOCK_DUEL_ROOM: DurableObjectNamespace
 }
 
@@ -49,6 +52,7 @@ app.route('/api/todo/chat', chatRouter)
 app.route('/api/email-monitor', emailMonitorRouter)
 app.route('/api/couplet', coupletRouter)
 app.route('/api/block-duel', blockDuelRouter)
+app.route('/api/push', pushRouter)
 app.route('/api/product-swap', productSwapRouter)
 
 
