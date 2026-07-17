@@ -2,6 +2,12 @@
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "product-swap",
   "compatibility_date": "2026-07-17",
+  "routes": [
+    {
+      "pattern": "product-swap.mm0708.top",
+      "custom_domain": true
+    }
+  ],
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
