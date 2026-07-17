@@ -1,59 +1,109 @@
-export async function onRequestPost(context) {
+﻿export async function onRequestPost(context) {
     const { env, request } = context;
-    const { DOUBAO_API_KEY, DOUBAO_ENDPOINT_ID } = env;
-
-    if (!DOUBAO_API_KEY || !DOUBAO_ENDPOINT_ID) {
-        return new Response(JSON.stringify({ error: "Missing API configuration in environment variables." }), {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-        });
-    }
 
     try {
-        const { image, prompt, model } = await request.json();
+        const body = await request.json();
+        const { image, prompt, model, size, quality, background, referenceImage, mode } = body;
 
-        // 豆包 API (Volcengine Ark) 图片生成接口
-        const apiEndpoint = `https://ark.cn-beijing.volces.com/api/v3/images/generations`;
+        if (!prompt || !String(prompt).trim()) {
+            return new Response(JSON.stringify({ error: 'Prompt is required.' }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
 
-        // 豆包 API 要求传入完整的 Data URL (包含 data:image/...;base64,)
-        const base64Image = image;
+        // Backward-compatible meme generation path.
+        if (image && env.DOUBAO_API_KEY && env.DOUBAO_ENDPOINT_ID && mode !== 'poster') {
+            const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/images/generations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${env.DOUBAO_API_KEY}`,
+                },
+                body: JSON.stringify({
+                    model: env.DOUBAO_ENDPOINT_ID,
+                    prompt,
+                    image,
+                }),
+            });
 
-        const response = await fetch(apiEndpoint, {
-            method: "POST",
+            const data = await response.json();
+            if (!response.ok) {
+                return new Response(JSON.stringify({
+                    error: 'Doubao API Error',
+                    details: data,
+                    status: response.status,
+                }), {
+                    status: response.status,
+                    headers: { 'Content-Type': 'application/json' },
+                });
+            }
+
+            return new Response(JSON.stringify(data), {
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
+        const baseUrl = (env.OPENAI_COMPAT_BASE_URL || 'https://api.openai.com').replace(/\/$/, '');
+        const apiKey = env.OPENAI_API_KEY;
+        const imageModel = model || env.OPENAI_IMAGE_MODEL || 'gpt-image-1';
+
+        if (!apiKey) {
+            return new Response(JSON.stringify({ error: 'Missing OPENAI_API_KEY.' }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
+        const finalPrompt = referenceImage
+            ? `${prompt}\n\n请参考用户上传图片的整体气质和构图倾向，但输出一张完整的新海报。`
+            : prompt;
+
+        const response = await fetch(`${baseUrl}/v1/images/generations`, {
+            method: 'POST',
             headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${DOUBAO_API_KEY}`,
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${apiKey}`,
             },
             body: JSON.stringify({
-                model: DOUBAO_ENDPOINT_ID,
-                prompt: prompt,
-                // 传入参考图
-                image: base64Image,
+                model: imageModel,
+                prompt: finalPrompt,
+                size: size || '1024x1536',
+                quality: quality || 'medium',
+                background: background || 'opaque',
             }),
         });
 
         const data = await response.json();
-
         if (!response.ok) {
-            // 记录详细错误并返回给前端
-            console.error("Doubao API Error:", data);
             return new Response(JSON.stringify({
-                error: "Doubao API Error",
+                error: 'Image generation failed',
                 details: data,
-                status: response.status
+                status: response.status,
             }), {
                 status: response.status,
-                headers: { "Content-Type": "application/json" },
+                headers: { 'Content-Type': 'application/json' },
             });
         }
 
-        return new Response(JSON.stringify(data), {
-            headers: { "Content-Type": "application/json" },
+        const imageValue = data?.data?.[0]?.b64_json || data?.data?.[0]?.url || null;
+        const imageUrl = imageValue && imageValue.startsWith('http')
+            ? imageValue
+            : imageValue
+                ? `data:image/png;base64,${imageValue}`
+                : null;
+
+        return new Response(JSON.stringify({
+            imageUrl,
+            raw: data,
+            model: imageModel,
+        }), {
+            headers: { 'Content-Type': 'application/json' },
         });
     } catch (error) {
         return new Response(JSON.stringify({ error: error.message }), {
             status: 500,
-            headers: { "Content-Type": "application/json" },
+            headers: { 'Content-Type': 'application/json' },
         });
     }
 }

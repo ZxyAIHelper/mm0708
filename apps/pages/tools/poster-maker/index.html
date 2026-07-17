@@ -1,0 +1,166 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI海报工作台</title>\n    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="workbench-shell">
+        <aside class="chat-pane">
+            <header class="chat-topbar">
+                <div class="workspace-brand">
+                    <div class="brand-mark">AI</div>
+                    <div>
+                        <p class="brand-eyebrow">Poster Maker</p>
+                        <h1>图像工作台</h1>
+                    </div>
+                </div>
+                <div class="topbar-icons">
+                    <button class="icon-btn" type="button" aria-label="视图切换">◧</button>
+                    <button class="icon-btn" type="button" aria-label="新建会话">✎</button>
+                    <button class="icon-btn ghost" id="clearChatBtn" type="button" aria-label="清空会话">···</button>
+                </div>
+            </header>
+
+            <section class="workspace-banner glass-card">
+                <div>
+                    <p class="eyebrow">Doubao-style Layout</p>
+                    <h2>左侧对话 + 右侧画布</h2>
+                </div>
+                <p>提示词可以直接保存成模板，后续一键套用并继续追改。</p>
+                <div class="banner-tags">
+                    <span>Prompt 模板</span>
+                    <span>多版本预览</span>
+                    <span>区域编辑</span>
+                </div>
+            </section>
+
+            <section class="template-drawer glass-card" id="templateDrawer" hidden>
+                <div class="drawer-head">
+                    <div>
+                        <p class="eyebrow">Prompt Templates</p>
+                        <h2>模板库</h2>
+                    </div>
+                    <div class="drawer-actions">
+                        <button id="saveTemplateBtn" class="text-btn" type="button">存为模板</button>
+                        <button id="closeTemplateDrawerBtn" class="text-btn" type="button">收起</button>
+                    </div>
+                </div>
+                <div class="template-tabs">
+                    <button class="template-tab active" data-tab="official" type="button">官方模板</button>
+                    <button class="template-tab" data-tab="mine" type="button">我的模板</button>
+                    <button class="template-tab" data-tab="recent" type="button">最近使用</button>
+                </div>
+                <div id="templateList" class="template-list"></div>
+            </section>
+
+            <main class="chat-scroll" id="chatList"></main>
+
+            <section class="left-recent glass-card">
+                <div class="recent-head">
+                    <div>
+                        <p class="eyebrow">Versions</p>
+                        <h2>最近版本</h2>
+                    </div>
+                    <button id="seedResetBtn" class="text-btn" type="button">恢复演示</button>
+                </div>
+                <div class="recent-strip" id="recentStrip"></div>
+            </section>
+
+            <footer class="composer-shell">
+                <div class="quick-actions">
+                    <button class="quick-chip" data-quick="整体更喜庆，适合商场节庆海报" type="button">更喜庆</button>
+                    <button class="quick-chip" data-quick="标题再大一些，强化主标题冲击力" type="button">标题更大</button>
+                    <button class="quick-chip" data-quick="增加灯笼、放射底纹和金色装饰" type="button">增加灯笼</button>
+                </div>
+                <div class="composer-box glass-card">
+                    <textarea id="promptInput" rows="3" placeholder="描述你想要的图片"></textarea>
+                    <div class="composer-tools">
+                        <button id="imageModeBtn" class="mode-pill active" type="button">图像生成</button>
+                        <button id="insertTemplateBtn" class="tool-link" type="button">模板</button>
+                        <label class="tool-link upload-link">
+                            <input id="referenceInput" type="file" accept="image/*">
+                            <span>参考图</span>
+                        </label>
+                        <button class="tool-link" type="button">更多</button>
+                        <button id="sendBtn" class="send-btn" type="button" aria-label="发送">发送</button>
+                    </div>
+                </div>
+            </footer>
+        </aside>
+
+        <div class="pane-arrow" aria-hidden="true">←</div>
+
+        <section class="canvas-pane">
+            <header class="canvas-topbar glass-card">
+                <div class="toolbar-left">
+                    <button class="tool-action active" data-tool="smart" type="button">智能编辑</button>
+                    <button class="tool-action" data-tool="repaint" type="button">区域重绘</button>
+                    <button class="tool-action" data-tool="outpaint" type="button">扩图</button>
+                    <button class="tool-action" data-tool="erase" type="button">擦除</button>
+                    <button class="tool-action" data-tool="enhance" type="button">变清晰</button>
+                </div>
+                <div class="toolbar-right">
+                    <button id="videoBtn" class="tool-action secondary" type="button">生成视频</button>
+                    <button id="downloadBtn" class="tool-action secondary" type="button">下载原图</button>
+                    <button class="icon-btn ghost" type="button" aria-label="关闭">✕</button>
+                </div>
+            </header>
+
+            <main class="canvas-body glass-card">
+                <div class="canvas-meta-row">
+                    <div>
+                        <p class="eyebrow">Canvas</p>
+                        <h2 id="canvasTitle">等待生成</h2>
+                    </div>
+                    <div class="canvas-meta">
+                        <span id="modeBadge">当前模式：智能编辑</span>
+                        <span id="selectionBadge">未选区</span>
+                    </div>
+                </div>
+
+                <div class="canvas-stage" id="canvasStage">
+                    <div id="stageHint" class="stage-hint">点击工具栏切换编辑模式，或在左侧继续描述修改需求</div>
+                    <div id="selectionToolbar" class="selection-toolbar" hidden>
+                        <button id="selectHeadlineBtn" class="selection-chip" data-selection="标题区" type="button">标题区</button>
+                        <button id="selectCenterBtn" class="selection-chip active" data-selection="中部主视觉" type="button">中部主视觉</button>
+                        <button id="selectFooterBtn" class="selection-chip" data-selection="底部福利区" type="button">底部福利区</button>
+                    </div>
+                    <div id="selectionBox" class="selection-box" hidden>
+                        <span id="selectionLabel">中部主视觉</span>
+                    </div>
+                    <div class="canvas-plate">
+                        <img id="posterPreview" class="poster-preview" alt="当前海报结果">
+                    </div>
+                </div>
+
+                <div class="canvas-footer">
+                    <div class="footer-note">
+                        <strong>继续追改：</strong>
+                        <span id="footerPrompt">标题更大、增加灯笼、背景更像商场活动主视觉</span>
+                    </div>
+                    <div class="footer-actions">
+                        <button id="compareBtn" class="tool-action secondary" type="button">前后对比</button>
+                        <button id="reuseBtn" class="tool-action secondary" type="button">基于当前继续生成</button>
+                    </div>
+                </div>
+            </main>
+
+            <footer class="version-bar glass-card">
+                <div class="version-head">
+                    <div>
+                        <p class="eyebrow">History</p>
+                        <h2>生成版本</h2>
+                    </div>
+                    <span class="version-tip">点击任一缩略图可切回该版本</span>
+                </div>
+                <div id="versionStrip" class="version-strip"></div>
+            </footer>
+        </section>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
