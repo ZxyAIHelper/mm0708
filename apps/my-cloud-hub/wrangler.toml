@@ -25,6 +25,10 @@ migrations_dir = "../../packages/database/migrations"
 binding = "WECHAT_KV"
 id = "a95d6ea52307466e85bbb150aea487c6"
 
+[[r2_buckets]]
+binding = "TASK_ASSETS"
+bucket_name = "my-cloud-hub-task-assets"
+
 [[vectorize]]
 binding = "VECTORIZE"
 index_name = "todo-tasks"
@@ -36,3 +40,6 @@ class_name = "BlockDuelRoom"
 [[migrations]]
 tag = "v1_block_duel_room"
 new_sqlite_classes = [ "BlockDuelRoom" ]
+
+[triggers]
+crons = [ "0 3 * * *" ]
