@@ -86,38 +86,7 @@ type SessionContext = Context<{
     Bindings: TaskHistoryEnv
 }>
 
-export async function ensureAnonymousSession(
-    c: SessionContext | Context,
-    repository?: SessionRepository,
-    now = Date.now(),
-) {
-    const resolvedRepository = repository
-        ?? createD1SessionRepository(
-            (c.env as TaskHistoryEnv).DB,
-        )
-    const existingToken = getCookie(c, SESSION_COOKIE) ?? ''
-
-    if (SESSION_TOKEN_PATTERN.test(existingToken)) {
-        const hash = await hashSessionToken(existingToken)
-        const existingUser = await resolvedRepository
-            .findBySessionHash(hash)
-        if (existingUser) {
-            await resolvedRepository.touch(existingUser.id, now)
-            return { ...existingUser, lastSeenAt: now }
-        }
-    }
-
-    const token = createSessionToken()
-    const user: AnonymousUser = {
-        id: `anon_${crypto.randomUUID()}`,
-        createdAt: now,
-        lastSeenAt: now,
-    }
-    await resolvedRepository.create(
-        user,
-        await hashSessionToken(token),
-    )
-
+function setSessionCookie(c: Context, token: string) {
     const hostname = new URL(c.req.url).hostname
     const isProduction = hostname === 'mm0708.top'
         || hostname.endsWith('.mm0708.top')
@@ -128,5 +97,57 @@ export async function ensureAnonymousSession(
         httpOnly: true,
         sameSite: 'Lax',
     })
+}
+
+export async function ensureAnonymousSession(
+    c: SessionContext | Context,
+    repository?: SessionRepository,
+    now = Date.now(),
+) {
+    const resolvedRepository = repository
+        ?? createD1SessionRepository(
+            (c.env as TaskHistoryEnv).DB,
+        )
+    const cookieToken = getCookie(c, SESSION_COOKIE) ?? ''
+    const headerToken = c.req.header('X-Browser-Session') ?? ''
+    const candidates = [...new Set([cookieToken, headerToken])]
+        .filter((token) => SESSION_TOKEN_PATTERN.test(token))
+
+    for (const token of candidates) {
+        const hash = await hashSessionToken(token)
+        const existingUser = await resolvedRepository
+            .findBySessionHash(hash)
+        if (existingUser) {
+            await resolvedRepository.touch(existingUser.id, now)
+            if (token !== cookieToken) {
+                setSessionCookie(c, token)
+            }
+            return { ...existingUser, lastSeenAt: now }
+        }
+    }
+
+    const token = SESSION_TOKEN_PATTERN.test(headerToken)
+        ? headerToken
+        : createSessionToken()
+    const hash = await hashSessionToken(token)
+    const user: AnonymousUser = {
+        id: `anon_${crypto.randomUUID()}`,
+        createdAt: now,
+        lastSeenAt: now,
+    }
+    try {
+        await resolvedRepository.create(user, hash)
+    } catch (error) {
+        const concurrentUser = await resolvedRepository
+            .findBySessionHash(hash)
+        if (!concurrentUser) {
+            throw error
+        }
+        await resolvedRepository.touch(concurrentUser.id, now)
+        setSessionCookie(c, token)
+        return { ...concurrentUser, lastSeenAt: now }
+    }
+
+    setSessionCookie(c, token)
     return user
 }

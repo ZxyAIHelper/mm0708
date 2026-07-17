@@ -40,6 +40,8 @@ SameSite: Lax
 
 API host-only Cookie 让所有经过明确授权的前端通过 `api.mm0708.top` 识别同一浏览器用户，同时避免兄弟子域收到身份凭据。前端所有 API 请求使用 `credentials: "include"`。API CORS 当前只允许 `product-swap.mm0708.top` 和本地开发来源；未来新增工具时需逐项加入明确白名单。
 
+前端另在 localStorage 保存 256 位浏览器启动令牌，并通过 `X-Browser-Session` 发送；首次初始化使用 Web Locks 串行化。服务端以令牌哈希的唯一约束处理并发创建，因此同一浏览器多个标签页首次同时打开也会收敛到同一个匿名用户。严格来源校验只作用于任务与换品接口，其他既有 API 保持原 CORS 兼容策略。
+
 ### 本地开发
 
 本地页面与本地 API 不共享生产 Cookie 域。开发环境由 API 设置 host-only Cookie；测试可直接注入 Cookie。身份协议保持一致，不在生产代码中把会话密钥放进 URL。

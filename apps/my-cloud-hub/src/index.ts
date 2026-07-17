@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono, type Context, type Next } from 'hono'
 import { cors } from 'hono/cors'
 import memeRouter from './projects/meme-generator'
 import tasksRouter from './projects/todo/tasks'
@@ -47,11 +47,29 @@ export function isTrustedOrigin(origin: string) {
     }
 }
 
+function isCorsOrigin(origin: string) {
+    return /^https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)*\.mm0708\.top$/i
+        .test(origin) || isTrustedOrigin(origin)
+}
+
 export function createApp() {
     const app = new Hono<{ Bindings: Bindings }>()
 
+    const protectPrivateOrigin = async (c: Context, next: Next) => {
+        const origin = c.req.header('Origin') || ''
+        if (origin && !isTrustedOrigin(origin)) {
+            return c.json({
+                success: false,
+                error: { code: 'ORIGIN_NOT_ALLOWED' },
+            }, 403)
+        }
+        await next()
+    }
+    app.use('/api/tasks/*', protectPrivateOrigin)
+    app.use('/api/product-swap/*', protectPrivateOrigin)
+
     app.use('/*', cors({
-        origin: (origin) => isTrustedOrigin(origin)
+        origin: (origin) => isCorsOrigin(origin)
             ? origin
             : null,
         allowMethods: [
@@ -61,7 +79,7 @@ export function createApp() {
             'DELETE',
             'OPTIONS',
         ],
-        allowHeaders: ['Content-Type'],
+        allowHeaders: ['Content-Type', 'X-Browser-Session'],
         exposeHeaders: ['ETag'],
         credentials: true,
         maxAge: 86400,

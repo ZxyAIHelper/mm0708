@@ -85,7 +85,7 @@ git commit -m "feat: add task history storage schema"
 
 - [ ] **Step 1: Write failing session tests**
 
-Test that a missing Cookie produces a new anonymous user ID and `mm_anonymous_session`; a valid Cookie reuses the existing user; an unknown/invalid Cookie rotates to a new session; production Cookie is host-only and includes `Secure`, `HttpOnly`, `SameSite=Lax`, and a one-year max age; localhost omits `Secure`.
+Test that a missing Cookie produces a new anonymous user ID and `mm_anonymous_session`; a valid Cookie reuses the existing user; a stable `X-Browser-Session` bootstrap token converges cookie-less tabs on the same user; an unknown/invalid Cookie rotates to a new session; production Cookie is host-only and includes `Secure`, `HttpOnly`, `SameSite=Lax`, and a one-year max age; localhost omits `Secure`.
 
 - [ ] **Step 2: Run the focused tests and confirm failure**
 

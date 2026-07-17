@@ -40,4 +40,19 @@ describe('worker task history wiring', () => {
         expect(response.headers.get('Access-Control-Allow-Origin'))
             .toBeNull()
     })
+
+    it('blocks untrusted sibling origins only on private task routes', async () => {
+        const privateResponse = await createApp().request('/api/tasks', {
+            headers: { Origin: 'https://untrusted.mm0708.top' },
+        })
+        const legacyResponse = await createApp().request('/', {
+            headers: { Origin: 'https://untrusted.mm0708.top' },
+        })
+
+        expect(privateResponse.status).toBe(403)
+        expect(privateResponse.headers.get('Access-Control-Allow-Origin'))
+            .toBeNull()
+        expect(legacyResponse.headers.get('Access-Control-Allow-Origin'))
+            .toBe('https://untrusted.mm0708.top')
+    })
 })

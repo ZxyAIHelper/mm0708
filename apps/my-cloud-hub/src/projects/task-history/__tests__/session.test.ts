@@ -97,4 +97,22 @@ describe('anonymous browser session', () => {
         expect(setCookie).not.toContain('Secure')
         expect(setCookie).toContain('HttpOnly')
     })
+
+    it('reuses a browser bootstrap token before a cookie exists', async () => {
+        const { repository, users } = createRepository()
+        const app = createApp(repository)
+        const browserToken = 'a'.repeat(43)
+        const first = await app.request('https://api.mm0708.top/session', {
+            method: 'POST',
+            headers: { 'X-Browser-Session': browserToken },
+        })
+        const second = await app.request('https://api.mm0708.top/session', {
+            method: 'POST',
+            headers: { 'X-Browser-Session': browserToken },
+        })
+
+        expect((await second.json() as { userId: string }).userId)
+            .toBe((await first.json() as { userId: string }).userId)
+        expect(users.size).toBe(1)
+    })
 })

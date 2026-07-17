@@ -1,5 +1,8 @@
 'use strict';
 
+const BROWSER_SESSION_KEY = 'product_swap_browser_session';
+const BROWSER_SESSION_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
 function resolveApiBase(explicitBase, hostname) {
     if (explicitBase) {
         return String(explicitBase).replace(/\/+$/, '');
@@ -28,13 +31,47 @@ function defaultApiBase() {
     );
 }
 
+function createBrowserSession() {
+    const bytes = new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+    let binary = '';
+    for (const byte of bytes) {
+        binary += String.fromCharCode(byte);
+    }
+    return btoa(binary)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+}
+
+function browserSession(config = {}) {
+    const storage = config.storage || (
+        typeof window !== 'undefined' ? window.localStorage : null
+    );
+    if (!storage) {
+        return '';
+    }
+    let token = storage.getItem(BROWSER_SESSION_KEY) || '';
+    if (!BROWSER_SESSION_PATTERN.test(token)) {
+        token = createBrowserSession();
+        storage.setItem(BROWSER_SESSION_KEY, token);
+    }
+    return token;
+}
+
 async function apiFetch(path, init = {}, config = {}) {
     const apiBase = config.apiBase === undefined
         ? defaultApiBase()
         : String(config.apiBase).replace(/\/+$/, '');
     const fetchImpl = config.fetchImpl || fetch;
+    const headers = new Headers(init.headers || {});
+    const session = browserSession(config);
+    if (session) {
+        headers.set('X-Browser-Session', session);
+    }
     return fetchImpl(`${apiBase}${path}`, {
         ...init,
+        headers,
         credentials: 'include',
     });
 }
@@ -53,10 +90,17 @@ async function apiJson(path, init = {}, config = {}) {
 }
 
 function ensureSession(apiBase, config = {}) {
-    return apiJson('/api/tasks/session', { method: 'POST' }, {
-        ...config,
-        apiBase,
-    });
+    const start = () => apiJson(
+        '/api/tasks/session',
+        { method: 'POST' },
+        { ...config, apiBase },
+    );
+    const locks = config.locks || (
+        typeof navigator !== 'undefined' ? navigator.locks : null
+    );
+    return locks
+        ? locks.request('product-swap-session-bootstrap', start)
+        : start();
 }
 
 function assetUrl(apiBase, taskId, assetId) {
@@ -70,6 +114,7 @@ const client = {
     resolveApiBase,
     apiFetch,
     apiJson,
+    browserSession,
     ensureSession,
     assetUrl,
 };
