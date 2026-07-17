@@ -86,6 +86,10 @@ export type TaskHistoryService = {
         role: TaskAssetRole,
         url: string,
     ): Promise<TaskAsset>
+    archiveOwnedResult(
+        task: TaskRecord,
+        sourceUrl: string,
+    ): Promise<TaskAsset>
     completeTask(
         taskId: string,
         result: Record<string, unknown>,

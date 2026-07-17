@@ -41,7 +41,7 @@ function cookiePair(setCookie: string) {
 }
 
 describe('anonymous browser session', () => {
-    it('creates a secure parent-domain cookie in production', async () => {
+    it('creates a secure host-only cookie in production', async () => {
         const { repository, users } = createRepository()
         const response = await createApp(repository).request(
             'https://api.mm0708.top/session',
@@ -54,7 +54,7 @@ describe('anonymous browser session', () => {
         expect(users.size).toBe(1)
         expect([...users.keys()][0]).toMatch(/^[a-f0-9]{64}$/)
         expect(setCookie).toContain('mm_anonymous_session=')
-        expect(setCookie).toContain('Domain=.mm0708.top')
+        expect(setCookie).not.toContain('Domain=')
         expect(setCookie).toContain('Max-Age=31536000')
         expect(setCookie).toContain('HttpOnly')
         expect(setCookie).toContain('Secure')

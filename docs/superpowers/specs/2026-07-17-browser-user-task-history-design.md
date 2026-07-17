@@ -30,7 +30,7 @@ Worker 只在 D1 中保存会话密钥的 SHA-256 摘要，原始密钥写入长
 
 ```text
 Name: mm_anonymous_session
-Domain: .mm0708.top
+Domain: 省略（仅 api.mm0708.top 可接收）
 Path: /
 Max-Age: 31536000
 Secure: true
@@ -38,7 +38,7 @@ HttpOnly: true
 SameSite: Lax
 ```
 
-共享父域 Cookie 使 `product-swap.mm0708.top` 和未来受信任的工具子域可以识别同一浏览器用户。前端所有 API 请求使用 `credentials: "include"`。API CORS 只允许明确配置的 `*.mm0708.top` 前端来源和本地开发来源，并启用凭据；不再对带身份的任务接口使用通配来源。
+API host-only Cookie 让所有经过明确授权的前端通过 `api.mm0708.top` 识别同一浏览器用户，同时避免兄弟子域收到身份凭据。前端所有 API 请求使用 `credentials: "include"`。API CORS 当前只允许 `product-swap.mm0708.top` 和本地开发来源；未来新增工具时需逐项加入明确白名单。
 
 ### 本地开发
 
@@ -96,7 +96,7 @@ D1 不保存 Base64 图片或火山临时 URL。
 1. 前端启动时调用 `POST /api/tasks/session`，Worker 自动恢复或创建匿名用户。
 2. 前端生成请求携带 Cookie 和现有输入数据。
 3. Worker 创建 `processing` 任务记录。
-4. Worker 解码输入 Data URL，将目标图、产品图、场景图以及修正时的上一版结果写入 R2，并写入 `task_assets`。
+4. Worker 只接受目标图、产品图、场景图的 Data URL；修正时的上一版 URL 必须匹配当前匿名用户已有任务的输出，再从已有 R2 对象复制，避免抓取用户提供的任意 URL。
 5. Worker调用火山 Provider。
 6. 成功后，Worker立即下载火山返回的临时 URL，验证 Content-Type 和大小，将输出写入 R2。
 7. Worker将任务更新为 `completed`，返回当前可展示的 `imageUrl`、`taskId` 和原有会话字段。
@@ -237,4 +237,3 @@ POST   /api/product-swap/generate
 3. 每个任务可以查看本期仍有效的全部输入与输出。
 4. 30 天后图片不可读取，但任务文字仍保留并显示已过期。
 5. 数据模型和任务页面可以在不改表结构的前提下增加新的 `task_type`。
-

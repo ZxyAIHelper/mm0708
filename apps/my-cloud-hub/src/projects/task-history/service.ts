@@ -337,7 +337,7 @@ implements TaskHistoryService {
             )
         }
         const response = await this.fetchImpl(parsedUrl.toString(), {
-            redirect: 'follow',
+            redirect: 'manual',
         })
         if (!response.ok) {
             throw new TaskHistoryError(
@@ -364,6 +364,49 @@ implements TaskHistoryService {
         return this.archiveBytes(
             task,
             role,
+            bytes,
+            imageType.contentType,
+            imageType.extension,
+        )
+    }
+
+    async archiveOwnedResult(
+        task: TaskRecord,
+        sourceUrl: string,
+    ) {
+        const source = await this.env.DB.prepare(
+            `SELECT a.* FROM task_assets a
+             INNER JOIN generation_tasks t ON t.id = a.task_id
+             WHERE t.user_id = ? AND t.status = 'completed'
+               AND json_extract(t.result_json, '$.imageUrl') = ?
+               AND a.role = 'output' AND a.deleted_at IS NULL
+               AND a.expires_at > ?
+             ORDER BY t.created_at DESC LIMIT 1`,
+        ).bind(task.userId, sourceUrl, this.now()).first<AssetRow>()
+        if (!source) {
+            throw new TaskHistoryError(
+                'INVALID_PREVIOUS_IMAGE',
+                'Previous image is not owned by this browser',
+            )
+        }
+        const object = await this.env.TASK_ASSETS.get(source.r2_key)
+        if (!object) {
+            throw new TaskHistoryError(
+                'PREVIOUS_IMAGE_EXPIRED',
+                'Previous image has expired',
+            )
+        }
+        const bytes = new Uint8Array(await object.arrayBuffer())
+        if (bytes.byteLength > INPUT_IMAGE_LIMIT) {
+            throw new TaskHistoryError(
+                'FILE_TOO_LARGE',
+                'Previous image is too large',
+            )
+        }
+        const imageType = extensionFor(source.content_type)
+        return this.archiveBytes(
+            task,
+            'previous',
             bytes,
             imageType.contentType,
             imageType.extension,

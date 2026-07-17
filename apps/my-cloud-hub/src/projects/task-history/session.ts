@@ -123,7 +123,6 @@ export async function ensureAnonymousSession(
         || hostname.endsWith('.mm0708.top')
     setCookie(c, SESSION_COOKIE, token, {
         path: '/',
-        domain: isProduction ? '.mm0708.top' : undefined,
         maxAge: SESSION_MAX_AGE_SECONDS,
         secure: isProduction,
         httpOnly: true,

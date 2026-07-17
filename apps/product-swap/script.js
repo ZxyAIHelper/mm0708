@@ -152,7 +152,8 @@ function boot() {
         archiveNotice.hidden = !message;
     }
 
-    apiClient.ensureSession(apiBase).catch(() => undefined);
+    const sessionReady = apiClient.ensureSession(apiBase)
+        .catch(() => undefined);
 
     function setGenerating(value) {
         state.isGenerating = value;
@@ -304,6 +305,7 @@ function boot() {
         setGenerating(true);
 
         try {
+            await sessionReady;
             const response = await apiClient.apiFetch(
                 '/api/product-swap/generate',
                 {
@@ -392,6 +394,7 @@ function boot() {
         setRefining(true);
 
         try {
+            await sessionReady;
             const response = await apiClient.apiFetch(
                 '/api/product-swap/generate',
                 {

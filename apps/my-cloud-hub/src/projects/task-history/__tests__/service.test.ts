@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
     assetExpiration,
+    CloudflareTaskHistoryService,
     decodeTaskImageDataUrl,
 } from '../service'
 
@@ -28,5 +29,26 @@ describe('task history image validation', () => {
         expect(assetExpiration(1000)).toBe(
             1000 + 30 * 24 * 60 * 60 * 1000,
         )
+    })
+
+    it('does not follow provider redirects while archiving', async () => {
+        let redirectMode = ''
+        const service = new CloudflareTaskHistoryService(
+            {} as any,
+            async (_url, init) => {
+                redirectMode = String(init?.redirect)
+                return new Response(null, {
+                    status: 302,
+                    headers: { Location: 'http://127.0.0.1/private' },
+                })
+            },
+        )
+
+        await expect(service.archiveRemoteImage(
+            { userId: 'anon_1' } as any,
+            'output',
+            'https://images.example/result.png',
+        )).rejects.toThrow('Result image download failed (302)')
+        expect(redirectMode).toBe('manual')
     })
 })

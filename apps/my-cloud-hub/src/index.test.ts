@@ -8,6 +8,9 @@ describe('worker task history wiring', () => {
         )).toBe(true)
         expect(isTrustedOrigin('http://localhost:8791')).toBe(true)
         expect(isTrustedOrigin('http://127.0.0.1:4173')).toBe(true)
+        expect(isTrustedOrigin(
+            'https://untrusted.mm0708.top',
+        )).toBe(false)
         expect(isTrustedOrigin('https://evil.example')).toBe(false)
     })
 

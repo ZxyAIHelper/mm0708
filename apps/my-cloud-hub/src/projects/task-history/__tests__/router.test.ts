@@ -19,6 +19,7 @@ function createService(overrides: Partial<TaskHistoryService> = {}) {
         startTask: async () => { throw new Error('unused') },
         archiveDataUrl: async () => { throw new Error('unused') },
         archiveRemoteImage: async () => { throw new Error('unused') },
+        archiveOwnedResult: async () => { throw new Error('unused') },
         completeTask: async () => undefined,
         failTask: async () => undefined,
         listTasks: async () => emptyPage,

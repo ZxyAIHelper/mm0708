@@ -33,15 +33,21 @@ function createApp(
 }
 
 describe('product swap router', () => {
-    it('archives a previous result URL as an image source', async () => {
+    it('only fetches a previous URL after ownership validation', async () => {
         const archived: Array<[string, string]> = []
         const service = {
-            archiveRemoteImage: async (
+            archiveDataUrl: async (
                 _task: unknown,
                 role: string,
                 source: string,
             ) => {
                 archived.push([role, source])
+            },
+            archiveOwnedResult: async (
+                _task: unknown,
+                source: string,
+            ) => {
+                archived.push(['owned-previous', source])
             },
         }
 
@@ -51,8 +57,9 @@ describe('product swap router', () => {
             requirements: '',
         })
 
+        expect(archived).toContainEqual(['target', targetImage])
         expect(archived).toContainEqual([
-            'previous',
+            'owned-previous',
             'https://example.com/previous.png',
         ])
     })

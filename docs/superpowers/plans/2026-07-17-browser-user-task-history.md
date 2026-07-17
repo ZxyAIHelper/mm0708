@@ -85,7 +85,7 @@ git commit -m "feat: add task history storage schema"
 
 - [ ] **Step 1: Write failing session tests**
 
-Test that a missing Cookie produces a new anonymous user ID and `mm_anonymous_session`; a valid Cookie reuses the existing user; an unknown/invalid Cookie rotates to a new session; production Cookie attributes include `Domain=.mm0708.top`, `Secure`, `HttpOnly`, `SameSite=Lax`, and a one-year max age; localhost omits `Domain` and `Secure`.
+Test that a missing Cookie produces a new anonymous user ID and `mm_anonymous_session`; a valid Cookie reuses the existing user; an unknown/invalid Cookie rotates to a new session; production Cookie is host-only and includes `Secure`, `HttpOnly`, `SameSite=Lax`, and a one-year max age; localhost omits `Secure`.
 
 - [ ] **Step 2: Run the focused tests and confirm failure**
 
@@ -142,6 +142,7 @@ Implement focused methods:
 startTask(userId, draft): Promise<TaskRecord>
 archiveDataUrl(task, role, source): Promise<TaskAsset>
 archiveRemoteImage(task, role, url): Promise<TaskAsset>
+archiveOwnedResult(task, sourceUrl): Promise<TaskAsset>
 completeTask(taskId, result): Promise<void>
 failTask(taskId, code, message): Promise<void>
 listTasks(userId, query): Promise<TaskPage>
@@ -333,4 +334,3 @@ Run `git diff --check`, `git status --short`, and a bounded `git diff --stat`. C
 git add apps/my-cloud-hub apps/product-swap packages/database/migrations/0004_task_history.sql
 git commit -m "test: verify anonymous task history flow"
 ```
-

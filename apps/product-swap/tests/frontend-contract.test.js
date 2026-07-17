@@ -106,3 +106,16 @@ test('builds the stable request and maps provider errors', () => {
         '生成超时，请稍后重试',
     );
 });
+
+test('generation waits for anonymous session initialization', () => {
+    const source = fs.readFileSync(
+        path.join(root, 'script.js'),
+        'utf8',
+    );
+
+    assert.match(source, /const sessionReady\s*=\s*apiClient\.ensureSession/);
+    assert.equal(
+        (source.match(/await sessionReady;/g) || []).length,
+        2,
+    );
+});

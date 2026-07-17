@@ -34,8 +34,7 @@ type Bindings = {
 }
 
 export function isTrustedOrigin(origin: string) {
-    if (/^https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)*\.mm0708\.top$/i
-        .test(origin)) {
+    if (origin === 'https://product-swap.mm0708.top') {
         return true
     }
     try {

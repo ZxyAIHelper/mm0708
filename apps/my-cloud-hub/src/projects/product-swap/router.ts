@@ -54,7 +54,10 @@ export type ProductSwapTaskArchive = {
 }
 
 export async function archiveProductSwapInputs(
-    service: Pick<CloudflareTaskHistoryService, 'archiveRemoteImage'>,
+    service: Pick<
+        CloudflareTaskHistoryService,
+        'archiveDataUrl' | 'archiveOwnedResult'
+    >,
     task: TaskRecord,
     input: ProductSwapArchiveInput,
 ): Promise<void> {
@@ -68,8 +71,13 @@ export async function archiveProductSwapInputs(
         ['previous', input.previousImage],
     ]
     for (const [role, source] of images) {
-        if (source) {
-            await service.archiveRemoteImage(task, role, source)
+        if (!source) {
+            continue
+        }
+        if (role === 'previous' && !source.startsWith('data:')) {
+            await service.archiveOwnedResult(task, source)
+        } else {
+            await service.archiveDataUrl(task, role, source)
         }
     }
 }
@@ -126,6 +134,7 @@ function createArchiveHandle(
             }
             try {
                 await service.completeTask(task.id, {
+                    imageUrl: result.imageUrl,
                     provider: result.provider,
                     conversationId: result.conversationId,
                     assistantMessage: result.assistantMessage ?? '',
