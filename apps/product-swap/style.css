@@ -253,6 +253,15 @@ button {
     cursor: pointer;
 }
 
+.archive-notice {
+    margin: 0;
+    padding: 10px 14px;
+    border-top: 1px solid var(--line);
+    color: #f4c56a;
+    background: rgba(244, 197, 106, 0.08);
+    font-size: 13px;
+}
+
 .refinement-panel {
     border-top: 1px solid var(--line);
     padding: 14px 12px 16px;

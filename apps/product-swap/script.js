@@ -108,10 +108,13 @@ function boot() {
         window.API_BASE_URL || '',
         window.location.hostname,
     );
+    const apiClient = window.ProductSwapApi;
     const form = document.getElementById('swapForm');
     const generateButton =
         document.getElementById('generateButton');
     const formError = document.getElementById('formError');
+    const archiveNotice =
+        document.getElementById('archiveNotice');
     const resultSection =
         document.getElementById('resultSection');
     const resultImage =
@@ -143,6 +146,13 @@ function boot() {
         formError.textContent = message;
         formError.hidden = !message;
     }
+
+    function showArchiveNotice(message) {
+        archiveNotice.textContent = message;
+        archiveNotice.hidden = !message;
+    }
+
+    apiClient.ensureSession(apiBase).catch(() => undefined);
 
     function setGenerating(value) {
         state.isGenerating = value;
@@ -290,11 +300,12 @@ function boot() {
         }
 
         showError('');
+        showArchiveNotice('');
         setGenerating(true);
 
         try {
-            const response = await fetch(
-                `${apiBase}/api/product-swap/generate`,
+            const response = await apiClient.apiFetch(
+                '/api/product-swap/generate',
                 {
                     method: 'POST',
                     headers: {
@@ -304,6 +315,7 @@ function boot() {
                         buildGeneratePayload(state),
                     ),
                 },
+                { apiBase },
             );
             const data = await response
                 .json()
@@ -341,6 +353,7 @@ function boot() {
             });
             resultImage.src = state.result;
             resultSection.hidden = false;
+            showArchiveNotice(data.archiveWarning || '');
             renderMessages();
             resultSection.scrollIntoView({
                 behavior: 'smooth',
@@ -375,11 +388,12 @@ function boot() {
         }
 
         showError('');
+        showArchiveNotice('');
         setRefining(true);
 
         try {
-            const response = await fetch(
-                `${apiBase}/api/product-swap/generate`,
+            const response = await apiClient.apiFetch(
+                '/api/product-swap/generate',
                 {
                     method: 'POST',
                     headers: {
@@ -389,6 +403,7 @@ function boot() {
                         buildRefinePayload(state, correction),
                     ),
                 },
+                { apiBase },
             );
             const data = await response.json().catch(() => ({}));
 
@@ -416,6 +431,7 @@ function boot() {
             state.conversationId = data.conversationId
                 || state.conversationId;
             resultImage.src = state.result;
+            showArchiveNotice(data.archiveWarning || '');
             refineInput.value = '';
             renderMessages();
             resultImage.scrollIntoView({
