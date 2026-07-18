@@ -117,6 +117,14 @@ async function pollLocalTask(
         if (task.status === 'completed' || task.status === 'failed') {
             return task;
         }
+        if (history.isStaleProcessingTask?.(task)) {
+            await history.failTask(
+                taskId,
+                'GENERATION_INTERRUPTED',
+                '页面后台生成已中断',
+            );
+            continue;
+        }
         await delay(intervalMs);
     }
 }
@@ -241,7 +249,7 @@ function boot() {
 
     function rememberActiveTask(taskId) {
         try {
-            window.localStorage.setItem(ACTIVE_TASK_KEY, taskId);
+            window.sessionStorage.setItem(ACTIVE_TASK_KEY, taskId);
         } catch {
             // IndexedDB polling still works in the current page.
         }
@@ -249,8 +257,8 @@ function boot() {
 
     function clearActiveTask(taskId) {
         try {
-            if (window.localStorage.getItem(ACTIVE_TASK_KEY) === taskId) {
-                window.localStorage.removeItem(ACTIVE_TASK_KEY);
+            if (window.sessionStorage.getItem(ACTIVE_TASK_KEY) === taskId) {
+                window.sessionStorage.removeItem(ACTIVE_TASK_KEY);
             }
         } catch {
             // Storage can be unavailable in strict privacy modes.
@@ -258,11 +266,14 @@ function boot() {
     }
 
     async function dispatchBackgroundGeneration(localTask, payload) {
-        const registration = await workerRegistration;
-        if (!localTask || !registration?.active) {
+        if (!localTask) {
             return false;
         }
         rememberActiveTask(localTask.id);
+        const registration = await workerRegistration;
+        if (!registration?.active) {
+            return false;
+        }
         registration.active.postMessage(createGenerationMessage(
             localTask.id,
             payload,
@@ -297,6 +308,9 @@ function boot() {
                 assistantMessage: task.result?.assistantMessage || '',
                 archiveWarning: null,
             };
+        }
+        if (localTask) {
+            clearActiveTask(localTask.id);
         }
 
         const response = await apiClient.apiFetch(
@@ -443,19 +457,25 @@ function boot() {
     }
 
     async function restoreActiveTask() {
-        let task = null;
+        setGenerating(true);
+        setRefining(true);
+        let rememberedTask = null;
         try {
-            const rememberedId = window.localStorage.getItem(ACTIVE_TASK_KEY);
+            const rememberedId = window.sessionStorage.getItem(ACTIVE_TASK_KEY);
             if (rememberedId) {
-                task = await localHistory.getTask(rememberedId);
+                rememberedTask = await localHistory.getTask(rememberedId);
             }
         } catch {
-            task = null;
+            rememberedTask = null;
         }
+        const processingTask = await localHistory
+            .latestProcessingTask('product_swap');
+        let task = rememberedTask?.status === 'processing'
+            ? rememberedTask
+            : (processingTask || rememberedTask);
         if (!task) {
-            task = await localHistory.latestProcessingTask('product_swap');
-        }
-        if (!task) {
+            setGenerating(false);
+            setRefining(false);
             return;
         }
 
@@ -463,10 +483,28 @@ function boot() {
         await hydrateTaskState(task);
         const isRefinement = Boolean(task.input?.isRefinement);
         if (task.status === 'processing') {
+            if (!task.dispatchedAt) {
+                const payload = isRefinement
+                    ? buildRefinePayload(state, state.requirements)
+                    : buildGeneratePayload(state);
+                const dispatched = await dispatchBackgroundGeneration(
+                    task,
+                    payload,
+                );
+                if (!dispatched) {
+                    await localHistory.failTask(
+                        task.id,
+                        'BACKGROUND_UNAVAILABLE',
+                        '后台生成不可用，请重新提交',
+                    );
+                }
+            }
             if (isRefinement) {
                 setRefining(true);
+                setGenerating(false);
             } else {
                 setGenerating(true);
+                setRefining(false);
             }
             showArchiveNotice('正在恢复生成进度，刷新页面不会重复提交');
             task = await pollLocalTask(task.id, { history: localHistory });

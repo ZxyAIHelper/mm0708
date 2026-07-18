@@ -220,7 +220,7 @@ function jsonResponse(request, body, status = 200) {
         await page.evaluate(() => navigator.serviceWorker.ready);
         await page.click('#generateButton');
         await page.waitForFunction(() =>
-            Boolean(localStorage.getItem('product_swap_active_task_id')),
+            Boolean(sessionStorage.getItem('product_swap_active_task_id')),
         );
         await page.reload({ waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() =>
@@ -232,10 +232,10 @@ function jsonResponse(request, body, status = 200) {
         await page.type('#refineInput', '盘子改成白色');
         await page.click('#refineButton');
         await page.waitForFunction(() =>
-            Boolean(localStorage.getItem('product_swap_active_task_id')),
+            Boolean(sessionStorage.getItem('product_swap_active_task_id')),
         );
         await page.waitForFunction(() =>
-            !localStorage.getItem('product_swap_active_task_id'),
+            !sessionStorage.getItem('product_swap_active_task_id'),
         );
 
         const state = await page.evaluate(() => ({
@@ -255,7 +255,7 @@ function jsonResponse(request, body, status = 200) {
                 ?.getAttribute('src')?.startsWith('data:image/jpeg') || false,
             chatMessages: document.querySelectorAll('.chat-message').length,
             formError: document.getElementById('formError')?.textContent || '',
-            activeTaskCleared: !localStorage.getItem(
+            activeTaskCleared: !sessionStorage.getItem(
                 'product_swap_active_task_id',
             ),
         }));

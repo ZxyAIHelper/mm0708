@@ -157,6 +157,7 @@ async function startTask({
         errorMessage: null,
         createdAt,
         updatedAt: createdAt,
+        dispatchedAt: null,
         completedAt: null,
         previewAsset: null,
     };
@@ -229,6 +230,27 @@ async function completeTask(taskId, result) {
     taskStore.put(task);
     await done;
     return task;
+}
+
+async function completeTaskMetadata(taskId, result) {
+    const completedAt = Date.now();
+    const preview = result?.imageUrl
+        ? previewAssetFromAsset(assetFromSource(
+            taskId,
+            'output',
+            result.imageUrl,
+            completedAt,
+        ))
+        : null;
+    return updateTask(taskId, (task) => ({
+        ...task,
+        status: 'completed',
+        result,
+        errorCode: null,
+        errorMessage: null,
+        completedAt,
+        previewAsset: preview,
+    }));
 }
 
 function failTask(taskId, code, message) {
@@ -315,6 +337,13 @@ async function touchTask(taskId, updatedAt = Date.now()) {
     store.put(updated);
     await done;
     return updated;
+}
+
+function markTaskDispatched(taskId, dispatchedAt = Date.now()) {
+    return updateTask(taskId, (task) => ({
+        ...task,
+        dispatchedAt,
+    }));
 }
 
 function deleteKeysFromIndex(index, range, store) {
@@ -458,11 +487,13 @@ const localHistory = {
     isStaleProcessingTask,
     startTask,
     completeTask,
+    completeTaskMetadata,
     failTask,
     listTasks,
     selectLatestProcessingTask,
     latestProcessingTask,
     touchTask,
+    markTaskDispatched,
     getTask,
     deleteTask,
     cleanupExpiredAssets,

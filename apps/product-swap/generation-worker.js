@@ -5,8 +5,30 @@ if (typeof importScripts === 'function') {
 }
 
 const runningTaskIds = new Set();
+const PRODUCTION_API_ORIGIN = 'https://api.mm0708.top';
 
-function isGenerationMessage(value) {
+function isAllowedApiUrl(apiUrl, workerOrigin = globalThis.location?.origin) {
+    try {
+        const url = new URL(apiUrl);
+        if (url.pathname !== '/api/product-swap/generate') {
+            return false;
+        }
+        if (url.origin === PRODUCTION_API_ORIGIN) {
+            return url.protocol === 'https:';
+        }
+        if (!workerOrigin || url.origin !== workerOrigin) {
+            return false;
+        }
+        return url.protocol === 'https:'
+            || (url.protocol === 'http:'
+                && (url.hostname === 'localhost'
+                    || url.hostname === '127.0.0.1'));
+    } catch {
+        return false;
+    }
+}
+
+function isGenerationMessage(value, workerOrigin) {
     if (!value || typeof value !== 'object'
         || value.type !== 'product-swap:start'
         || value.version !== 1
@@ -15,13 +37,7 @@ function isGenerationMessage(value) {
         || typeof value.payload.targetImage !== 'string') {
         return false;
     }
-    try {
-        const url = new URL(value.apiUrl);
-        return /^https?:$/.test(url.protocol)
-            && url.pathname === '/api/product-swap/generate';
-    } catch {
-        return false;
-    }
+    return isAllowedApiUrl(value.apiUrl, workerOrigin);
 }
 
 async function runGenerationMessage(
@@ -31,16 +47,16 @@ async function runGenerationMessage(
         fetchImpl = globalThis.fetch,
     } = {},
 ) {
+    await history.markTaskDispatched(message.taskId);
+    let data;
     try {
-        const request = fetchImpl(message.apiUrl, {
+        const response = await fetchImpl(message.apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify(message.payload),
         });
-        await history.touchTask(message.taskId);
-        const response = await request;
-        const data = await response.json().catch(() => ({}));
+        data = await response.json().catch(() => ({}));
         if (!response.ok || !data.success || !data.imageUrl) {
             const error = new Error(
                 data?.error?.message || '图片生成失败',
@@ -48,17 +64,24 @@ async function runGenerationMessage(
             error.code = data?.error?.code || 'PROVIDER_REQUEST_FAILED';
             throw error;
         }
-        await history.completeTask(message.taskId, {
-            imageUrl: data.imageUrl,
-            conversationId: data.conversationId || '',
-            assistantMessage: data.assistantMessage || '',
-        });
     } catch (error) {
         await history.failTask(
             message.taskId,
             error?.code || 'PROVIDER_REQUEST_FAILED',
             error?.message || '图片生成失败',
         );
+        return;
+    }
+
+    const result = {
+        imageUrl: data.imageUrl,
+        conversationId: data.conversationId || '',
+        assistantMessage: data.assistantMessage || '',
+    };
+    try {
+        await history.completeTask(message.taskId, result);
+    } catch {
+        await history.completeTaskMetadata(message.taskId, result);
     }
 }
 

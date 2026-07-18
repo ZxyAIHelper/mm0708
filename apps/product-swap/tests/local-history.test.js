@@ -66,6 +66,8 @@ test('selects the newest processing task for the current user and tool', () => {
 test('exports local polling helpers', () => {
     assert.equal(typeof history.latestProcessingTask, 'function');
     assert.equal(typeof history.touchTask, 'function');
+    assert.equal(typeof history.markTaskDispatched, 'function');
+    assert.equal(typeof history.completeTaskMetadata, 'function');
 });
 
 test('exposes the repository to window and service worker globals', () => {

@@ -173,10 +173,33 @@ test('polls one local task until it reaches a terminal state', async () => {
     assert.equal(reads, 3);
 });
 
+test('turns a stale processing task into an interrupted terminal state', async () => {
+    const failures = [];
+    const task = await pollLocalTask('task_local_1', {
+        history: {
+            getTask: async () => failures.length
+                ? { id: 'task_local_1', status: 'failed' }
+                : { id: 'task_local_1', status: 'processing' },
+            isStaleProcessingTask: () => true,
+            failTask: async (taskId, code) => failures.push([taskId, code]),
+        },
+        intervalMs: 0,
+        delay: async () => {
+            throw new Error('stale task was not recovered');
+        },
+    });
+
+    assert.equal(task.status, 'failed');
+    assert.deepEqual(failures, [[
+        'task_local_1',
+        'GENERATION_INTERRUPTED',
+    ]]);
+});
+
 test('generation page registers the background worker and restores active tasks', () => {
     const source = fs.readFileSync(path.join(root, 'script.js'), 'utf8');
     assert.match(source, /serviceWorker\.register\('\/generation-worker\.js'/);
-    assert.match(source, /product_swap_active_task_id/);
+    assert.match(source, /sessionStorage/);
     assert.match(source, /latestProcessingTask/);
     assert.match(source, /postMessage/);
 });

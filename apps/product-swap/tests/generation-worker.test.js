@@ -23,12 +23,21 @@ test('accepts only the versioned product-swap generation message', () => {
     assert.equal(isGenerationMessage(message({ version: 2 })), false);
     assert.equal(isGenerationMessage(message({ taskId: '' })), false);
     assert.equal(isGenerationMessage(message({ payload: null })), false);
+    assert.equal(isGenerationMessage(message({
+        apiUrl: 'https://evil.example/api/product-swap/generate',
+    })), false);
+    assert.equal(isGenerationMessage(message({
+        apiUrl: 'http://api.mm0708.top/api/product-swap/generate',
+    })), false);
 });
 
 test('writes a successful generation response to local task history', async () => {
     const calls = [];
     const history = {
-        touchTask: async (taskId) => calls.push(['touch', taskId]),
+        markTaskDispatched: async (taskId) => calls.push([
+            'dispatch',
+            taskId,
+        ]),
         completeTask: async (taskId, result) => calls.push([
             'complete',
             taskId,
@@ -53,7 +62,7 @@ test('writes a successful generation response to local task history', async () =
     assert.equal(request.url, message().apiUrl);
     assert.equal(request.init.credentials, 'include');
     assert.deepEqual(JSON.parse(request.init.body), message().payload);
-    assert.equal(calls[0][0], 'touch');
+    assert.equal(calls[0][0], 'dispatch');
     assert.equal(calls[1][0], 'complete');
     assert.equal(calls[1][2].imageUrl, 'https://example.com/result.png');
 });
@@ -71,7 +80,7 @@ test('deduplicates an already running local task', async () => {
         });
     };
     const history = {
-        touchTask: async () => undefined,
+        markTaskDispatched: async () => undefined,
         completeTask: async () => undefined,
         failTask: async () => undefined,
     };
@@ -87,6 +96,7 @@ test('deduplicates an already running local task', async () => {
 
     assert.equal(first, true);
     assert.equal(second, false);
+    await Promise.resolve();
     assert.equal(requests, 1);
     release();
     await Promise.all(promises);
@@ -96,7 +106,7 @@ test('marks the local task failed when fetch cannot start', async () => {
     let failure;
     await runGenerationMessage(message(), {
         history: {
-            touchTask: async () => undefined,
+            markTaskDispatched: async () => undefined,
             completeTask: async () => assert.fail('should not complete'),
             failTask: async (taskId, code, errorMessage) => {
                 failure = { taskId, code, errorMessage };
@@ -112,4 +122,52 @@ test('marks the local task failed when fetch cannot start', async () => {
         code: 'PROVIDER_REQUEST_FAILED',
         errorMessage: 'network unavailable',
     });
+});
+
+test('does not start a billable request when dispatch persistence fails', async () => {
+    let requests = 0;
+    await assert.rejects(
+        runGenerationMessage(message(), {
+            history: {
+                markTaskDispatched: async () => {
+                    throw new Error('indexeddb unavailable');
+                },
+                completeTask: async () => undefined,
+                completeTaskMetadata: async () => undefined,
+                failTask: async () => undefined,
+            },
+            fetchImpl: async () => {
+                requests += 1;
+                return new Response('{}');
+            },
+        }),
+        /indexeddb unavailable/,
+    );
+    assert.equal(requests, 0);
+});
+
+test('falls back to metadata completion without marking a billed task failed', async () => {
+    const calls = [];
+    await runGenerationMessage(message(), {
+        history: {
+            markTaskDispatched: async () => undefined,
+            completeTask: async () => {
+                throw new Error('asset quota exceeded');
+            },
+            completeTaskMetadata: async (taskId, result) => {
+                calls.push(['metadata', taskId, result.imageUrl]);
+            },
+            failTask: async () => calls.push(['failed']),
+        },
+        fetchImpl: async () => new Response(JSON.stringify({
+            success: true,
+            imageUrl: 'https://example.com/result.png',
+        })),
+    });
+
+    assert.deepEqual(calls, [[
+        'metadata',
+        'task_local_1',
+        'https://example.com/result.png',
+    ]]);
 });
