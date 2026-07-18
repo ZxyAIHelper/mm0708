@@ -52,6 +52,22 @@ test('recognizes interrupted processing tasks after the recovery window', () => 
     }, now), false);
 });
 
+test('selects the newest processing task for the current user and tool', () => {
+    const selected = history.selectLatestProcessingTask([
+        { id: 'other', userId: 'u2', taskType: 'product_swap', status: 'processing', createdAt: 30 },
+        { id: 'old', userId: 'u1', taskType: 'product_swap', status: 'processing', createdAt: 10 },
+        { id: 'done', userId: 'u1', taskType: 'product_swap', status: 'completed', createdAt: 40 },
+        { id: 'new', userId: 'u1', taskType: 'product_swap', status: 'processing', createdAt: 20 },
+    ], 'u1', 'product_swap');
+
+    assert.equal(selected.id, 'new');
+});
+
+test('exports local polling helpers', () => {
+    assert.equal(typeof history.latestProcessingTask, 'function');
+    assert.equal(typeof history.touchTask, 'function');
+});
+
 test('avoids bulk asset reads and completes tasks atomically', () => {
     const source = fs.readFileSync(
         path.resolve(__dirname, '..', 'local-history.js'),

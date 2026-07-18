@@ -282,6 +282,41 @@ async function listTasks({ taskType = '', cursor, limit = 30 } = {}) {
     };
 }
 
+function selectLatestProcessingTask(tasks, userId, taskType = 'product_swap') {
+    return tasks
+        .filter((task) => task.userId === userId)
+        .filter((task) => task.taskType === taskType)
+        .filter((task) => task.status === 'processing')
+        .sort((left, right) => right.createdAt - left.createdAt
+            || right.id.localeCompare(left.id))[0]
+        || null;
+}
+
+async function latestProcessingTask(taskType = 'product_swap') {
+    const database = await openDatabase();
+    const transaction = database.transaction('tasks', 'readonly');
+    const tasks = await requestValue(
+        transaction.objectStore('tasks').getAll(),
+    );
+    return selectLatestProcessingTask(tasks, ensureUserId(), taskType);
+}
+
+async function touchTask(taskId, updatedAt = Date.now()) {
+    const database = await openDatabase();
+    const transaction = database.transaction('tasks', 'readwrite');
+    const done = transactionDone(transaction);
+    const store = transaction.objectStore('tasks');
+    const task = await requestValue(store.get(taskId));
+    if (!task) {
+        transaction.abort();
+        throw new Error('TASK_NOT_FOUND');
+    }
+    const updated = { ...task, updatedAt };
+    store.put(updated);
+    await done;
+    return updated;
+}
+
 function deleteKeysFromIndex(index, range, store) {
     return new Promise((resolve, reject) => {
         const request = index.openKeyCursor(range);
@@ -425,6 +460,9 @@ const localHistory = {
     completeTask,
     failTask,
     listTasks,
+    selectLatestProcessingTask,
+    latestProcessingTask,
+    touchTask,
     getTask,
     deleteTask,
     cleanupExpiredAssets,
