@@ -10,6 +10,8 @@ const {
     buildGeneratePayload,
     buildRefinePayload,
     historyInputFromPayload,
+    createGenerationMessage,
+    pollLocalTask,
     mapErrorCode,
 } = require('../script');
 
@@ -137,6 +139,46 @@ test('preserves the complete non-image refinement input in history', () => {
     });
     assert.equal('targetImage' in input, false);
     assert.equal('previousImage' in input, false);
+});
+
+test('builds the versioned service worker generation message', () => {
+    assert.deepEqual(createGenerationMessage(
+        'task_local_1',
+        { targetImage: 'target' },
+        'https://api.mm0708.top',
+        'https://product-swap.mm0708.top',
+    ), {
+        type: 'product-swap:start',
+        version: 1,
+        taskId: 'task_local_1',
+        apiUrl: 'https://api.mm0708.top/api/product-swap/generate',
+        payload: { targetImage: 'target' },
+    });
+});
+
+test('polls one local task until it reaches a terminal state', async () => {
+    const states = ['processing', 'processing', 'completed'];
+    let reads = 0;
+    const task = await pollLocalTask('task_local_1', {
+        history: {
+            getTask: async () => ({
+                id: 'task_local_1',
+                status: states[reads++],
+            }),
+        },
+        intervalMs: 0,
+    });
+
+    assert.equal(task.status, 'completed');
+    assert.equal(reads, 3);
+});
+
+test('generation page registers the background worker and restores active tasks', () => {
+    const source = fs.readFileSync(path.join(root, 'script.js'), 'utf8');
+    assert.match(source, /serviceWorker\.register\('\/generation-worker\.js'/);
+    assert.match(source, /product_swap_active_task_id/);
+    assert.match(source, /latestProcessingTask/);
+    assert.match(source, /postMessage/);
 });
 
 test('generation records task lifecycle in local history', () => {

@@ -79,6 +79,48 @@ function historyInputFromPayload(payload, isRefinement = false) {
     };
 }
 
+const ACTIVE_TASK_KEY = 'product_swap_active_task_id';
+
+function createGenerationMessage(taskId, payload, apiBase, origin) {
+    const base = apiBase || origin;
+    return {
+        type: 'product-swap:start',
+        version: 1,
+        taskId,
+        apiUrl: new URL(
+            `${String(base).replace(/\/$/, '')}/api/product-swap/generate`,
+            origin,
+        ).toString(),
+        payload,
+    };
+}
+
+function pollingDelay(milliseconds) {
+    return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function pollLocalTask(
+    taskId,
+    {
+        history,
+        intervalMs = 1000,
+        delay = pollingDelay,
+        onUpdate = () => undefined,
+    },
+) {
+    while (true) {
+        const task = await history.getTask(taskId);
+        if (!task) {
+            throw new Error('TASK_NOT_FOUND');
+        }
+        onUpdate(task);
+        if (task.status === 'completed' || task.status === 'failed') {
+            return task;
+        }
+        await delay(intervalMs);
+    }
+}
+
 const ERROR_MESSAGES = {
     INVALID_INPUT: '请检查上传图片和额外要求',
     FILE_TOO_LARGE: '单张图片不能超过 10MB',
@@ -124,6 +166,12 @@ function boot() {
     );
     const apiClient = window.ProductSwapApi;
     const localHistory = window.LocalTaskHistory;
+    const workerRegistration = 'serviceWorker' in navigator
+        ? navigator.serviceWorker.register('/generation-worker.js', {
+            scope: '/',
+        }).then(() => navigator.serviceWorker.ready)
+            .catch(() => null)
+        : Promise.resolve(null);
     const form = document.getElementById('swapForm');
     const generateButton =
         document.getElementById('generateButton');
@@ -189,6 +237,94 @@ function boot() {
             showArchiveNotice('生成会继续，但本次任务无法保存到浏览器');
             return null;
         }
+    }
+
+    function rememberActiveTask(taskId) {
+        try {
+            window.localStorage.setItem(ACTIVE_TASK_KEY, taskId);
+        } catch {
+            // IndexedDB polling still works in the current page.
+        }
+    }
+
+    function clearActiveTask(taskId) {
+        try {
+            if (window.localStorage.getItem(ACTIVE_TASK_KEY) === taskId) {
+                window.localStorage.removeItem(ACTIVE_TASK_KEY);
+            }
+        } catch {
+            // Storage can be unavailable in strict privacy modes.
+        }
+    }
+
+    async function dispatchBackgroundGeneration(localTask, payload) {
+        const registration = await workerRegistration;
+        if (!localTask || !registration?.active) {
+            return false;
+        }
+        rememberActiveTask(localTask.id);
+        registration.active.postMessage(createGenerationMessage(
+            localTask.id,
+            payload,
+            apiBase,
+            window.location.origin,
+        ));
+        return true;
+    }
+
+    function taskFailure(task) {
+        const error = new Error(
+            task.errorMessage || mapErrorCode(task.errorCode),
+        );
+        error.code = task.errorCode || 'PROVIDER_REQUEST_FAILED';
+        return error;
+    }
+
+    async function runGeneration(localTask, payload) {
+        if (await dispatchBackgroundGeneration(localTask, payload)) {
+            showArchiveNotice('后台生成中，刷新页面后可继续查看进度');
+            const task = await pollLocalTask(localTask.id, {
+                history: localHistory,
+            });
+            clearActiveTask(localTask.id);
+            if (task.status === 'failed') {
+                throw taskFailure(task);
+            }
+            return {
+                success: true,
+                imageUrl: task.result?.imageUrl || '',
+                conversationId: task.result?.conversationId || '',
+                assistantMessage: task.result?.assistantMessage || '',
+                archiveWarning: null,
+            };
+        }
+
+        const response = await apiClient.apiFetch(
+            '/api/product-swap/generate',
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            },
+            { apiBase },
+        );
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success || !data.imageUrl) {
+            const error = new Error(
+                data?.error?.message
+                || mapErrorCode(data?.error?.code),
+            );
+            error.code = data?.error?.code || 'PROVIDER_REQUEST_FAILED';
+            throw error;
+        }
+        if (localTask) {
+            await localHistory.completeTask(localTask.id, {
+                imageUrl: data.imageUrl,
+                conversationId: data.conversationId || '',
+                assistantMessage: data.assistantMessage || '',
+            });
+        }
+        return data;
     }
 
     function setGenerating(value) {
@@ -257,6 +393,93 @@ function boot() {
             hint.textContent = '点击上传';
             box.appendChild(hint);
         }
+    }
+
+    async function sourceForAsset(asset) {
+        if (asset?.blob) {
+            return readFileAsDataUrl(asset.blob);
+        }
+        return asset?.sourceUrl || '';
+    }
+
+    async function hydrateTaskState(task) {
+        for (const role of ['target', 'product', 'scene']) {
+            const asset = task.assets?.find((item) => item.role === role);
+            state[role] = await sourceForAsset(asset);
+            renderSlot(role);
+        }
+        state.requirements = task.input?.requirements || '';
+        requirementsInput.value = state.requirements;
+        state.conversationId = task.input?.conversationId || '';
+        state.messages = Array.isArray(task.input?.messages)
+            ? task.input.messages.map((message) => ({ ...message }))
+            : [];
+
+        const previous = task.assets?.find((item) => item.role === 'previous');
+        if (previous) {
+            state.result = await sourceForAsset(previous);
+        }
+        if (task.status === 'completed' && task.result?.imageUrl) {
+            state.result = task.result.imageUrl;
+            state.conversationId = task.result.conversationId
+                || state.conversationId;
+            if (state.requirements.trim()) {
+                state.messages.push({
+                    role: 'user',
+                    content: state.requirements.trim(),
+                });
+            }
+            state.messages.push({
+                role: 'assistant',
+                content: task.result.assistantMessage || '已完成本次生成。',
+            });
+            state.messages = state.messages.slice(-6);
+        }
+        if (state.result) {
+            resultImage.src = state.result;
+            resultSection.hidden = false;
+        }
+        renderMessages();
+    }
+
+    async function restoreActiveTask() {
+        let task = null;
+        try {
+            const rememberedId = window.localStorage.getItem(ACTIVE_TASK_KEY);
+            if (rememberedId) {
+                task = await localHistory.getTask(rememberedId);
+            }
+        } catch {
+            task = null;
+        }
+        if (!task) {
+            task = await localHistory.latestProcessingTask('product_swap');
+        }
+        if (!task) {
+            return;
+        }
+
+        rememberActiveTask(task.id);
+        await hydrateTaskState(task);
+        const isRefinement = Boolean(task.input?.isRefinement);
+        if (task.status === 'processing') {
+            if (isRefinement) {
+                setRefining(true);
+            } else {
+                setGenerating(true);
+            }
+            showArchiveNotice('正在恢复生成进度，刷新页面不会重复提交');
+            task = await pollLocalTask(task.id, { history: localHistory });
+            await hydrateTaskState(task);
+        }
+        clearActiveTask(task.id);
+        if (task.status === 'failed') {
+            showError(taskFailure(task).message);
+        } else {
+            showArchiveNotice('');
+        }
+        setGenerating(false);
+        setRefining(false);
     }
 
     async function acceptFile(name, file) {
@@ -344,36 +567,7 @@ function boot() {
         try {
             const payload = buildGeneratePayload(state);
             localTask = await startLocalTask(payload);
-            const response = await apiClient.apiFetch(
-                '/api/product-swap/generate',
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(payload),
-                },
-                { apiBase },
-            );
-            const data = await response
-                .json()
-                .catch(() => ({}));
-
-            if (
-                !response.ok
-                || !data.success
-                || !data.imageUrl
-            ) {
-                const code =
-                    data?.error?.code
-                    || 'PROVIDER_REQUEST_FAILED';
-                const error = new Error(
-                    data?.error?.message
-                    || mapErrorCode(code),
-                );
-                error.code = code;
-                throw error;
-            }
+            const data = await runGeneration(localTask, payload);
 
             state.result = data.imageUrl;
             state.conversationId = data.conversationId || '';
@@ -392,15 +586,6 @@ function boot() {
             resultImage.src = state.result;
             resultSection.hidden = false;
             showArchiveNotice(data.archiveWarning || '');
-            if (localTask) {
-                await localHistory.completeTask(localTask.id, {
-                    imageUrl: data.imageUrl,
-                    conversationId: data.conversationId || '',
-                    assistantMessage: data.assistantMessage || '',
-                }).catch(() => {
-                    showArchiveNotice('图片已生成，但任务记录更新失败');
-                });
-            }
             renderMessages();
             resultSection.scrollIntoView({
                 behavior: 'smooth',
@@ -449,28 +634,7 @@ function boot() {
         try {
             const payload = buildRefinePayload(state, correction);
             localTask = await startLocalTask(payload, true);
-            const response = await apiClient.apiFetch(
-                '/api/product-swap/generate',
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(payload),
-                },
-                { apiBase },
-            );
-            const data = await response.json().catch(() => ({}));
-
-            if (!response.ok || !data.success || !data.imageUrl) {
-                const code = data?.error?.code
-                    || 'PROVIDER_REQUEST_FAILED';
-                const error = new Error(
-                    data?.error?.message || mapErrorCode(code),
-                );
-                error.code = code;
-                throw error;
-            }
+            const data = await runGeneration(localTask, payload);
 
             state.messages.push({
                 role: 'user',
@@ -487,15 +651,6 @@ function boot() {
                 || state.conversationId;
             resultImage.src = state.result;
             showArchiveNotice(data.archiveWarning || '');
-            if (localTask) {
-                await localHistory.completeTask(localTask.id, {
-                    imageUrl: data.imageUrl,
-                    conversationId: data.conversationId || '',
-                    assistantMessage: data.assistantMessage || '',
-                }).catch(() => {
-                    showArchiveNotice('图片已生成，但任务记录更新失败');
-                });
-            }
             refineInput.value = '';
             renderMessages();
             resultImage.scrollIntoView({
@@ -538,6 +693,12 @@ function boot() {
         .addEventListener('click', () => {
             window.history.back();
         });
+
+    restoreActiveTask().catch(() => {
+        showError('恢复生成进度失败，请到所有任务中查看记录');
+        setGenerating(false);
+        setRefining(false);
+    });
 }
 
 if (typeof document !== 'undefined') {
@@ -551,6 +712,8 @@ if (typeof module !== 'undefined') {
         buildGeneratePayload,
         buildRefinePayload,
         historyInputFromPayload,
+        createGenerationMessage,
+        pollLocalTask,
         mapErrorCode,
     };
 }
