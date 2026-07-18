@@ -31,14 +31,14 @@ async function runGenerationMessage(
         fetchImpl = globalThis.fetch,
     } = {},
 ) {
-    const request = fetchImpl(message.apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(message.payload),
-    });
-    await history.touchTask(message.taskId);
     try {
+        const request = fetchImpl(message.apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(message.payload),
+        });
+        await history.touchTask(message.taskId);
         const response = await request;
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data.success || !data.imageUrl) {

@@ -261,7 +261,8 @@ async function handleGenerate(request, response, provider) {
 
         sendJson(response, 200, {
             success: true,
-            imageUrl: `data:${result.mimeType};base64,${result.imageBuffer.toString('base64')}`,
+            imageUrl: result.imageUrl
+                || `data:${result.mimeType};base64,${result.imageBuffer.toString('base64')}`,
             provider: result.provider,
             assistantMessage: result.assistantMessage,
             requestId,

@@ -42,6 +42,32 @@ test('serves the app and returns an injected generated image', async (t) => {
     assert.match(data.imageUrl, /^data:image\/png;base64,/);
 });
 
+test('passes through an injected provider image URL', async (t) => {
+    const server = createProductSwapServer({
+        provider: async () => ({
+            imageUrl: 'https://example.com/result.png',
+            imageBuffer: Buffer.from('unused'),
+            mimeType: 'image/png',
+            provider: 'fake-url',
+        }),
+    });
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    t.after(() => server.close());
+    const { port } = server.address();
+    const response = await fetch(
+        `http://127.0.0.1:${port}/api/product-swap/generate`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetImage: tinyPng }),
+        },
+    );
+    const data = await response.json();
+
+    assert.equal(data.imageUrl, 'https://example.com/result.png');
+});
+
 test('returns stable validation errors', async (t) => {
     const server = createProductSwapServer({
         provider: async () => null,

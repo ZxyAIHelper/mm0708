@@ -68,6 +68,14 @@ test('exports local polling helpers', () => {
     assert.equal(typeof history.touchTask, 'function');
 });
 
+test('exposes the repository to window and service worker globals', () => {
+    const source = fs.readFileSync(
+        path.resolve(__dirname, '..', 'local-history.js'),
+        'utf8',
+    );
+    assert.match(source, /globalThis\.LocalTaskHistory = localHistory/);
+});
+
 test('avoids bulk asset reads and completes tasks atomically', () => {
     const source = fs.readFileSync(
         path.resolve(__dirname, '..', 'local-history.js'),

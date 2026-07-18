@@ -17,6 +17,11 @@ const productPath = path.join(
     'assets',
     'example-product.jpg',
 );
+const resultBuffer = fs.readFileSync(path.join(
+    appRoot,
+    'assets',
+    'example-result.jpg',
+));
 function jsonResponse(request, body, status = 200) {
     request.respond({
         status,
@@ -26,17 +31,28 @@ function jsonResponse(request, body, status = 200) {
 }
 
 (async () => {
+    let appUrl = '';
+    let generationCount = 0;
     const server = createProductSwapServer({
-        provider: async () => ({
-            imageBuffer: Buffer.from('unused'),
-            mimeType: 'image/png',
-            provider: 'browser-smoke',
-        }),
+        provider: async () => {
+            generationCount += 1;
+            if (generationCount === 1) {
+                await new Promise((resolve) => setTimeout(resolve, 1500));
+            }
+            return {
+                imageBuffer: resultBuffer,
+                mimeType: 'image/jpeg',
+                provider: 'browser-smoke',
+                assistantMessage: generationCount === 1
+                    ? '已完成第一版。'
+                    : '已完成新一版修正。',
+            };
+        },
     });
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const address = server.address();
-    const appUrl = `http://127.0.0.1:${address.port}`;
+    appUrl = `http://127.0.0.1:${address.port}`;
     const browser = await puppeteer.launch({
         executablePath:
             'C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -45,7 +61,6 @@ function jsonResponse(request, body, status = 200) {
     });
     const page = await browser.newPage();
     const errors = [];
-    let generationCount = 0;
 
     try {
         await page.setViewport({
@@ -72,27 +87,6 @@ function jsonResponse(request, body, status = 200) {
                 && requestUrl.pathname === '/api/tasks/session'
             ) {
                 jsonResponse(request, { userId: 'anon_browser_smoke' });
-                return;
-            }
-            if (
-                request.method() === 'POST'
-                && requestUrl.pathname === '/api/product-swap/generate'
-            ) {
-                generationCount += 1;
-                jsonResponse(request, {
-                    success: true,
-                    imageUrl: `${appUrl}/assets/example-result.jpg`,
-                    provider: 'browser-smoke',
-                    requestId: 'swap_browser_smoke',
-                    conversationId: 'conversation_browser_smoke',
-                    assistantMessage: generationCount === 1
-                        ? '已完成第一版。'
-                        : '已完成新一版修正。',
-                    taskId: generationCount === 1
-                        ? 'task_smoke'
-                        : 'task_refine',
-                    archiveWarning: null,
-                });
                 return;
             }
             if (
@@ -223,12 +217,25 @@ function jsonResponse(request, body, status = 200) {
             '#requirementsInput',
             '保持三个托盘的排列方式',
         );
+        await page.evaluate(() => navigator.serviceWorker.ready);
         await page.click('#generateButton');
+        await page.waitForFunction(() =>
+            Boolean(localStorage.getItem('product_swap_active_task_id')),
+        );
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(() =>
+            document.getElementById('generateButton')?.disabled
+            || !document.getElementById('resultSection')?.hidden,
+        );
         await page.waitForSelector('#resultSection:not([hidden])');
+        const initialGenerationCount = generationCount;
         await page.type('#refineInput', '盘子改成白色');
         await page.click('#refineButton');
         await page.waitForFunction(() =>
-            document.querySelectorAll('.chat-message').length >= 4,
+            Boolean(localStorage.getItem('product_swap_active_task_id')),
+        );
+        await page.waitForFunction(() =>
+            !localStorage.getItem('product_swap_active_task_id'),
         );
 
         const state = await page.evaluate(() => ({
@@ -245,12 +252,21 @@ function jsonResponse(request, body, status = 200) {
             )?.getAttribute('src')?.startsWith('data:image/') || false,
             resultVisible: !document.getElementById('resultSection')?.hidden,
             resultSource: document.getElementById('resultImage')
-                ?.getAttribute('src')?.endsWith(
-                    '/assets/example-result.jpg',
-                ) || false,
+                ?.getAttribute('src')?.startsWith('data:image/jpeg') || false,
             chatMessages: document.querySelectorAll('.chat-message').length,
+            formError: document.getElementById('formError')?.textContent || '',
+            activeTaskCleared: !localStorage.getItem(
+                'product_swap_active_task_id',
+            ),
         }));
-
+        state.taskStatuses = await page.evaluate(async () => {
+            const { tasks } = await window.LocalTaskHistory.listTasks();
+            return tasks.map((task) => ({
+                status: task.status,
+                errorCode: task.errorCode,
+                errorMessage: task.errorMessage,
+            }));
+        });
         await Promise.all([
             page.waitForNavigation({ waitUntil: 'networkidle0' }),
             page.click('#historyLink'),
@@ -326,10 +342,13 @@ function jsonResponse(request, body, status = 200) {
             || !state.resultVisible
             || !state.resultSource
             || state.chatMessages < 4
+            || !state.activeTaskCleared
+            || state.taskStatuses.some((task) => task.status !== 'completed')
+            || initialGenerationCount !== 1
             || generationCount !== 2
             || historyState.title !== '所有任务'
             || historyState.cards !== 2
-            || historyState.expired !== 0
+            || historyState.expired !== 2
             || historyState.expiredAfterCleanup !== 2
             || historyState.detailAssets !== 4
             || historyState.outputUrlAfterCleanup !== ''

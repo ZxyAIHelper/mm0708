@@ -91,3 +91,25 @@ test('deduplicates an already running local task', async () => {
     release();
     await Promise.all(promises);
 });
+
+test('marks the local task failed when fetch cannot start', async () => {
+    let failure;
+    await runGenerationMessage(message(), {
+        history: {
+            touchTask: async () => undefined,
+            completeTask: async () => assert.fail('should not complete'),
+            failTask: async (taskId, code, errorMessage) => {
+                failure = { taskId, code, errorMessage };
+            },
+        },
+        fetchImpl: () => {
+            throw new Error('network unavailable');
+        },
+    });
+
+    assert.deepEqual(failure, {
+        taskId: 'task_local_1',
+        code: 'PROVIDER_REQUEST_FAILED',
+        errorMessage: 'network unavailable',
+    });
+});

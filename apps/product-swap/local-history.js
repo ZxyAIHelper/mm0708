@@ -469,9 +469,7 @@ const localHistory = {
     recoverInterruptedTasks,
 };
 
-if (typeof window !== 'undefined') {
-    window.LocalTaskHistory = localHistory;
-}
+globalThis.LocalTaskHistory = localHistory;
 if (typeof module !== 'undefined') {
     module.exports = localHistory;
 }

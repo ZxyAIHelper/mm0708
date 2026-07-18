@@ -470,6 +470,8 @@ function boot() {
             }
             showArchiveNotice('正在恢复生成进度，刷新页面不会重复提交');
             task = await pollLocalTask(task.id, { history: localHistory });
+            setGenerating(false);
+            setRefining(false);
             await hydrateTaskState(task);
         }
         clearActiveTask(task.id);
