@@ -171,3 +171,35 @@ test('falls back to metadata completion without marking a billed task failed', a
         'https://example.com/result.png',
     ]]);
 });
+
+test('keeps a local success receipt when both IndexedDB completions fail', async () => {
+    const calls = [];
+    await runGenerationMessage(message(), {
+        history: {
+            markTaskDispatched: async () => undefined,
+            storeGenerationReceipt: async (taskId, result) => {
+                calls.push(['receipt', taskId, result.imageUrl]);
+            },
+            deleteGenerationReceipt: async () => {
+                calls.push(['delete-receipt']);
+            },
+            completeTask: async () => {
+                throw new Error('quota');
+            },
+            completeTaskMetadata: async () => {
+                throw new Error('quota');
+            },
+            failTask: async () => calls.push(['failed']),
+        },
+        fetchImpl: async () => new Response(JSON.stringify({
+            success: true,
+            imageUrl: 'https://example.com/result.png',
+        })),
+    });
+
+    assert.deepEqual(calls, [[
+        'receipt',
+        'task_local_1',
+        'https://example.com/result.png',
+    ]]);
+});

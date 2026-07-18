@@ -196,6 +196,33 @@ test('turns a stale processing task into an interrupted terminal state', async (
     ]]);
 });
 
+test('prefers a local success receipt over stale interruption', async () => {
+    let failures = 0;
+    let completions = 0;
+    const task = await pollLocalTask('task_local_1', {
+        history: {
+            getTask: async () => ({
+                id: 'task_local_1',
+                status: 'failed',
+                errorCode: 'GENERATION_INTERRUPTED',
+            }),
+            getGenerationReceipt: async () => ({
+                imageUrl: 'https://example.com/result.png',
+            }),
+            completeTask: async () => { completions += 1; },
+            isStaleProcessingTask: () => true,
+            failTask: async () => { failures += 1; },
+        },
+        intervalMs: 0,
+        delay: async () => assert.fail('should not wait'),
+    });
+
+    assert.equal(task.status, 'completed');
+    assert.equal(task.result.imageUrl, 'https://example.com/result.png');
+    assert.equal(failures, 0);
+    assert.equal(completions, 1);
+});
+
 test('generation page registers the background worker and restores active tasks', () => {
     const source = fs.readFileSync(path.join(root, 'script.js'), 'utf8');
     assert.match(source, /serviceWorker\.register\('\/generation-worker\.js'/);

@@ -114,7 +114,49 @@ async function pollLocalTask(
             throw new Error('TASK_NOT_FOUND');
         }
         onUpdate(task);
-        if (task.status === 'completed' || task.status === 'failed') {
+        if (task.status === 'completed') {
+            return task;
+        }
+        let receipt = null;
+        if (history.getGenerationReceipt) {
+            try {
+                receipt = await history.getGenerationReceipt(taskId);
+            } catch {
+                // IndexedDB polling continues when Cache Storage is unavailable.
+            }
+        }
+        if (receipt?.imageUrl) {
+            let persisted = false;
+            if (history.completeTask) {
+                try {
+                    await history.completeTask(taskId, receipt);
+                    persisted = true;
+                } catch {
+                    // Try the smaller metadata-only write below.
+                }
+            }
+            if (!persisted && history.completeTaskMetadata) {
+                try {
+                    await history.completeTaskMetadata(taskId, receipt);
+                    persisted = true;
+                } catch {
+                    // The receipt itself is sufficient to return the success.
+                }
+            }
+            if (persisted) {
+                await history.deleteGenerationReceipt?.(taskId).catch(
+                    () => undefined,
+                );
+            }
+            return {
+                ...task,
+                status: 'completed',
+                result: receipt,
+                errorCode: null,
+                errorMessage: null,
+            };
+        }
+        if (task.status === 'failed') {
             return task;
         }
         if (history.isStaleProcessingTask?.(task)) {

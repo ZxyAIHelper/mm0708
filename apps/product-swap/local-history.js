@@ -5,6 +5,55 @@ const DB_VERSION = 1;
 const USER_KEY = 'product_swap_local_user_id';
 const ASSET_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PROCESSING_STALE_MS = 15 * 60 * 1000;
+const RECEIPT_CACHE = 'product-swap-generation-receipts-v1';
+
+function receiptUrl(taskId) {
+    const origin = globalThis.location?.origin || 'https://product-swap.local';
+    return new URL(
+        `/__local-generation-receipt/${encodeURIComponent(taskId)}`,
+        origin,
+    ).toString();
+}
+
+async function storeGenerationReceipt(
+    taskId,
+    result,
+    cachesImpl = globalThis.caches,
+) {
+    if (!cachesImpl) {
+        throw new Error('CACHE_STORAGE_UNAVAILABLE');
+    }
+    const cache = await cachesImpl.open(RECEIPT_CACHE);
+    await cache.put(receiptUrl(taskId), new Response(JSON.stringify(result), {
+        headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
+        },
+    }));
+}
+
+async function getGenerationReceipt(taskId, cachesImpl = globalThis.caches) {
+    if (!cachesImpl) {
+        return null;
+    }
+    const cache = await cachesImpl.open(RECEIPT_CACHE);
+    const response = await cache.match(receiptUrl(taskId));
+    if (!response) {
+        return null;
+    }
+    return response.json().catch(() => null);
+}
+
+async function deleteGenerationReceipt(
+    taskId,
+    cachesImpl = globalThis.caches,
+) {
+    if (!cachesImpl) {
+        return false;
+    }
+    const cache = await cachesImpl.open(RECEIPT_CACHE);
+    return cache.delete(receiptUrl(taskId));
+}
 
 function randomId(prefix) {
     const value = globalThis.crypto?.randomUUID
@@ -197,6 +246,43 @@ async function updateTask(taskId, updater) {
     return updated;
 }
 
+function transitionTaskToFailed(task, code, message, completedAt = Date.now()) {
+    if (task.status !== 'processing') {
+        return task;
+    }
+    return {
+        ...task,
+        status: 'failed',
+        errorCode: code || 'GENERATION_FAILED',
+        errorMessage: String(message || '生成失败').slice(0, 500),
+        completedAt,
+    };
+}
+
+function transitionTaskToCompleted(
+    task,
+    result,
+    previewAsset,
+    completedAt = Date.now(),
+) {
+    const canComplete = task.status === 'processing'
+        || (task.status === 'failed'
+            && task.errorCode === 'GENERATION_INTERRUPTED');
+    if (!canComplete) {
+        return task;
+    }
+    return {
+        ...task,
+        status: 'completed',
+        result,
+        errorCode: null,
+        errorMessage: null,
+        updatedAt: completedAt,
+        completedAt,
+        previewAsset,
+    };
+}
+
 async function completeTask(taskId, result) {
     const completedAt = Date.now();
     const outputAsset = result?.imageUrl
@@ -214,16 +300,16 @@ async function completeTask(taskId, result) {
         transaction.abort();
         throw new Error('TASK_NOT_FOUND');
     }
-    const task = {
-        ...current,
-        status: 'completed',
+    const task = transitionTaskToCompleted(
+        current,
         result,
-        errorCode: null,
-        errorMessage: null,
-        updatedAt: completedAt,
+        previewAssetFromAsset(outputAsset),
         completedAt,
-        previewAsset: previewAssetFromAsset(outputAsset),
-    };
+    );
+    if (task === current) {
+        await done;
+        return current;
+    }
     if (outputAsset) {
         transaction.objectStore('assets').put(outputAsset);
     }
@@ -234,33 +320,31 @@ async function completeTask(taskId, result) {
 
 async function completeTaskMetadata(taskId, result) {
     const completedAt = Date.now();
-    const preview = result?.imageUrl
+    const safeResult = result?.imageUrl?.startsWith('data:')
+        ? { ...result, imageUrl: '' }
+        : result;
+    const preview = safeResult?.imageUrl
         ? previewAssetFromAsset(assetFromSource(
             taskId,
             'output',
-            result.imageUrl,
+            safeResult.imageUrl,
             completedAt,
         ))
         : null;
-    return updateTask(taskId, (task) => ({
-        ...task,
-        status: 'completed',
-        result,
-        errorCode: null,
-        errorMessage: null,
+    return updateTask(taskId, (task) => transitionTaskToCompleted(
+        task,
+        safeResult,
+        preview,
         completedAt,
-        previewAsset: preview,
-    }));
+    ));
 }
 
 function failTask(taskId, code, message) {
-    return updateTask(taskId, (task) => ({
-        ...task,
-        status: 'failed',
-        errorCode: code || 'GENERATION_FAILED',
-        errorMessage: String(message || '生成失败').slice(0, 500),
-        completedAt: Date.now(),
-    }));
+    return updateTask(taskId, (task) => transitionTaskToFailed(
+        task,
+        code,
+        message,
+    ));
 }
 
 async function assetsForTask(database, taskId) {
@@ -485,6 +569,11 @@ const localHistory = {
     ensureUserId,
     previewAssetFromAsset,
     isStaleProcessingTask,
+    transitionTaskToFailed,
+    transitionTaskToCompleted,
+    storeGenerationReceipt,
+    getGenerationReceipt,
+    deleteGenerationReceipt,
     startTask,
     completeTask,
     completeTaskMetadata,

@@ -68,6 +68,31 @@ test('exports local polling helpers', () => {
     assert.equal(typeof history.touchTask, 'function');
     assert.equal(typeof history.markTaskDispatched, 'function');
     assert.equal(typeof history.completeTaskMetadata, 'function');
+    assert.equal(typeof history.storeGenerationReceipt, 'function');
+    assert.equal(typeof history.getGenerationReceipt, 'function');
+});
+
+test('does not overwrite terminal success with an interruption failure', () => {
+    const completed = { status: 'completed', result: { imageUrl: 'url' } };
+    assert.equal(
+        history.transitionTaskToFailed(
+            completed,
+            'GENERATION_INTERRUPTED',
+            'interrupted',
+            100,
+        ),
+        completed,
+    );
+});
+
+test('allows provider success to recover an interruption race', () => {
+    const task = history.transitionTaskToCompleted({
+        status: 'failed',
+        errorCode: 'GENERATION_INTERRUPTED',
+    }, { imageUrl: 'url' }, null, 100);
+
+    assert.equal(task.status, 'completed');
+    assert.equal(task.result.imageUrl, 'url');
 });
 
 test('exposes the repository to window and service worker globals', () => {

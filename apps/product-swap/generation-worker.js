@@ -78,10 +78,31 @@ async function runGenerationMessage(
         conversationId: data.conversationId || '',
         assistantMessage: data.assistantMessage || '',
     };
+    let receiptStored = false;
+    if (history.storeGenerationReceipt) {
+        try {
+            await history.storeGenerationReceipt(message.taskId, result);
+            receiptStored = true;
+        } catch {
+            // IndexedDB remains the primary local persistence path.
+        }
+    }
+    let persisted = false;
     try {
         await history.completeTask(message.taskId, result);
+        persisted = true;
     } catch {
-        await history.completeTaskMetadata(message.taskId, result);
+        try {
+            await history.completeTaskMetadata(message.taskId, result);
+            persisted = true;
+        } catch {
+            // Keep the success receipt so the page can recover without retrying.
+        }
+    }
+    if (persisted && receiptStored && history.deleteGenerationReceipt) {
+        await history.deleteGenerationReceipt(message.taskId).catch(
+            () => undefined,
+        );
     }
 }
 
