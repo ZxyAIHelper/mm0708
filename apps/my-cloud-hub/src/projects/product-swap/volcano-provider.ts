@@ -1,42 +1,86 @@
 import {
     ProductSwapProviderError,
-    type ProductSwapInput,
     type ProductSwapProvider,
 } from './provider'
 import {
-    buildProductSwapPrompt,
     buildPromptComposerMessages,
 } from './prompt-builder'
 
 const DEFAULT_ARK_BASE_URL =
     'https://ark.cn-beijing.volces.com/api/v3'
 
-type ArkChatResponse = {
-    choices?: Array<{
-        message?: { content?: string }
-    }>
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024
+const MAX_IMAGE_RESPONSE_BYTES =
+    Math.ceil(MAX_IMAGE_BYTES / 3) * 4 + 64 * 1024
+const MAX_CHAT_RESPONSE_BYTES = 1024 * 1024
+
+function isRecord(
+    value: unknown,
+): value is Record<string, unknown> {
+    return Boolean(value)
+        && typeof value === 'object'
+        && !Array.isArray(value)
 }
 
-type ArkImageResponse = {
-    data?: Array<{
-        url?: string
-        b64_json?: string
-    }>
-}
-
-function imageInputs(input: ProductSwapInput): string[] {
-    return [
-        input.previousImage,
-        input.targetImage,
-        input.productImage,
-        input.sceneImage,
-    ].filter((image): image is string => Boolean(image))
-}
-
-async function parseArkResponse<T>(
+async function readBoundedJson(
     response: Response,
-): Promise<T> {
-    const data = await response.json().catch(() => null)
+    maxBytes: number,
+): Promise<unknown> {
+    const contentLength = Number(
+        response.headers.get('content-length'),
+    )
+    if (
+        Number.isFinite(contentLength)
+        && contentLength > maxBytes
+    ) {
+        throw new ProductSwapProviderError(
+            'PROVIDER_REQUEST_FAILED',
+            '火山方舟返回内容过大',
+        )
+    }
+
+    const reader = response.body?.getReader()
+    if (!reader) {
+        throw new ProductSwapProviderError(
+            'PROVIDER_REQUEST_FAILED',
+            `火山方舟请求失败（${response.status}）`,
+        )
+    }
+    const chunks: Uint8Array[] = []
+    let totalBytes = 0
+
+    try {
+        while (true) {
+            const { done, value } = await reader.read()
+            if (done) {
+                break
+            }
+            totalBytes += value.byteLength
+            if (totalBytes > maxBytes) {
+                await reader.cancel()
+                throw new ProductSwapProviderError(
+                    'PROVIDER_REQUEST_FAILED',
+                    '火山方舟返回内容过大',
+                )
+            }
+            chunks.push(value)
+        }
+    } finally {
+        reader.releaseLock()
+    }
+
+    const bytes = new Uint8Array(totalBytes)
+    let offset = 0
+    for (const chunk of chunks) {
+        bytes.set(chunk, offset)
+        offset += chunk.byteLength
+    }
+    let data: unknown
+    try {
+        data = JSON.parse(new TextDecoder().decode(bytes))
+    } catch {
+        data = null
+    }
 
     if (!response.ok || !data) {
         throw new ProductSwapProviderError(
@@ -45,7 +89,71 @@ async function parseArkResponse<T>(
         )
     }
 
-    return data as T
+    return data
+}
+
+function chatContent(data: unknown): string | undefined {
+    if (!isRecord(data) || !Array.isArray(data.choices)) {
+        return undefined
+    }
+    const first = data.choices[0]
+    if (!isRecord(first) || !isRecord(first.message)) {
+        return undefined
+    }
+    return typeof first.message.content === 'string'
+        ? first.message.content.trim()
+        : undefined
+}
+
+function base64Value(character: string): number {
+    return 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+        .indexOf(character)
+}
+
+function isCanonicalBoundedBase64(value: unknown): value is string {
+    if (
+        typeof value !== 'string'
+        || !value
+        || value.length % 4 !== 0
+        || value.length > MAX_IMAGE_RESPONSE_BYTES
+        || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+            value,
+        )
+    ) {
+        return false
+    }
+    const padding = value.endsWith('==')
+        ? 2
+        : value.endsWith('=')
+            ? 1
+            : 0
+    if (
+        padding === 2
+        && (base64Value(value[value.length - 3]) & 15) !== 0
+    ) {
+        return false
+    }
+    if (
+        padding === 1
+        && (base64Value(value[value.length - 2]) & 3) !== 0
+    ) {
+        return false
+    }
+    const decodedBytes = value.length / 4 * 3 - padding
+    return decodedBytes <= MAX_IMAGE_BYTES
+}
+
+function imageBase64(data: unknown): string | undefined {
+    if (!isRecord(data) || !Array.isArray(data.data)) {
+        return undefined
+    }
+    const first = data.data[0]
+    if (!isRecord(first)) {
+        return undefined
+    }
+    return isCanonicalBoundedBase64(first.b64_json)
+        ? first.b64_json
+        : undefined
 }
 
 export function createVolcanoProductSwapProvider(
@@ -74,10 +182,13 @@ export function createVolcanoProductSwapProvider(
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${env.DOUBAO_API_KEY}`,
             }
-            let prompt = buildProductSwapPrompt(input)
+            let prompt = input.prompt
 
             try {
-                if (env.DOUBAO_CHAT_ENDPOINT) {
+                if (
+                    input.templateId === 'product-swap'
+                    && env.DOUBAO_CHAT_ENDPOINT
+                ) {
                     const chatResponse = await fetchImpl(
                         `${baseUrl}/chat/completions`,
                         {
@@ -92,12 +203,11 @@ export function createVolcanoProductSwapProvider(
                             signal: AbortSignal.timeout(60_000),
                         },
                     )
-                    const chatData =
-                        await parseArkResponse<ArkChatResponse>(
-                            chatResponse,
-                        )
-                    const composed = chatData.choices?.[0]
-                        ?.message?.content?.trim()
+                    const chatData = await readBoundedJson(
+                        chatResponse,
+                        MAX_CHAT_RESPONSE_BYTES,
+                    )
+                    const composed = chatContent(chatData)
 
                     if (composed) {
                         prompt = composed
@@ -112,9 +222,10 @@ export function createVolcanoProductSwapProvider(
                         body: JSON.stringify({
                             model: endpointId,
                             prompt,
-                            image: imageInputs(input),
+                            image: input.images,
                             sequential_image_generation: 'disabled',
-                            response_format: 'url',
+                            response_format: 'b64_json',
+                            n: 1,
                             size: '2K',
                             stream: false,
                             watermark: false,
@@ -122,17 +233,13 @@ export function createVolcanoProductSwapProvider(
                         signal: AbortSignal.timeout(180_000),
                     },
                 )
-                const imageData =
-                    await parseArkResponse<ArkImageResponse>(
-                        imageResponse,
-                    )
-                const firstImage = imageData.data?.[0]
-                const imageUrl = firstImage?.url
-                    || (firstImage?.b64_json
-                        ? `data:image/jpeg;base64,${firstImage.b64_json}`
-                        : '')
+                const imageData = await readBoundedJson(
+                    imageResponse,
+                    MAX_IMAGE_RESPONSE_BYTES,
+                )
+                const encodedImage = imageBase64(imageData)
 
-                if (!imageUrl) {
+                if (!encodedImage) {
                     throw new ProductSwapProviderError(
                         'PROVIDER_REQUEST_FAILED',
                         '火山方舟没有返回结果图片',
@@ -140,10 +247,13 @@ export function createVolcanoProductSwapProvider(
                 }
 
                 return {
-                    imageUrl,
+                    imageUrl:
+                        `data:image/jpeg;base64,${encodedImage}`,
                     assistantMessage: input.previousImage
                         ? '已根据你的要求完成新一版修正。'
-                        : '已完成第一版换品，可以继续告诉我需要调整的地方。',
+                        : input.templateId === 'food-copy-layout'
+                            ? '已完成第一版文案配图，可以继续告诉我需要调整的地方。'
+                            : '已完成第一版换品，可以继续告诉我需要调整的地方。',
                     metadata: { prompt },
                 }
             } catch (error) {

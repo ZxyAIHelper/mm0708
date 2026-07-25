@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { buildProductSwapPrompt } from '../prompt-builder'
 import { createVolcanoProductSwapProvider } from '../volcano-provider'
 
 const runLive =
@@ -22,11 +23,21 @@ function imageDataUrl(fileName: string): string {
 
 describe.skipIf(!runLive)('live Volcano product swap', () => {
     it('generates a real replacement image', async () => {
+        const targetImage = imageDataUrl('example-template.jpg')
+        const productImage = imageDataUrl('example-product.jpg')
+        const requirements = '保持三份排列和黑色背景'
         const result = await createVolcanoProductSwapProvider()
             .generate({
-                targetImage: imageDataUrl('example-template.jpg'),
-                productImage: imageDataUrl('example-product.jpg'),
-                requirements: '保持三份排列和黑色背景',
+                templateId: 'product-swap',
+                targetImage,
+                productImage,
+                prompt: buildProductSwapPrompt({
+                    targetImage,
+                    productImage,
+                    requirements,
+                }),
+                images: [targetImage, productImage],
+                requirements,
                 requestId: 'swap_live_smoke',
                 messages: [],
             }, {

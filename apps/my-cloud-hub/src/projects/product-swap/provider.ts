@@ -1,4 +1,7 @@
 export type ProductSwapInput = {
+    templateId: 'product-swap' | 'food-copy-layout'
+    prompt: string
+    images: string[]
     targetImage: string
     productImage?: string
     sceneImage?: string

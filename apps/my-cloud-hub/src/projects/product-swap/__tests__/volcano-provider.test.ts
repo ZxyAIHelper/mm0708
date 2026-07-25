@@ -15,7 +15,6 @@ describe('product swap prompt builder', () => {
             targetImage,
             productImage,
             requirements: '保持三份排列',
-            requestId: 'swap_1',
             messages: [],
         })
 
@@ -26,10 +25,19 @@ describe('product swap prompt builder', () => {
     })
 
     it('prioritizes the previous result during refinement', () => {
-        const messages = buildPromptComposerMessages({
+        const prompt = buildProductSwapPrompt({
             targetImage,
             productImage,
             previousImage,
+            requirements: '把盘子改成白色，产品不要变',
+        })
+        const messages = buildPromptComposerMessages({
+            templateId: 'product-swap',
+            targetImage,
+            productImage,
+            previousImage,
+            prompt,
+            images: [previousImage, targetImage, productImage],
             requirements: '把盘子改成白色，产品不要变',
             requestId: 'swap_2',
             messages: [
@@ -41,7 +49,10 @@ describe('product swap prompt builder', () => {
         const lastMessage = messages[messages.length - 1]
         expect(lastMessage.content).toContain('把盘子改成白色')
         expect(lastMessage.content).toContain('上一版结果')
-        expect(messages).toHaveLength(4)
+        expect(messages).toHaveLength(2)
+        expect(lastMessage.content).toContain(
+            '---BEGIN_UNTRUSTED_USER_EDIT_INTENT---',
+        )
     })
 })
 
@@ -56,14 +67,23 @@ describe('volcano product swap provider', () => {
                 }],
             }), { status: 200 }))
             .mockResolvedValueOnce(new Response(JSON.stringify({
-                data: [{ url: 'https://image.example/result.jpg' }],
+                data: [{ b64_json: 'aW1hZ2U=' }],
             }), { status: 200 }))
         const provider = createVolcanoProductSwapProvider(fetchImpl)
-
-        const result = await provider.generate({
+        const prompt = buildProductSwapPrompt({
             targetImage,
             productImage,
             previousImage,
+            requirements: '背景更暗一点',
+        })
+
+        const result = await provider.generate({
+            templateId: 'product-swap',
+            targetImage,
+            productImage,
+            previousImage,
+            prompt,
+            images: [previousImage, targetImage, productImage],
             requirements: '背景更暗一点',
             requestId: 'swap_3',
             messages: [],
@@ -73,7 +93,9 @@ describe('volcano product swap provider', () => {
             DOUBAO_IMAGE_ENDPOINT_ID: 'ep-image',
         })
 
-        expect(result.imageUrl).toBe('https://image.example/result.jpg')
+        expect(result.imageUrl).toBe(
+            'data:image/jpeg;base64,aW1hZ2U=',
+        )
         expect(result.assistantMessage).toContain('已根据你的要求')
         expect(fetchImpl).toHaveBeenCalledTimes(2)
 
@@ -89,7 +111,10 @@ describe('volcano product swap provider', () => {
             targetImage,
             productImage,
         ])
-        expect(imageBody.response_format).toBe('url')
+        expect(imageBody.response_format).toBe('b64_json')
+        expect(imageBody.sequential_image_generation).toBe('disabled')
+        expect(imageBody.watermark).toBe(false)
+        expect(imageBody.n).toBe(1)
     })
 
     it('maps a base64 image response to a data URL', async () => {
@@ -100,7 +125,10 @@ describe('volcano product swap provider', () => {
         const provider = createVolcanoProductSwapProvider(fetchImpl)
 
         const result = await provider.generate({
+            templateId: 'product-swap',
             targetImage,
+            prompt: 'final prompt',
+            images: [targetImage],
             requirements: '',
             requestId: 'swap_4',
             messages: [],
@@ -113,5 +141,69 @@ describe('volcano product swap provider', () => {
             'data:image/jpeg;base64,aW1hZ2U=',
         )
         expect(fetchImpl).toHaveBeenCalledTimes(1)
+    })
+
+    it.each([
+        { data: [{ url: 'https://image.example/result.jpg' }] },
+        { data: [{ b64_json: 'not base64' }] },
+        { data: [{ b64_json: 'AB==' }] },
+        { data: [] },
+    ])('rejects an unsafe image response %#', async (payload) => {
+        const fetchImpl = vi.fn().mockResolvedValueOnce(
+            new Response(JSON.stringify(payload), { status: 200 }),
+        )
+        const provider = createVolcanoProductSwapProvider(fetchImpl)
+
+        await expect(provider.generate({
+            templateId: 'food-copy-layout',
+            targetImage,
+            prompt: 'locked food prompt',
+            images: [targetImage],
+            requirements: '',
+            requestId: 'swap_unsafe',
+            messages: [],
+        }, {
+            DOUBAO_API_KEY: 'secret',
+            DOUBAO_CHAT_ENDPOINT: 'ep-chat',
+            DOUBAO_IMAGE_ENDPOINT_ID: 'ep-image',
+        })).rejects.toMatchObject({
+            code: 'PROVIDER_REQUEST_FAILED',
+        })
+
+        const [, init] = fetchImpl.mock.calls[0]
+        expect(fetchImpl).toHaveBeenCalledTimes(1)
+        expect(JSON.parse(String(init.body))).toMatchObject({
+            prompt: 'locked food prompt',
+            image: [targetImage],
+            response_format: 'b64_json',
+        })
+    })
+
+    it('rejects an upstream response declared over the bound', async () => {
+        const fetchImpl = vi.fn().mockResolvedValueOnce(
+            new Response('{"data":[]}', {
+                status: 200,
+                headers: {
+                    'Content-Length': String(30 * 1024 * 1024),
+                },
+            }),
+        )
+        const provider = createVolcanoProductSwapProvider(fetchImpl)
+
+        await expect(provider.generate({
+            templateId: 'food-copy-layout',
+            targetImage,
+            prompt: 'locked food prompt',
+            images: [targetImage],
+            requirements: '',
+            requestId: 'swap_oversized',
+            messages: [],
+        }, {
+            DOUBAO_API_KEY: 'secret',
+            DOUBAO_IMAGE_ENDPOINT_ID: 'ep-image',
+        })).rejects.toMatchObject({
+            code: 'PROVIDER_REQUEST_FAILED',
+            message: '火山方舟返回内容过大',
+        })
     })
 })

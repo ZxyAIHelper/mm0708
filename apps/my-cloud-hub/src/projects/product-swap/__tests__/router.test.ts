@@ -32,6 +32,222 @@ function createApp(
 }
 
 describe('product swap router', () => {
+    it('routes a browser-shaped food copy layout request', async () => {
+        let archived: unknown
+        const provider: ProductSwapProvider = {
+            name: 'fake',
+            generate: async (input) => {
+                expect(input.templateId).toBe('food-copy-layout')
+                expect(input.prompt).toContain('真实随手分享')
+                expect(input.prompt).toContain('2026-07-25 18:00')
+                expect(input.prompt).toContain(
+                    '不得编造店名、价格、地点、菜名或食材',
+                )
+                expect(input.images).toEqual([targetImage])
+                expect(input.requirements).toBe('突出分量足')
+                return { imageUrl: targetImage }
+            },
+        }
+        const archive: ProductSwapTaskArchive = {
+            start: async (_context, input) => {
+                archived = input
+                return {
+                    taskId: 'food_initial',
+                    complete: async () => null,
+                    fail: async () => undefined,
+                }
+            },
+        }
+        const response = await createApp(provider, archive).request(
+            '/api/product-swap/generate',
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    templateId: 'food-copy-layout',
+                    targetImage,
+                    aspectRatio: '3:4',
+                    showDateTime: true,
+                    generatedAt: '2026-07-25T10:00:00.000Z',
+                    requirements: '  突出分量足  ',
+                    messages: [],
+                }),
+            },
+        )
+
+        expect(response.status).toBe(200)
+        expect(archived).toMatchObject({
+            templateId: 'food-copy-layout',
+            aspectRatio: '3:4',
+            showDateTime: true,
+            generatedAt: '2026-07-25T10:00:00.000Z',
+            requirements: '突出分量足',
+        })
+        expect(archived).not.toHaveProperty('images')
+    })
+
+    it('keeps the legacy product-swap fallback', async () => {
+        const provider: ProductSwapProvider = {
+            name: 'fake',
+            generate: async (input) => {
+                expect(input.templateId).toBe('product-swap')
+                expect(input.prompt).toContain('只替换菜品或商品主体')
+                expect(input.images).toEqual([targetImage])
+                return { imageUrl: targetImage }
+            },
+        }
+        const response = await createApp(provider).request(
+            '/api/product-swap/generate',
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targetImage }),
+            },
+        )
+
+        expect(response.status).toBe(200)
+    })
+
+    it.each([
+        [
+            { templateId: 'coming-soon', targetImage },
+            'INVALID_TEMPLATE',
+            '模板不可用',
+        ],
+        [
+            {
+                templateId: 'food-copy-layout',
+                targetImage,
+                aspectRatio: '1:1',
+            },
+            'INVALID_INPUT',
+            '画布比例无效',
+        ],
+        [
+            {
+                templateId: 'food-copy-layout',
+                targetImage,
+                showDateTime: 'true',
+            },
+            'INVALID_INPUT',
+            '显示日期时间无效',
+        ],
+        [
+            {
+                templateId: 'food-copy-layout',
+                targetImage,
+                generatedAt: '2026-07-25T10:00:00',
+            },
+            'INVALID_INPUT',
+            '日期时间无效',
+        ],
+        [
+            {
+                templateId: 'food-copy-layout',
+                targetImage: 42,
+            },
+            'INVALID_INPUT',
+            '菜品图片无效',
+        ],
+        [
+            { templateId: 'food-copy-layout' },
+            'INVALID_INPUT',
+            '请上传菜品图片',
+        ],
+        [
+            {
+                templateId: 'food-copy-layout',
+                targetImage,
+                messages: 'invalid',
+            },
+            'INVALID_INPUT',
+            'messages 无效',
+        ],
+    ])(
+        'rejects invalid template input %#',
+        async (body, code, message) => {
+            const provider: ProductSwapProvider = {
+                name: 'fake',
+                generate: async () => ({ imageUrl: targetImage }),
+            }
+            const response = await createApp(provider).request(
+                '/api/product-swap/generate',
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                },
+            )
+            const data = await response.json() as {
+                error: { code: string; message: string }
+            }
+
+            expect(response.status).toBe(400)
+            expect(data.error).toEqual({ code, message })
+        },
+    )
+
+    it('orders food refinement images and archives its settings', async () => {
+        let archived: unknown
+        const previousImage =
+            'data:image/jpeg;base64,cHJldmlvdXM='
+        const provider: ProductSwapProvider = {
+            name: 'fake',
+            generate: async (input) => {
+                expect(input.images).toEqual([
+                    previousImage,
+                    targetImage,
+                ])
+                expect(input.prompt).toContain(
+                    '只修改用户明确指定的内容',
+                )
+                expect(input.messages).toHaveLength(6)
+                return { imageUrl: targetImage }
+            },
+        }
+        const archive: ProductSwapTaskArchive = {
+            start: async (_context, input) => {
+                archived = input
+                return {
+                    taskId: 'food_refinement',
+                    complete: async () => null,
+                    fail: async () => undefined,
+                }
+            },
+        }
+        const response = await createApp(provider, archive).request(
+            '/api/product-swap/generate',
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    templateId: 'food-copy-layout',
+                    targetImage,
+                    previousImage,
+                    aspectRatio: 'original',
+                    showDateTime: false,
+                    requirements: '文案短一点',
+                    messages: Array.from(
+                        { length: 8 },
+                        (_, index) => ({
+                            role: index % 2 ? 'assistant' : 'user',
+                            content: `message ${index}`,
+                        }),
+                    ),
+                }),
+            },
+        )
+
+        expect(response.status).toBe(200)
+        expect(archived).toMatchObject({
+            templateId: 'food-copy-layout',
+            aspectRatio: 'original',
+            showDateTime: false,
+            requirements: '文案短一点',
+        })
+        expect(archived).not.toHaveProperty('images')
+    })
+
     it('generates without any task storage bindings by default', async () => {
         const provider: ProductSwapProvider = {
             name: 'fake',

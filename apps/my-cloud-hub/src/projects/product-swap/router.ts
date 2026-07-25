@@ -2,29 +2,43 @@ import { Hono, type Context } from 'hono'
 import {
     ProductSwapProviderError,
     type ProductSwapEnv,
-    type ProductSwapMessage,
     type ProductSwapProvider,
 } from './provider'
+import {
+    buildTemplateGeneration,
+    TemplateValidationError,
+    validateTemplateRequest,
+    type SupportedTemplateId,
+    type TemplateGeneration,
+} from './template-strategies'
 import { volcanoProductSwapProvider } from './volcano-provider'
 
 type Bindings = ProductSwapEnv
 
 type GenerateBody = {
+    templateId?: unknown
     targetImage?: unknown
     productImage?: unknown
     sceneImage?: unknown
     previousImage?: unknown
     requirements?: unknown
+    aspectRatio?: unknown
+    showDateTime?: unknown
+    generatedAt?: unknown
     conversationId?: unknown
     messages?: unknown
 }
 
 export type ProductSwapArchiveInput = {
+    templateId: SupportedTemplateId
     targetImage: string
     productImage?: string
     sceneImage?: string
     previousImage?: string
     requirements: string
+    aspectRatio?: '3:4' | 'original' | '9:16'
+    showDateTime?: boolean
+    generatedAt?: string
 }
 
 export type ProductSwapArchiveResult = {
@@ -57,34 +71,6 @@ const defaultTaskArchive: ProductSwapTaskArchive = {
     },
 }
 
-function optionalString(value: unknown): string | undefined {
-    return typeof value === 'string' && value
-        ? value
-        : undefined
-}
-
-function cleanMessages(value: unknown): ProductSwapMessage[] {
-    if (!Array.isArray(value)) {
-        return []
-    }
-
-    return value
-        .filter((message): message is Record<string, unknown> =>
-            Boolean(message) && typeof message === 'object',
-        )
-        .filter((message) =>
-            (message.role === 'user'
-                || message.role === 'assistant')
-            && typeof message.content === 'string',
-        )
-        .slice(-6)
-        .map((message) => ({
-            role: message.role as 'user' | 'assistant',
-            content: String(message.content).trim().slice(0, 500),
-        }))
-        .filter((message) => Boolean(message.content))
-}
-
 function providerStatus(code: ProductSwapProviderError['code']) {
     if (code === 'VOLCANO_PROVIDER_NOT_CONFIGURED') {
         return 503 as const
@@ -106,14 +92,22 @@ export function createProductSwapRouter(
         const requestId = `swap_${crypto.randomUUID()}`
         const body = await c.req.json<GenerateBody>()
             .catch(() => null)
+        let generation: TemplateGeneration
 
-        if (!body || typeof body.targetImage !== 'string') {
+        try {
+            generation = buildTemplateGeneration(
+                validateTemplateRequest(body),
+            )
+        } catch (error) {
+            if (!(error instanceof TemplateValidationError)) {
+                throw error
+            }
             return c.json(
                 {
                     success: false,
                     error: {
-                        code: 'INVALID_INPUT',
-                        message: '请上传目标图',
+                        code: error.code,
+                        message: error.message,
                     },
                     requestId,
                 },
@@ -121,38 +115,32 @@ export function createProductSwapRouter(
             )
         }
 
-        const requirements = typeof body.requirements === 'string'
-            ? body.requirements.trim()
-            : ''
-
-        if (requirements.length > 500) {
-            return c.json(
-                {
-                    success: false,
-                    error: {
-                        code: 'INVALID_INPUT',
-                        message: '单次要求不能超过 500 字',
-                    },
-                    requestId,
-                },
-                400,
-            )
-        }
-
-        const conversationId =
-            typeof body.conversationId === 'string'
-            && /^conversation_[\w-]{1,100}$/.test(
-                body.conversationId,
-            )
-                ? body.conversationId
-                : `conversation_${crypto.randomUUID()}`
+        const conversationId = generation.conversationId
+            || `conversation_${crypto.randomUUID()}`
         const provider = resolveProvider()
         const archiveInput: ProductSwapArchiveInput = {
-            targetImage: body.targetImage,
-            productImage: optionalString(body.productImage),
-            sceneImage: optionalString(body.sceneImage),
-            previousImage: optionalString(body.previousImage),
-            requirements,
+            templateId: generation.templateId,
+            targetImage: generation.targetImage,
+            productImage: generation.templateId === 'product-swap'
+                ? generation.productImage
+                : undefined,
+            sceneImage: generation.templateId === 'product-swap'
+                ? generation.sceneImage
+                : undefined,
+            previousImage: generation.previousImage,
+            requirements: generation.requirements,
+            aspectRatio:
+                generation.templateId === 'food-copy-layout'
+                    ? generation.aspectRatio
+                    : undefined,
+            showDateTime:
+                generation.templateId === 'food-copy-layout'
+                    ? generation.showDateTime
+                    : undefined,
+            generatedAt:
+                generation.templateId === 'food-copy-layout'
+                    ? generation.generatedAt
+                    : undefined,
         }
         let archive: ProductSwapArchiveHandle
 
@@ -180,13 +168,8 @@ export function createProductSwapRouter(
         try {
             const result = await provider.generate(
                 {
-                    targetImage: archiveInput.targetImage,
-                    productImage: archiveInput.productImage,
-                    sceneImage: archiveInput.sceneImage,
-                    previousImage: archiveInput.previousImage,
-                    requirements,
+                    ...generation,
                     requestId,
-                    messages: cleanMessages(body.messages),
                 },
                 c.env,
             )
