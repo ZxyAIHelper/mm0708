@@ -121,6 +121,10 @@ test('chat template mounts its own editor and skips image generation', () => {
         css,
         /body\[data-template-id="wechat-chat-screenshot"\][\s\S]*?#generateButton/,
     );
+    assert.match(
+        css,
+        /body\[data-template-id="wechat-chat-screenshot"\] \.product-swap-shell\s*\{[\s\S]*?width:\s*min\(100%, 1180px\)/,
+    );
 });
 
 test('chat template cover exists as a local svg', () => {

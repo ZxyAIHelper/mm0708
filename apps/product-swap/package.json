@@ -7,7 +7,7 @@
     "dev": "node server/dev-server.js",
     "deploy": "node build.mjs && wrangler deploy",
     "test": "node --test tests/*.test.js",
-    "test:browser": "node tests/browser-smoke.js && node tests/dish-ranking-browser-smoke.js"
+    "test:browser": "node tests/browser-smoke.js && node tests/dish-ranking-browser-smoke.js && node tests/wechat-chat-browser-smoke.js"
   },
   "dependencies": {
     "sharp": "^0.34.5"

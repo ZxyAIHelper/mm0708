@@ -503,6 +503,11 @@ body[data-template-id="wechat-chat-screenshot"] #resultSection {
     display: none;
 }
 
+body[data-template-id="wechat-chat-screenshot"] .product-swap-shell {
+    width: min(100%, 1180px);
+    padding-inline: 28px;
+}
+
 body[data-template-id="wechat-chat-screenshot"] #swapForm {
     max-width: 1180px;
 }
@@ -615,6 +620,12 @@ body[data-template-id="wechat-chat-screenshot"] #swapForm {
 .chat-location-button,
 .chat-edit-controls button {
     min-height: 44px;
+    border: 1px solid #d8d2cc;
+    border-radius: 10px;
+    padding: 9px 14px;
+    background: #ffffff;
+    color: #383430;
+    cursor: pointer;
 }
 
 .chat-generate-button,
@@ -652,7 +663,7 @@ body[data-template-id="wechat-chat-screenshot"] #swapForm {
 
 .chat-edit-message {
     display: grid;
-    grid-template-columns: 52px minmax(0, 1fr) auto;
+    grid-template-columns: 52px minmax(0, 1fr);
     gap: 10px;
     align-items: center;
     border: 1px solid #e1ddd8;
@@ -672,6 +683,21 @@ body[data-template-id="wechat-chat-screenshot"] #swapForm {
 .chat-edit-text {
     min-height: 62px;
     resize: vertical;
+}
+
+.chat-edit-controls {
+    grid-column: 2;
+}
+
+.chat-material-panel input[type="file"]::file-selector-button {
+    min-height: 38px;
+    margin-right: 10px;
+    border: 0;
+    border-radius: 9px;
+    padding: 0 12px;
+    background: #f0eee8;
+    color: #383430;
+    cursor: pointer;
 }
 
 .chat-map-dialog {
