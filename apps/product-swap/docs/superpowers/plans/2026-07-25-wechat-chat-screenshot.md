@@ -87,7 +87,7 @@ const LIMITS = {
 };
 ```
 
-The manifest must be live at `/create.html?template=wechat-chat-screenshot`, use `chat-materials`, cost 1 bean, and advertise a 1080×1920 PNG. Extend `FIELD_KEYS` with only:
+The manifest must be live at `/create.html?template=wechat-chat-screenshot`, use `chat-materials`, cost 0 beans for the first text-only release, and advertise a 1080×1920 PNG. Extend `FIELD_KEYS` with only:
 
 ```js
 'chat-materials': [
@@ -671,15 +671,14 @@ http://127.0.0.1:8791/create.html?template=wechat-chat-screenshot
 
 Check desktop and 390px mobile viewport. Save one local screenshot and one exported PNG, verify text, avatars, image message, map card, scroll behavior, and no overlap. Do not commit verification artifacts.
 
-- [ ] **Step 5: Record the configuration status**
+- [ ] **Step 5: Record the configuration and deploy**
 
-Append a short implementation note to the design document stating that production location selection requires:
+Append a short implementation note to the design document recording:
 
-```powershell
-wrangler secret put TENCENT_MAP_KEY
-```
+- `TENCENT_MAP_KEY` has been stored with Cloudflare Secrets and is not present in the repository.
+- Tencent Console still requires the production domain/referer whitelist.
 
-from `apps/my-cloud-hub`, followed by Tencent Console domain/referer whitelist configuration and deployment. Do not deploy or invent a Key before the user provides it.
+Deploy the shared API first, smoke-check `/api/product-swap/map-config`, then deploy `apps/product-swap`. Never print the Key while checking the response.
 
 - [ ] **Step 6: Commit**
 
@@ -687,4 +686,3 @@ from `apps/my-cloud-hub`, followed by Tencent Console domain/referer whitelist c
 git add apps/product-swap/tests/wechat-chat-browser-smoke.js apps/product-swap/package.json apps/product-swap/docs/superpowers/specs/2026-07-25-wechat-chat-screenshot-design.md
 git commit -m "test: verify chat screenshot workflow"
 ```
-

@@ -42,6 +42,15 @@ const FIELD_KEYS = {
         'minOwned',
         'accept',
     ],
+    'chat-materials': [
+        'key',
+        'type',
+        'label',
+        'required',
+        'minSources',
+        'maxImages',
+        'accept',
+    ],
     choice: [
         'key',
         'type',
@@ -286,12 +295,21 @@ function validateField(field, manifestId) {
         );
     }
 
-    if (values.type === 'image' || values.type === 'dish-list') {
-        requireOwnDataProperty(field, 'role', fieldContext);
+    if (
+        values.type === 'image'
+        || values.type === 'dish-list'
+        || values.type === 'chat-materials'
+    ) {
+        if (values.type !== 'chat-materials') {
+            requireOwnDataProperty(field, 'role', fieldContext);
+        }
         requireOwnDataProperty(field, 'required', fieldContext);
         if (
-            typeof values.role !== 'string'
-            || !values.role.trim()
+            values.type !== 'chat-materials'
+            && (
+                typeof values.role !== 'string'
+                || !values.role.trim()
+            )
         ) {
             throw new Error(
                 fieldContext
@@ -338,6 +356,21 @@ function validateField(field, manifestId) {
                 }
             }
             values.accept = acceptValues;
+        }
+    }
+
+    if (values.type === 'chat-materials') {
+        requireOwnDataProperty(field, 'minSources', fieldContext);
+        requireOwnDataProperty(field, 'maxImages', fieldContext);
+        if (
+            values.minSources !== 1
+            || !Number.isInteger(values.maxImages)
+            || values.maxImages < 1
+            || values.maxImages > 3
+        ) {
+            throw new Error(
+                `${fieldContext} has invalid chat-materials bounds`,
+            );
         }
     }
 
@@ -754,7 +787,8 @@ function publicManifest(manifest) {
         );
         if (
             (fieldValues.type === 'image'
-                || fieldValues.type === 'dish-list')
+                || fieldValues.type === 'dish-list'
+                || fieldValues.type === 'chat-materials')
             && Array.isArray(fieldValues.accept)
         ) {
             publishedField.accept = denseArrayValues(fieldValues.accept);

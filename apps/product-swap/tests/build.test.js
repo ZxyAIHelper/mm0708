@@ -16,6 +16,7 @@ test('build emits only deployable public assets', async () => {
         'api-client.js',
         'app.css',
         'assets',
+        'chat-materials.js',
         'create.html',
         'creator-form.js',
         'creator-meta.js',

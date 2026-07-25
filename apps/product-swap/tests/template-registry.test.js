@@ -85,8 +85,42 @@ test('discovers all template packages in stable id order', () => {
             'product-swap',
             'store-promotion',
             'summer-seeding',
+            'wechat-chat-screenshot',
         ],
     );
+});
+
+test('publishes the live wechat chat screenshot contract', () => {
+    const template = publicCatalog().find(
+        (item) => item.id === 'wechat-chat-screenshot',
+    );
+
+    assert.equal(template.status, 'live');
+    assert.equal(template.creditCost, 0);
+    assert.equal(template.href, '/create.html?template=wechat-chat-screenshot');
+    assert.deepEqual(template.fields, [{
+        key: 'chatSource',
+        type: 'chat-materials',
+        label: '聊天素材',
+        required: true,
+        minSources: 1,
+        maxImages: 3,
+        accept: ['image/jpeg', 'image/png', 'image/webp'],
+    }]);
+});
+
+test('validates the chat-materials field contract', () => {
+    assert.doesNotThrow(() => validateManifest(validManifest({
+        fields: [{
+            key: 'chatSource',
+            type: 'chat-materials',
+            label: '聊天素材',
+            required: true,
+            minSources: 1,
+            maxImages: 3,
+            accept: ['image/jpeg', 'image/png', 'image/webp'],
+        }],
+    }), 'sample'));
 });
 
 test('publishes the live food-copy-layout contract without its prompt builder', () => {
