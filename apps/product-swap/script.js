@@ -80,6 +80,21 @@ function buildRefinePayload(
     };
 }
 
+function appendQuickPrompt(existingValue, prompt, maxLength = 500) {
+    const limit = Number.isInteger(maxLength) && maxLength > 0
+        ? maxLength
+        : 500;
+    const current = String(existingValue || '').trim();
+    const next = String(prompt || '').trim();
+    if (!next) return current.slice(0, limit);
+    const tail = current.split(/[，,]/).at(-1)?.trim();
+    if (tail === next) return current.slice(0, limit);
+    return [current, next]
+        .filter(Boolean)
+        .join('，')
+        .slice(0, limit);
+}
+
 const ACTIVE_TASK_KEY = 'product_swap_active_task_id';
 
 function activeTaskStorageKey(template) {
@@ -363,8 +378,13 @@ function boot() {
     function showVersion(version) {
         if (!version) return;
         state.result = version.imageUrl;
+        state.conversationId = version.conversationId;
+        state.messages = version.messages.map((message) => ({
+            ...message,
+        }));
         resultImage.src = version.imageUrl;
         resultSection.hidden = false;
+        renderMessages();
         renderVersions();
     }
 
@@ -403,6 +423,10 @@ function boot() {
             restoreButton.type = 'button';
             restoreButton.className = 'restore-version';
             restoreButton.textContent = '恢复';
+            restoreButton.setAttribute(
+                'aria-label',
+                `恢复版本 ${index + 1}：${version.instruction}`,
+            );
             restoreButton.addEventListener('click', () => {
                 const restored = versions.restore(index);
                 if (!restored) return;
@@ -415,8 +439,8 @@ function boot() {
         });
     }
 
-    function addVersion(imageUrl, instruction) {
-        versions.add({ imageUrl, instruction });
+    function addVersion(input) {
+        versions.add(input);
         selectedVersionIndex = versions.list().length - 1;
         const current = versions.current();
         showVersion(current);
@@ -436,10 +460,13 @@ function boot() {
             quickPrompt.className = 'quick-prompt';
             quickPrompt.textContent = prompt;
             quickPrompt.addEventListener('click', () => {
-                refineInput.value = [
-                    refineInput.value.trim(),
+                refineInput.value = appendQuickPrompt(
+                    refineInput.value,
                     prompt,
-                ].filter(Boolean).join('，');
+                    refineInput.maxLength > 0
+                        ? refineInput.maxLength
+                        : 500,
+                );
                 refineInput.focus();
             });
             quickPrompts.appendChild(quickPrompt);
@@ -451,7 +478,11 @@ function boot() {
         localHistory.recoverInterruptedTasks(),
     ]).catch(() => undefined);
 
-    async function startLocalTask(payload, isRefinement = false) {
+    async function startLocalTask(
+        payload,
+        isRefinement = false,
+        versionContext = {},
+    ) {
         try {
             return await localHistory.startTask({
                 taskType: activeTemplate?.taskType || 'product_swap',
@@ -463,6 +494,9 @@ function boot() {
                         isRefinement,
                     ),
                     templateId: activeTemplate?.id || 'product-swap',
+                    baseVersionId: String(
+                        versionContext.baseVersionId || '',
+                    ),
                 },
                 images: [
                     ...fields
@@ -734,16 +768,30 @@ function boot() {
             state.messages = state.messages.slice(-6);
         }
         if (state.result) {
-            const current = versions.current();
-            if (!current || current.imageUrl !== state.result) {
-                addVersion(
-                    state.result,
-                    task.input?.isRefinement
-                        ? String(task.input.requirements || '继续修改')
-                        : '首次生成',
+            const hydratedVersion = {
+                imageUrl: state.result,
+                instruction: task.input?.isRefinement
+                    ? String(task.input.requirements || '继续修改')
+                    : '首次生成',
+                conversationId: state.conversationId,
+                messages: state.messages,
+                baseVersionId: task.input?.baseVersionId || null,
+                sourceTaskId: (
+                    task.status === 'completed'
+                    && task.result?.imageUrl
+                ) ? task.id : null,
+            };
+            const existingIndex =
+                VersionHistory.findVersionIndexByIdentity(
+                    versions.list(),
+                    hydratedVersion,
                 );
+            if (existingIndex >= 0) {
+                const selected = versions.select(existingIndex);
+                selectedVersionIndex = existingIndex;
+                showVersion(selected);
             } else {
-                showVersion(current);
+                addVersion(hydratedVersion);
             }
         }
         renderMessages();
@@ -1029,7 +1077,13 @@ function boot() {
                 content: data.assistantMessage
                     || '已完成第一版，可以继续告诉我需要调整的地方。',
             });
-            addVersion(data.imageUrl, '首次生成');
+            addVersion({
+                imageUrl: data.imageUrl,
+                instruction: '首次生成',
+                conversationId: state.conversationId,
+                messages: state.messages,
+                sourceTaskId: localTask?.id || null,
+            });
             showArchiveNotice(data.archiveWarning || '');
             renderMessages();
             resultSection.scrollIntoView({
@@ -1077,6 +1131,11 @@ function boot() {
             refineInput.focus();
             return;
         }
+        const baseVersion = versions.current();
+        if (!baseVersion) {
+            showError('请先生成一个版本');
+            return;
+        }
 
         showError('');
         showArchiveNotice('');
@@ -1091,27 +1150,35 @@ function boot() {
                     new Date().toISOString(),
                 ),
                 {
-                    ...state,
-                    result: versions.current().imageUrl,
+                    result: baseVersion.imageUrl,
+                    conversationId: baseVersion.conversationId,
+                    messages: baseVersion.messages,
                 },
                 correction,
             );
-            localTask = await startLocalTask(payload, true);
+            localTask = await startLocalTask(payload, true, {
+                baseVersionId: baseVersion.id,
+            });
             const data = await runGeneration(localTask, payload);
 
-            state.messages.push({
+            state.messages = [...baseVersion.messages, {
                 role: 'user',
                 content: correction,
-            });
-            state.messages.push({
+            }, {
                 role: 'assistant',
                 content: data.assistantMessage
                     || '已完成新一版修正。',
-            });
-            state.messages = state.messages.slice(-6);
+            }].slice(-6);
             state.conversationId = data.conversationId
-                || state.conversationId;
-            addVersion(data.imageUrl, correction);
+                || baseVersion.conversationId;
+            addVersion({
+                imageUrl: data.imageUrl,
+                instruction: correction,
+                baseVersionId: baseVersion.id,
+                conversationId: state.conversationId,
+                messages: state.messages,
+                sourceTaskId: localTask?.id || null,
+            });
             showArchiveNotice(data.archiveWarning || '');
             refineInput.value = '';
             renderMessages();
@@ -1142,21 +1209,46 @@ function boot() {
         if (!current) return;
 
         let objectUrl = '';
+        let revokeScheduled = false;
         try {
-            const response = await fetch(current.imageUrl);
-            if (!response.ok) {
-                throw new Error('DOWNLOAD_FAILED');
-            }
+            const request = VersionHistory.createDownloadRequest(
+                current.imageUrl,
+                window.location.origin,
+            );
+            const response = await fetch(
+                request.url,
+                request.fetchOptions,
+            );
+            const responseDetails = {
+                url: response.url,
+                ok: response.ok,
+                contentType: response.headers.get('content-type'),
+                contentLength: response.headers.get('content-length'),
+            };
+            VersionHistory.validateDownloadResponse(
+                request,
+                responseDetails,
+            );
             const blob = await response.blob();
+            VersionHistory.validateDownloadResponse(request, {
+                ...responseDetails,
+                blobSize: blob.size,
+            });
             objectUrl = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = objectUrl;
             link.download = `${activeTemplate.id}-${Date.now()}.png`;
+            document.body.appendChild(link);
             link.click();
+            link.remove();
+            setTimeout(() => {
+                URL.revokeObjectURL(objectUrl);
+            }, 0);
+            revokeScheduled = true;
         } catch {
             showError('下载失败，请保留当前页面后重试');
         } finally {
-            if (objectUrl) {
+            if (objectUrl && !revokeScheduled) {
                 URL.revokeObjectURL(objectUrl);
             }
         }
@@ -1185,6 +1277,7 @@ if (typeof document !== 'undefined') {
 
 if (typeof module !== 'undefined') {
     module.exports = {
+        appendQuickPrompt,
         resolveApiBase,
         activeTaskStorageKey,
         taskMatchesTemplate,

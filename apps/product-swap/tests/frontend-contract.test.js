@@ -11,6 +11,7 @@ const productSwapManifest = require(
 
 const root = path.resolve(__dirname, '..');
 const {
+    appendQuickPrompt,
     resolveApiBase,
     activeTaskStorageKey,
     taskMatchesTemplate,
@@ -431,10 +432,29 @@ test('quick prompts only fill and focus the refinement input', () => {
     const source = fs.readFileSync(path.join(root, 'script.js'), 'utf8');
 
     assert.match(source, /activeTemplate\?\.quickPrompts/);
-    assert.match(source, /refineInput\.value\s*=\s*\[/);
-    assert.match(source, /\.join\('，'\)/);
+    assert.match(source, /appendQuickPrompt\(/);
+    assert.match(source, /refineInput\.maxLength/);
     assert.match(source, /refineInput\.focus\(\)/);
     assert.doesNotMatch(source, /quickPrompt[\s\S]{0,300}requestSubmit/);
+});
+
+test('quick prompts avoid duplicate tails and respect the input limit', () => {
+    assert.equal(
+        appendQuickPrompt('背景更亮', '背景更亮', 500),
+        '背景更亮',
+    );
+    assert.equal(
+        appendQuickPrompt('背景更亮，字号更大', '字号更大', 500),
+        '背景更亮，字号更大',
+    );
+    assert.equal(
+        appendQuickPrompt('背景更亮', '字号更大', 500),
+        '背景更亮，字号更大',
+    );
+    assert.equal(
+        appendQuickPrompt('12345', 'abcdef', 8),
+        '12345，ab',
+    );
 });
 
 test('restored and refined versions become the current image source', () => {
@@ -443,28 +463,83 @@ test('restored and refined versions become the current image source', () => {
     assert.match(source, /VersionHistory\.createVersionHistory\(\)/);
     assert.match(source, /versions\.restore\(index\)/);
     assert.match(source, /showVersion\(restored\)/);
+    assert.match(source, /state\.conversationId\s*=\s*version\.conversationId/);
+    assert.match(source, /state\.messages\s*=\s*version\.messages/);
     assert.match(
         source,
-        /result:\s*versions\.current\(\)\.imageUrl/,
+        /result:\s*baseVersion\.imageUrl/,
     );
     assert.doesNotMatch(source, /versions\.list\(\)\.at\(-1\)/);
 });
 
 test('downloads the current version through a checked blob response', () => {
-    const source = fs.readFileSync(path.join(root, 'script.js'), 'utf8');
+    const source = [
+        fs.readFileSync(path.join(root, 'script.js'), 'utf8'),
+        fs.readFileSync(path.join(root, 'version-history.js'), 'utf8'),
+    ].join('\n');
 
     assert.match(source, /async function downloadCurrentVersion\(\)/);
     assert.match(source, /versions\.current\(\)/);
-    assert.match(source, /await fetch\(current\.imageUrl\)/);
-    assert.match(source, /if \(!response\.ok\)/);
+    assert.match(source, /VersionHistory\.createDownloadRequest/);
+    assert.match(
+        source,
+        /fetch\(\s*request\.url,\s*request\.fetchOptions/,
+    );
+    assert.match(source, /credentials:\s*'omit'/);
+    assert.match(source, /redirect:\s*'error'/);
+    assert.match(source, /referrerPolicy:\s*'no-referrer'/);
+    assert.match(source, /VersionHistory\.validateDownloadResponse/);
     assert.match(source, /await response\.blob\(\)/);
     assert.match(source, /URL\.createObjectURL/);
     assert.match(
         source,
         /`\$\{activeTemplate\.id\}-\$\{Date\.now\(\)\}\.png`/,
     );
+    assert.match(source, /link\.remove\(\)/);
+    assert.match(
+        source,
+        /setTimeout\([\s\S]*?URL\.revokeObjectURL\(objectUrl\)[\s\S]*?,\s*0\)/,
+    );
     assert.match(source, /URL\.revokeObjectURL/);
     assert.match(source, /下载失败，请保留当前页面后重试/);
+});
+
+test('generation versions retain context and hydrate by task identity', () => {
+    const source = fs.readFileSync(path.join(root, 'script.js'), 'utf8');
+
+    assert.match(source, /const baseVersion = versions\.current\(\)/);
+    assert.match(source, /baseVersionId:\s*baseVersion\.id/);
+    assert.match(
+        source,
+        /startLocalTask\(payload,\s*true,\s*\{[\s\S]*?baseVersionId:\s*baseVersion\.id/,
+    );
+    assert.match(
+        source,
+        /baseVersionId:\s*task\.input\?\.baseVersionId/,
+    );
+    assert.match(source, /conversationId:\s*state\.conversationId/);
+    assert.match(source, /messages:\s*state\.messages/);
+    assert.match(
+        source,
+        /VersionHistory\.findVersionIndexByIdentity/,
+    );
+    assert.match(
+        source,
+        /sourceTaskId:[\s\S]{0,120}\?\s*task\.id\s*:\s*null/,
+    );
+    assert.doesNotMatch(
+        source,
+        /current\.imageUrl\s*!==\s*state\.result/,
+    );
+});
+
+test('restore controls describe the exact version and instruction', () => {
+    const source = fs.readFileSync(path.join(root, 'script.js'), 'utf8');
+
+    assert.match(
+        source,
+        /`恢复版本 \$\{index \+ 1\}：\$\{version\.instruction\}`/,
+    );
 });
 
 test('version and quick prompt controls have bounded scrolling styles', () => {

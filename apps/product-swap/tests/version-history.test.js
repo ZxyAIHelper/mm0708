@@ -4,6 +4,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
     createVersionHistory,
+    createDownloadRequest,
+    findVersionIndexByIdentity,
+    validateDownloadResponse,
 } = require('../version-history');
 
 test('adds versions and selects the newest version', () => {
@@ -19,6 +22,7 @@ test('adds versions and selects the newest version', () => {
     });
 
     assert.equal(typeof first.createdAt, 'number');
+    assert.notEqual(first.id, second.id);
     assert.deepEqual(history.list(), [first, second]);
     assert.deepEqual(history.current(), second);
 });
@@ -27,22 +31,38 @@ test('returns copies that cannot mutate internal versions', () => {
     const input = {
         imageUrl: 'https://example.com/original.png',
         instruction: '首次生成',
+        conversationId: 'conversation-1',
+        messages: [{
+            role: 'assistant',
+            content: 'original message',
+        }],
     };
     const history = createVersionHistory();
     const added = history.add(input);
 
     input.imageUrl = 'mutated input';
+    input.messages[0].content = 'mutated input message';
     added.imageUrl = 'mutated return';
+    added.messages[0].content = 'mutated return message';
     const listed = history.list();
     listed[0].instruction = 'mutated list';
+    listed[0].messages[0].content = 'mutated list message';
     listed.push({ imageUrl: 'extra' });
     const current = history.current();
     current.createdAt = 0;
 
     assert.deepEqual(history.list(), [{
+        id: added.id,
         imageUrl: 'https://example.com/original.png',
         instruction: '首次生成',
         createdAt: added.createdAt,
+        baseVersionId: null,
+        conversationId: 'conversation-1',
+        messages: [{
+            role: 'assistant',
+            content: 'original message',
+        }],
+        sourceTaskId: null,
     }]);
 });
 
@@ -61,16 +81,28 @@ test('selects by index and returns null for invalid selections', () => {
 
 test('restores a selected version as a new latest version', () => {
     const history = createVersionHistory();
-    history.add({ imageUrl: 'first', instruction: '首次生成' });
+    const first = history.add({
+        imageUrl: 'first',
+        instruction: '首次生成',
+        conversationId: 'conversation-1',
+        messages: [{ role: 'assistant', content: 'first result' }],
+        sourceTaskId: 'task-1',
+    });
     history.add({ imageUrl: 'second', instruction: '调整背景' });
 
     const restored = history.restore(0);
 
     assert.deepEqual(restored, {
+        id: restored.id,
         imageUrl: 'first',
         instruction: '恢复版本 1',
         createdAt: restored.createdAt,
+        baseVersionId: first.id,
+        conversationId: 'conversation-1',
+        messages: [{ role: 'assistant', content: 'first result' }],
+        sourceTaskId: null,
     });
+    assert.notEqual(restored.id, first.id);
     assert.deepEqual(history.current(), restored);
     assert.equal(history.list().length, 3);
     assert.equal(history.restore(8), null);
@@ -90,5 +122,223 @@ test('keeps selection stable when timestamps collide', () => {
         assert.equal(history.list()[0].createdAt, history.list()[1].createdAt);
     } finally {
         Date.now = originalNow;
+    }
+});
+
+test('keeps identical image URLs as distinct generation attempts', () => {
+    const originalNow = Date.now;
+    Date.now = () => 1234;
+    try {
+        const history = createVersionHistory();
+        const first = history.add({
+            imageUrl: 'data:image/png;base64,AAAA',
+            instruction: 'first',
+            sourceTaskId: 'task-1',
+        });
+        const second = history.add({
+            imageUrl: 'data:image/png;base64,AAAA',
+            instruction: 'second',
+            sourceTaskId: 'task-2',
+            baseVersionId: first.id,
+        });
+
+        assert.notEqual(first.id, second.id);
+        assert.equal(second.baseVersionId, first.id);
+        assert.equal(history.list().length, 2);
+    } finally {
+        Date.now = originalNow;
+    }
+});
+
+test('bounds message snapshots to the latest six entries', () => {
+    const history = createVersionHistory();
+    const input = Array.from({ length: 8 }, (_, index) => ({
+        role: index % 2 ? 'assistant' : 'user',
+        content: `message-${index}`,
+    }));
+
+    const version = history.add({
+        imageUrl: 'result',
+        instruction: 'first',
+        messages: input,
+    });
+
+    assert.deepEqual(
+        version.messages.map((message) => message.content),
+        [
+            'message-2',
+            'message-3',
+            'message-4',
+            'message-5',
+            'message-6',
+            'message-7',
+        ],
+    );
+});
+
+test('finds hydrated versions by version or task identity, never URL', () => {
+    const existing = [{
+        id: 'version-1',
+        sourceTaskId: 'task-1',
+        imageUrl: 'same-url',
+    }];
+
+    assert.equal(findVersionIndexByIdentity(existing, {
+        id: 'version-1',
+        imageUrl: 'other-url',
+    }), 0);
+    assert.equal(findVersionIndexByIdentity(existing, {
+        sourceTaskId: 'task-1',
+        imageUrl: 'other-url',
+    }), 0);
+    assert.equal(findVersionIndexByIdentity(existing, {
+        id: 'unknown-version',
+        sourceTaskId: 'task-1',
+        imageUrl: 'other-url',
+    }), 0);
+    assert.equal(findVersionIndexByIdentity(existing, {
+        sourceTaskId: 'task-2',
+        imageUrl: 'same-url',
+    }), -1);
+    assert.equal(findVersionIndexByIdentity(existing, {
+        imageUrl: 'same-url',
+    }), -1);
+});
+
+test('evicts the oldest versions at the configured entry cap', () => {
+    const history = createVersionHistory({ maxEntries: 3 });
+    const added = Array.from({ length: 4 }, (_, index) => history.add({
+        imageUrl: `image-${index}`,
+        instruction: `instruction-${index}`,
+    }));
+
+    assert.deepEqual(
+        history.list().map((version) => version.id),
+        added.slice(1).map((version) => version.id),
+    );
+    assert.equal(history.current().id, added[3].id);
+});
+
+test('evicts oldest entries when the estimated byte budget is exceeded', () => {
+    const history = createVersionHistory({
+        maxEntries: 20,
+        maxEstimatedBytes: 260,
+    });
+    const first = history.add({
+        imageUrl: `data:image/png;base64,${'A'.repeat(180)}`,
+        instruction: 'first',
+    });
+    const second = history.add({
+        imageUrl: `data:image/png;base64,${'B'.repeat(180)}`,
+        instruction: 'second',
+    });
+
+    assert.deepEqual(
+        history.list().map((version) => version.id),
+        [second.id],
+    );
+    assert.notEqual(first.id, second.id);
+    assert.equal(history.current().id, second.id);
+});
+
+test('retains the newest current version when it alone exceeds the budget', () => {
+    const history = createVersionHistory({
+        maxEstimatedBytes: 32,
+    });
+    const oversized = history.add({
+        imageUrl: `data:image/png;base64,${'A'.repeat(200)}`,
+        instruction: 'oversized',
+    });
+
+    assert.equal(history.list().length, 1);
+    assert.equal(history.current().id, oversized.id);
+});
+
+test('allows canonical PNG data URLs and same-origin network URLs', () => {
+    const dataUrl = 'data:image/png;base64,AAAA';
+    assert.deepEqual(
+        createDownloadRequest(
+            dataUrl,
+            'https://product-swap.example',
+            1024,
+        ),
+        {
+            kind: 'data',
+            url: dataUrl,
+            maxBytes: 1024,
+            fetchOptions: undefined,
+        },
+    );
+
+    assert.deepEqual(
+        createDownloadRequest(
+            '/results/current.png',
+            'https://product-swap.example',
+            2048,
+        ),
+        {
+            kind: 'network',
+            url: 'https://product-swap.example/results/current.png',
+            maxBytes: 2048,
+            fetchOptions: {
+                credentials: 'omit',
+                redirect: 'error',
+                referrerPolicy: 'no-referrer',
+            },
+        },
+    );
+});
+
+test('rejects malformed data URLs and non-same-origin download URLs', () => {
+    const origin = 'https://product-swap.example';
+    for (const unsafeUrl of [
+        'data:image/jpeg;base64,AAAA',
+        'data:image/png;base64,AAA',
+        'data:image/png;base64,',
+        'data:image/png;base64,AB==',
+        'data:image/png;base64,AAB=',
+        'javascript:alert(1)',
+        'https://other.example/result.png',
+        'https://user:password@product-swap.example/result.png',
+    ]) {
+        assert.throws(
+            () => createDownloadRequest(unsafeUrl, origin),
+            /UNSAFE_DOWNLOAD/,
+        );
+    }
+});
+
+test('validates the final PNG response and bounded blob size', () => {
+    const policy = createDownloadRequest(
+        '/result.png',
+        'https://product-swap.example',
+        64,
+    );
+    const response = {
+        url: 'https://product-swap.example/result.png',
+        ok: true,
+        contentType: 'image/png; charset=binary',
+        contentLength: '32',
+        blobSize: 32,
+    };
+
+    assert.equal(validateDownloadResponse(policy, response), true);
+
+    for (const override of [
+        { ok: false },
+        { url: 'https://other.example/result.png' },
+        { contentType: 'image/jpeg' },
+        { contentLength: '65' },
+        { contentLength: 'invalid' },
+        { blobSize: 65 },
+        { blobSize: 0 },
+    ]) {
+        assert.throws(
+            () => validateDownloadResponse(
+                policy,
+                { ...response, ...override },
+            ),
+            /UNSAFE_DOWNLOAD/,
+        );
     }
 });
