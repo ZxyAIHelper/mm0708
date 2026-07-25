@@ -142,3 +142,73 @@ test('shop save rejects blank names without writing and stabilizes write errors'
         message: '浏览器存储不可用，请检查隐私设置后重试',
     });
 });
+
+test('product save rejects blank names and trims valid products before writing', () => {
+    const { saveProductProfile } = loadProfileModule();
+    const saved = [];
+    const store = {
+        saveProduct(product) {
+            saved.push(product);
+            return product;
+        },
+    };
+    const scope = {
+        crypto: { randomUUID: () => 'product-1' },
+    };
+
+    const blank = saveProductProfile(
+        store,
+        { name: '   ', sellingPoint: ' 清爽 ', price: ' 18 ' },
+        scope,
+    );
+    assert.equal(saved.length, 0);
+    assert.deepEqual(plain(blank), {
+        ok: false,
+        validationError: true,
+        message: '产品名称不能为空',
+        product: null,
+    });
+
+    const valid = saveProductProfile(
+        store,
+        { name: ' 冰拿铁 ', sellingPoint: ' 清爽 ', price: ' 18 ' },
+        scope,
+    );
+    assert.deepEqual(plain(saved), [{
+        id: 'product-1',
+        name: '冰拿铁',
+        sellingPoint: '清爽',
+        price: '18',
+    }]);
+    assert.deepEqual(plain(valid), {
+        ok: true,
+        validationError: false,
+        message: '产品已添加',
+        product: {
+            id: 'product-1',
+            name: '冰拿铁',
+            sellingPoint: '清爽',
+            price: '18',
+        },
+    });
+});
+
+test('product save maps storage write failures to the stable error', () => {
+    const { saveProductProfile } = loadProfileModule();
+    const result = saveProductProfile(
+        {
+            saveProduct() {
+                throw new DOMException('Access denied', 'SecurityError');
+            },
+        },
+        { name: '冰拿铁' },
+        { crypto: { randomUUID: () => 'product-1' } },
+    );
+
+    assert.deepEqual(plain(result), {
+        ok: false,
+        validationError: false,
+        message: '浏览器存储不可用，请检查隐私设置后重试',
+        product: null,
+    });
+});

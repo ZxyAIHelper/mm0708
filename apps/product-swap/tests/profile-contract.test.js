@@ -52,4 +52,12 @@ test('profile styles keep form actions clear of the fixed navigation', () => {
         css,
         /\.product-row h3,[\s\S]*?\.product-row p,[\s\S]*?\.product-row strong\s*\{[\s\S]*?overflow-wrap:\s*anywhere;/,
     );
+    assert.match(
+        css,
+        /\.profile-shell \.profile-section\s*\{[\s\S]*?margin-top:\s*18px;[\s\S]*?gap:\s*10px;/,
+    );
+    assert.match(
+        css,
+        /\.profile-shell \.settings-card\s*\{[\s\S]*?gap:\s*7px;/,
+    );
 });

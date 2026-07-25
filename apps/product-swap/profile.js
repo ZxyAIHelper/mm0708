@@ -80,6 +80,51 @@
         }
     }
 
+    function normalizeProductInput(product = {}) {
+        const normalized = {
+            name: String(product.name || '').trim(),
+            sellingPoint: String(product.sellingPoint || '').trim(),
+            price: String(product.price || '').trim(),
+        };
+        return {
+            valid: Boolean(normalized.name),
+            product: normalized,
+        };
+    }
+
+    function saveProductProfile(store, product, scope = globalScope) {
+        const normalized = normalizeProductInput(product);
+        if (!normalized.valid) {
+            return {
+                ok: false,
+                validationError: true,
+                message: '产品名称不能为空',
+                product: null,
+            };
+        }
+
+        const productToSave = {
+            id: createProductId(scope),
+            ...normalized.product,
+        };
+        try {
+            const saved = store.saveProduct(productToSave);
+            return {
+                ok: true,
+                validationError: false,
+                message: '产品已添加',
+                product: saved || productToSave,
+            };
+        } catch {
+            return {
+                ok: false,
+                validationError: false,
+                message: STORAGE_ERROR,
+                product: null,
+            };
+        }
+    }
+
     function boot() {
         const shopForm = document.getElementById('shopForm');
         const productForm = document.getElementById('productForm');
@@ -144,7 +189,8 @@
         shopName.value = profile.shop.name;
         shopIndustry.value = profile.shop.industry;
         shopSlogan.value = profile.shop.slogan;
-        renderProducts(profile.products);
+        let currentProducts = profile.products.slice();
+        renderProducts(currentProducts);
 
         if (!loaded.available) {
             disableSaving();
@@ -174,22 +220,39 @@
             showNotice(result.message, !result.ok);
         });
 
+        productName.addEventListener('input', () => {
+            if (productName.value.trim()) {
+                productName.removeAttribute('aria-invalid');
+            }
+        });
+
         productForm.addEventListener('submit', (event) => {
             event.preventDefault();
-            try {
-                store.saveProduct({
-                    id: createProductId(globalScope),
-                    name: productName.value,
-                    sellingPoint: productSellingPoint.value,
-                    price: productPrice.value,
-                });
-                const products = store.listProducts();
-                productForm.reset();
-                showNotice('产品已添加');
-                renderProducts(products);
-            } catch {
-                showNotice(STORAGE_ERROR, true);
+            const result = saveProductProfile(store, {
+                name: productName.value,
+                sellingPoint: productSellingPoint.value,
+                price: productPrice.value,
+            }, globalScope);
+
+            if (result.validationError) {
+                productName.setAttribute('aria-invalid', 'true');
+            } else {
+                productName.removeAttribute('aria-invalid');
             }
+            if (!result.ok) {
+                showNotice(result.message, true);
+                return;
+            }
+
+            currentProducts = [
+                result.product,
+                ...currentProducts.filter((product) => (
+                    product.id !== result.product.id
+                )),
+            ];
+            productForm.reset();
+            showNotice(result.message);
+            renderProducts(currentProducts);
         });
     }
 
@@ -197,7 +260,9 @@
         STORAGE_ERROR,
         createProductId,
         loadProfileStore,
+        normalizeProductInput,
         normalizeShopInput,
+        saveProductProfile,
         saveShopProfile,
     };
 

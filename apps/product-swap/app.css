@@ -367,6 +367,11 @@ h2 {
     margin-top: 30px;
 }
 
+.profile-shell .profile-section {
+    margin-top: 18px;
+    gap: 10px;
+}
+
 .settings-card,
 .product-row {
     padding: 16px;
@@ -379,6 +384,10 @@ h2 {
     display: flex;
     flex-direction: column;
     gap: 9px;
+}
+
+.profile-shell .settings-card {
+    gap: 7px;
 }
 
 .settings-card label {
