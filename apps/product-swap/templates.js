@@ -3,6 +3,8 @@
         ? global.__TEMPLATE_CATALOG__
         : (
             typeof module !== 'undefined'
+                && module.exports
+                && typeof require === 'function'
                 ? require('./server/template-registry').publicCatalog()
                 : []
         );
@@ -29,8 +31,12 @@
             template.name,
             template.summary,
             template.category,
-            ...template.platforms,
-            ...template.tags,
+            ...(Array.isArray(template.platforms)
+                ? template.platforms
+                : []),
+            ...(Array.isArray(template.tags)
+                ? template.tags
+                : []),
         ].some((value) => normalize(value).includes(normalized)));
     }
 

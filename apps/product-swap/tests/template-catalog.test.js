@@ -1,5 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
 
 const {
     getTemplate,
@@ -41,4 +44,47 @@ test('lists, filters, and searches the catalog', () => {
         ['food-copy-layout'],
     );
     assert.equal(getTemplate('unknown-template'), null);
+});
+
+test('browser catalog stays safe without CommonJS require or metadata arrays', () => {
+    const source = fs.readFileSync(
+        path.resolve(__dirname, '..', 'templates.js'),
+        'utf8',
+    );
+    const context = {
+        __TEMPLATE_CATALOG__: [{
+            id: 'minimal',
+            name: '最小模板',
+            summary: '可搜索',
+            category: '示例',
+        }],
+        module: {},
+    };
+    context.globalThis = context;
+
+    vm.runInNewContext(source, context);
+
+    assert.deepEqual(
+        Array.from(
+            context.ContentTemplates.searchTemplates('示例'),
+            (template) => template.id,
+        ),
+        ['minimal'],
+    );
+});
+
+test('browser catalog does not assume a partial module global has require', () => {
+    const source = fs.readFileSync(
+        path.resolve(__dirname, '..', 'templates.js'),
+        'utf8',
+    );
+    const context = { module: {} };
+    context.globalThis = context;
+
+    vm.runInNewContext(source, context);
+
+    assert.deepEqual(
+        Array.from(context.ContentTemplates.listTemplates()),
+        [],
+    );
 });
