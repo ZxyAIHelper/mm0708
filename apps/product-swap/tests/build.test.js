@@ -32,6 +32,7 @@ test('build emits only deployable public assets', async () => {
         'style.css',
         'template-catalog.js',
         'templates.js',
+        'version-history.js',
     ]);
     assert.equal(
         await fs.stat(

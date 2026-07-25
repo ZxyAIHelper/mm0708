@@ -297,6 +297,8 @@ function boot() {
     const activeTemplate = window.CreatorMeta?.resolveCreatorTemplate(window.location.search);
     if (!activeTemplate) return;
     const CreatorForm = window.CreatorForm;
+    const versions = VersionHistory.createVersionHistory();
+    let selectedVersionIndex = -1;
     const activeTaskKey = activeTaskStorageKey(activeTemplate);
     const uploadOperations = CreatorForm.createUploadOperations();
     const state = {
@@ -330,12 +332,14 @@ function boot() {
         document.getElementById('resultSection');
     const resultImage =
         document.getElementById('resultImage');
+    const versionRail = document.getElementById('versionRail');
     const templateFields =
         document.getElementById('templateFields');
     const refineForm = document.getElementById('refineForm');
     const refineInput = document.getElementById('refineInput');
     const refineButton = document.getElementById('refineButton');
     const chatTimeline = document.getElementById('chatTimeline');
+    const quickPrompts = document.getElementById('quickPrompts');
     const fields = Array.isArray(activeTemplate?.fields)
         ? activeTemplate.fields
         : [];
@@ -354,6 +358,92 @@ function boot() {
     function showArchiveNotice(message) {
         archiveNotice.textContent = message;
         archiveNotice.hidden = !message;
+    }
+
+    function showVersion(version) {
+        if (!version) return;
+        state.result = version.imageUrl;
+        resultImage.src = version.imageUrl;
+        resultSection.hidden = false;
+        renderVersions();
+    }
+
+    function renderVersions() {
+        const items = versions.list();
+        versionRail.replaceChildren();
+        versionRail.hidden = items.length === 0;
+
+        items.forEach((version, index) => {
+            const item = document.createElement('div');
+            item.className = 'version-item';
+
+            const selectButton = document.createElement('button');
+            selectButton.type = 'button';
+            selectButton.className = 'version-select';
+            selectButton.setAttribute(
+                'aria-label',
+                `查看版本 ${index + 1}：${version.instruction}`,
+            );
+            if (index === selectedVersionIndex) {
+                selectButton.setAttribute('aria-current', 'true');
+            }
+            selectButton.addEventListener('click', () => {
+                const selected = versions.select(index);
+                if (!selected) return;
+                selectedVersionIndex = index;
+                showVersion(selected);
+            });
+
+            const thumbnail = document.createElement('img');
+            thumbnail.src = version.imageUrl;
+            thumbnail.alt = '';
+            selectButton.appendChild(thumbnail);
+
+            const restoreButton = document.createElement('button');
+            restoreButton.type = 'button';
+            restoreButton.className = 'restore-version';
+            restoreButton.textContent = '恢复';
+            restoreButton.addEventListener('click', () => {
+                const restored = versions.restore(index);
+                if (!restored) return;
+                selectedVersionIndex = versions.list().length - 1;
+                showVersion(restored);
+            });
+
+            item.append(selectButton, restoreButton);
+            versionRail.appendChild(item);
+        });
+    }
+
+    function addVersion(imageUrl, instruction) {
+        versions.add({ imageUrl, instruction });
+        selectedVersionIndex = versions.list().length - 1;
+        const current = versions.current();
+        showVersion(current);
+        return current;
+    }
+
+    function renderQuickPrompts() {
+        const prompts = Array.isArray(activeTemplate?.quickPrompts)
+            ? activeTemplate.quickPrompts
+            : [];
+        quickPrompts.replaceChildren();
+        quickPrompts.hidden = prompts.length === 0;
+
+        for (const prompt of prompts) {
+            const quickPrompt = document.createElement('button');
+            quickPrompt.type = 'button';
+            quickPrompt.className = 'quick-prompt';
+            quickPrompt.textContent = prompt;
+            quickPrompt.addEventListener('click', () => {
+                refineInput.value = [
+                    refineInput.value.trim(),
+                    prompt,
+                ].filter(Boolean).join('，');
+                refineInput.focus();
+            });
+            quickPrompts.appendChild(quickPrompt);
+        }
     }
 
     Promise.all([
@@ -644,8 +734,17 @@ function boot() {
             state.messages = state.messages.slice(-6);
         }
         if (state.result) {
-            resultImage.src = state.result;
-            resultSection.hidden = false;
+            const current = versions.current();
+            if (!current || current.imageUrl !== state.result) {
+                addVersion(
+                    state.result,
+                    task.input?.isRefinement
+                        ? String(task.input.requirements || '继续修改')
+                        : '首次生成',
+                );
+            } else {
+                showVersion(current);
+            }
         }
         renderMessages();
     }
@@ -698,7 +797,10 @@ function boot() {
                 const payload = isRefinement
                     ? buildRefinePayload(
                         restoredInitialPayload,
-                        state,
+                        {
+                            ...state,
+                            result: versions.current()?.imageUrl || '',
+                        },
                         state.values.requirements,
                     )
                     : restoredInitialPayload;
@@ -911,7 +1013,6 @@ function boot() {
             localTask = await startLocalTask(payload);
             const data = await runGeneration(localTask, payload);
 
-            state.result = data.imageUrl;
             state.conversationId = data.conversationId || '';
             state.messages = [];
             const requirements = String(
@@ -928,8 +1029,7 @@ function boot() {
                 content: data.assistantMessage
                     || '已完成第一版，可以继续告诉我需要调整的地方。',
             });
-            resultImage.src = state.result;
-            resultSection.hidden = false;
+            addVersion(data.imageUrl, '首次生成');
             showArchiveNotice(data.archiveWarning || '');
             renderMessages();
             resultSection.scrollIntoView({
@@ -956,6 +1056,8 @@ function boot() {
         event.preventDefault();
         submitGeneration();
     });
+
+    renderQuickPrompts();
 
     refineForm.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -988,7 +1090,10 @@ function boot() {
                     state.values,
                     new Date().toISOString(),
                 ),
-                state,
+                {
+                    ...state,
+                    result: versions.current().imageUrl,
+                },
                 correction,
             );
             localTask = await startLocalTask(payload, true);
@@ -1004,10 +1109,9 @@ function boot() {
                     || '已完成新一版修正。',
             });
             state.messages = state.messages.slice(-6);
-            state.result = data.imageUrl;
             state.conversationId = data.conversationId
                 || state.conversationId;
-            resultImage.src = state.result;
+            addVersion(data.imageUrl, correction);
             showArchiveNotice(data.archiveWarning || '');
             refineInput.value = '';
             renderMessages();
@@ -1033,18 +1137,34 @@ function boot() {
         .getElementById('regenerateButton')
         .addEventListener('click', submitGeneration);
 
+    async function downloadCurrentVersion() {
+        const current = versions.current();
+        if (!current) return;
+
+        let objectUrl = '';
+        try {
+            const response = await fetch(current.imageUrl);
+            if (!response.ok) {
+                throw new Error('DOWNLOAD_FAILED');
+            }
+            const blob = await response.blob();
+            objectUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = objectUrl;
+            link.download = `${activeTemplate.id}-${Date.now()}.png`;
+            link.click();
+        } catch {
+            showError('下载失败，请保留当前页面后重试');
+        } finally {
+            if (objectUrl) {
+                URL.revokeObjectURL(objectUrl);
+            }
+        }
+    }
+
     document
         .getElementById('downloadButton')
-        .addEventListener('click', () => {
-            if (!state.result) {
-                return;
-            }
-
-            const link = document.createElement('a');
-            link.href = state.result;
-            link.download = `product-swap-${Date.now()}.png`;
-            link.click();
-        });
+        .addEventListener('click', downloadCurrentVersion);
 
     document
         .getElementById('backButton')

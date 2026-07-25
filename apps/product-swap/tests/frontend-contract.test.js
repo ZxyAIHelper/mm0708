@@ -407,3 +407,91 @@ test('generation records task lifecycle in local history', () => {
     assert.match(source, /localHistory\.completeTask/);
     assert.match(source, /localHistory\.failTask/);
 });
+
+test('generation page exposes version history and quick refinement prompts', () => {
+    const html = fs.readFileSync(
+        path.join(root, 'create.html'),
+        'utf8',
+    );
+
+    assert.match(
+        html,
+        /id="versionRail"[\s\S]*aria-label="生成版本"/,
+    );
+    assert.match(
+        html,
+        /id="quickPrompts"[\s\S]*aria-label="快捷修改"/,
+    );
+    assert.ok(
+        html.indexOf('/version-history.js') < html.indexOf('/script.js'),
+    );
+});
+
+test('quick prompts only fill and focus the refinement input', () => {
+    const source = fs.readFileSync(path.join(root, 'script.js'), 'utf8');
+
+    assert.match(source, /activeTemplate\?\.quickPrompts/);
+    assert.match(source, /refineInput\.value\s*=\s*\[/);
+    assert.match(source, /\.join\('，'\)/);
+    assert.match(source, /refineInput\.focus\(\)/);
+    assert.doesNotMatch(source, /quickPrompt[\s\S]{0,300}requestSubmit/);
+});
+
+test('restored and refined versions become the current image source', () => {
+    const source = fs.readFileSync(path.join(root, 'script.js'), 'utf8');
+
+    assert.match(source, /VersionHistory\.createVersionHistory\(\)/);
+    assert.match(source, /versions\.restore\(index\)/);
+    assert.match(source, /showVersion\(restored\)/);
+    assert.match(
+        source,
+        /result:\s*versions\.current\(\)\.imageUrl/,
+    );
+    assert.doesNotMatch(source, /versions\.list\(\)\.at\(-1\)/);
+});
+
+test('downloads the current version through a checked blob response', () => {
+    const source = fs.readFileSync(path.join(root, 'script.js'), 'utf8');
+
+    assert.match(source, /async function downloadCurrentVersion\(\)/);
+    assert.match(source, /versions\.current\(\)/);
+    assert.match(source, /await fetch\(current\.imageUrl\)/);
+    assert.match(source, /if \(!response\.ok\)/);
+    assert.match(source, /await response\.blob\(\)/);
+    assert.match(source, /URL\.createObjectURL/);
+    assert.match(
+        source,
+        /`\$\{activeTemplate\.id\}-\$\{Date\.now\(\)\}\.png`/,
+    );
+    assert.match(source, /URL\.revokeObjectURL/);
+    assert.match(source, /下载失败，请保留当前页面后重试/);
+});
+
+test('version and quick prompt controls have bounded scrolling styles', () => {
+    const source = fs.readFileSync(path.join(root, 'style.css'), 'utf8');
+
+    assert.match(
+        source,
+        /\.version-rail\s*\{[\s\S]*?display:\s*flex;[\s\S]*?gap:[\s\S]*?overflow-x:\s*auto;/,
+    );
+    assert.match(
+        source,
+        /\.quick-prompts\s*\{[\s\S]*?display:\s*flex;[\s\S]*?gap:[\s\S]*?overflow-x:\s*auto;/,
+    );
+    assert.match(
+        source,
+        /\.version-select\s*\{[\s\S]*?width:\s*72px;[\s\S]*?height:\s*96px;/,
+    );
+    assert.match(
+        source,
+        /\.version-select\[aria-current="true"\][\s\S]*?border-color:/,
+    );
+    assert.match(
+        source,
+        /\.version-select img\s*\{[\s\S]*?object-fit:\s*cover;/,
+    );
+    assert.doesNotMatch(
+        source,
+        /\.version-item button\s*\{[\s\S]*?width:\s*72px;/,
+    );
+});

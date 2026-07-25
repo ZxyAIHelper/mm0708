@@ -97,6 +97,11 @@
             hidden
         >
             <img id="resultImage" alt="换品结果">
+            <div
+                id="versionRail"
+                class="version-rail"
+                aria-label="生成版本"
+            ></div>
             <div class="result-actions">
                 <button
                     id="regenerateButton"
@@ -122,6 +127,11 @@
                     id="chatTimeline"
                     class="chat-timeline"
                     aria-live="polite"
+                ></div>
+                <div
+                    id="quickPrompts"
+                    class="quick-prompts"
+                    aria-label="快捷修改"
                 ></div>
                 <form id="refineForm" class="refine-form">
                     <textarea
@@ -156,6 +166,7 @@
     <script src="/creator-meta.js"></script>
     <script src="/api-client.js"></script>
     <script src="/local-history.js"></script>
+    <script src="/version-history.js"></script>
     <script src="/script.js"></script>
 </body>
 </html>

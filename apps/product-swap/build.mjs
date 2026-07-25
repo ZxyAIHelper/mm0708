@@ -16,6 +16,7 @@ const publicEntries = [
     'app.css',
     'api-client.js',
     'local-history.js',
+    'version-history.js',
     'merchant-store.js',
     'generation-worker.js',
     'script.js',
