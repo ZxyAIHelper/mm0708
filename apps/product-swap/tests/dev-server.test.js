@@ -24,7 +24,7 @@ test('serves the app and returns an injected generated image', async (t) => {
     const { port } = server.address();
     const page = await fetch(`http://127.0.0.1:${port}/`);
     assert.equal(page.status, 200);
-    assert.match(await page.text(), /一键换产品/);
+    assert.match(await page.text(), /今天想发什么？/);
 
     const response = await fetch(
         `http://127.0.0.1:${port}/api/product-swap/generate`,
