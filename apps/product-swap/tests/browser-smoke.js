@@ -49,20 +49,22 @@ function jsonResponse(request, body, status = 200) {
             };
         },
     });
-    server.listen(0, '127.0.0.1');
-    await once(server, 'listening');
-    const address = server.address();
-    appUrl = `http://127.0.0.1:${address.port}`;
-    const browser = await puppeteer.launch({
-        executablePath:
-            'C:/Program Files/Google/Chrome/Application/chrome.exe',
-        headless: 'new',
-        args: ['--no-sandbox'],
-    });
-    const page = await browser.newPage();
+    let browser;
+    let page;
     const errors = [];
 
     try {
+        server.listen(0, '127.0.0.1');
+        await once(server, 'listening');
+        const address = server.address();
+        appUrl = `http://127.0.0.1:${address.port}`;
+        browser = await puppeteer.launch({
+            executablePath:
+                'C:/Program Files/Google/Chrome/Application/chrome.exe',
+            headless: 'new',
+            args: ['--no-sandbox'],
+        });
+        page = await browser.newPage();
         await page.setViewport({
             width: 456,
             height: 980,
@@ -70,6 +72,32 @@ function jsonResponse(request, body, status = 200) {
         });
         page.on('pageerror', (error) => {
             errors.push(String(error));
+        });
+        page.on('console', (message) => {
+            if (message.type() === 'error') {
+                errors.push(`console.error: ${message.text()}`);
+            }
+        });
+        page.on('requestfailed', (request) => {
+            const requestUrl = request.url();
+            if (
+                requestUrl.startsWith('data:')
+                || requestUrl.startsWith('blob:')
+            ) {
+                return;
+            }
+            errors.push(
+                `request failed: ${request.method()} ${requestUrl}`
+                + ` (${request.failure()?.errorText || 'unknown'})`,
+            );
+        });
+        page.on('response', (response) => {
+            if (response.status() >= 400) {
+                errors.push(
+                    `unexpected HTTP ${response.status()}: `
+                    + `${response.request().method()} ${response.url()}`,
+                );
+            }
         });
         page.on('dialog', (dialog) => dialog.accept());
         await page.setRequestInterception(true);
@@ -208,6 +236,8 @@ function jsonResponse(request, body, status = 200) {
             timeout: 60000,
         });
         await page.waitForSelector('#templateGrid .template-card');
+        const liveTemplateSelector =
+            'a[href="/create.html?template=product-swap"]';
         const homeState = await page.evaluate(() => ({
             title: document.querySelector('h1')?.textContent || '',
             liveHref: document.querySelector(
@@ -215,10 +245,14 @@ function jsonResponse(request, body, status = 200) {
             )?.getAttribute('href') || '',
             navItems: document.querySelectorAll('.bottom-nav a').length,
         }));
-        await page.goto(`${appUrl}/create.html?template=product-swap`, {
-            waitUntil: 'networkidle0',
-            timeout: 60000,
-        });
+        await Promise.all([
+            page.waitForNavigation({
+                waitUntil: 'networkidle0',
+                timeout: 60000,
+            }),
+            page.click(liveTemplateSelector),
+        ]);
+        homeState.creatorUrl = page.url();
         const targetInput = await page.$('#targetInput');
         await targetInput.uploadFile(targetPath);
         await page.waitForSelector('[data-slot="target"].has-preview');
@@ -241,14 +275,31 @@ function jsonResponse(request, body, status = 200) {
         );
         await page.waitForSelector('#resultSection:not([hidden])');
         const initialGenerationCount = generationCount;
+        const refinementBefore = await page.evaluate(async () => {
+            const { tasks } = await window.LocalTaskHistory.listTasks();
+            return {
+                chatMessages: document.querySelectorAll('.chat-message').length,
+                taskCount: tasks.length,
+                completedTasks: tasks.filter(
+                    (task) => task.status === 'completed',
+                ).length,
+            };
+        });
         await page.type('#refineInput', '盘子改成白色');
         await page.click('#refineButton');
-        await page.waitForFunction(() =>
-            Boolean(sessionStorage.getItem('product_swap_active_task_id')),
-        );
-        await page.waitForFunction(() =>
-            !sessionStorage.getItem('product_swap_active_task_id'),
-        );
+        await page.waitForFunction(async (before) => {
+            const { tasks } = await window.LocalTaskHistory.listTasks();
+            const completedTasks = tasks.filter(
+                (task) => task.status === 'completed',
+            ).length;
+            return (
+                !sessionStorage.getItem('product_swap_active_task_id')
+                && document.querySelectorAll('.chat-message').length
+                    > before.chatMessages
+                && tasks.length > before.taskCount
+                && completedTasks > before.completedTasks
+            );
+        }, { timeout: 60000 }, refinementBefore);
 
         const state = await page.evaluate(() => ({
             title: document.querySelector('h1')?.textContent || '',
@@ -323,9 +374,30 @@ function jsonResponse(request, body, status = 200) {
         historyState.expiredAfterCleanup = await page.evaluate(() =>
             document.querySelectorAll('.task-card .asset-expired').length,
         );
+        historyState.deletedTaskId = await page.$eval(
+            '.task-card .danger-button',
+            (button) => button.closest('.task-card')?.dataset.taskId || '',
+        );
         await page.click('.task-card .danger-button');
         await page.waitForFunction(() =>
             document.querySelectorAll('.task-card').length === 1,
+        );
+        await page.reload({ waitUntil: 'networkidle0' });
+        await page.waitForFunction(() =>
+            document.querySelectorAll('.task-card').length === 1,
+        );
+        historyState.persistedDelete = await page.evaluate(
+            async (deletedTaskId) => {
+                const { tasks } = await window.LocalTaskHistory.listTasks();
+                return {
+                    cards: document.querySelectorAll('.task-card').length,
+                    tasks: tasks.length,
+                    deletedAbsent: !tasks.some(
+                        (task) => task.id === deletedTaskId,
+                    ),
+                };
+            },
+            historyState.deletedTaskId,
         );
         historyState.recoveredTask = await page.evaluate(async () => {
             const task = await window.LocalTaskHistory.startTask({
@@ -355,6 +427,8 @@ function jsonResponse(request, body, status = 200) {
             || homeState.liveHref
                 !== '/create.html?template=product-swap'
             || homeState.navItems !== 4
+            || homeState.creatorUrl
+                !== `${appUrl}/create.html?template=product-swap`
             || state.title !== '爆款场景同款图'
             || state.button !== '生成 1 张场景图（消耗 3 豆额度）'
             || state.width > 460
@@ -363,16 +437,23 @@ function jsonResponse(request, body, status = 200) {
             || !state.resultVisible
             || !state.resultSource
             || state.chatMessages < 4
+            || state.chatMessages <= refinementBefore.chatMessages
+            || state.formError.trim() !== ''
             || !state.activeTaskCleared
+            || state.taskStatuses.length <= refinementBefore.taskCount
             || state.taskStatuses.some((task) => task.status !== 'completed')
             || initialGenerationCount !== 1
-            || generationCount !== 2
+            || generationCount !== initialGenerationCount + 1
             || historyState.title !== '作品'
             || historyState.cards !== 2
             || historyState.expired !== 2
             || historyState.expiredAfterCleanup !== 2
             || historyState.detailAssets !== 4
             || historyState.outputUrlAfterCleanup !== ''
+            || !historyState.deletedTaskId
+            || historyState.persistedDelete.cards !== 1
+            || historyState.persistedDelete.tasks !== 1
+            || !historyState.persistedDelete.deletedAbsent
             || historyState.recoveredTask.status !== 'failed'
             || historyState.recoveredTask.errorCode
                 !== 'GENERATION_INTERRUPTED'
@@ -380,7 +461,11 @@ function jsonResponse(request, body, status = 200) {
             process.exitCode = 1;
         }
     } finally {
-        await browser.close();
-        await new Promise((resolve) => server.close(resolve));
+        if (browser) {
+            await browser.close();
+        }
+        if (server.listening) {
+            await new Promise((resolve) => server.close(resolve));
+        }
     }
 })();
