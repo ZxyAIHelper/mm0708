@@ -31,6 +31,8 @@ export type ProductSwapEnv = {
     DOUBAO_PRODUCT_SWAP_ENDPOINT_ID?: string
     DOUBAO_CHAT_ENDPOINT?: string
     DOUBAO_ARK_BASE_URL?: string
+    TENCENT_MAP_KEY?: string
+    TENCENT_MAP_REFERER?: string
 }
 
 export type ProductSwapProvider = {
