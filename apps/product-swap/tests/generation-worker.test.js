@@ -10,19 +10,42 @@ const {
 function message(overrides = {}) {
     return {
         type: 'product-swap:start',
-        version: 1,
+        version: 2,
         taskId: 'task_local_1',
         apiUrl: 'https://api.mm0708.top/api/product-swap/generate',
-        payload: { targetImage: 'data:image/png;base64,aW1hZ2U=' },
+        payload: {
+            templateId: 'food-copy-layout',
+            targetImage: 'data:image/png;base64,aW1hZ2U=',
+            aspectRatio: '3:4',
+            showDateTime: true,
+            generatedAt: '2026-07-25T10:00:00.000Z',
+        },
         ...overrides,
     };
 }
 
-test('accepts only the versioned product-swap generation message', () => {
+test('accepts a version 2 food-copy generation message', () => {
     assert.equal(isGenerationMessage(message()), true);
-    assert.equal(isGenerationMessage(message({ version: 2 })), false);
+});
+
+test('rejects a version 2 generation message without a template id', () => {
+    assert.equal(isGenerationMessage(message({
+        payload: {
+            targetImage: 'data:image/png;base64,aW1hZ2U=',
+        },
+    })), false);
+});
+
+test('rejects malformed or unsafe generation messages', () => {
+    assert.equal(isGenerationMessage(message({ version: 1 })), false);
     assert.equal(isGenerationMessage(message({ taskId: '' })), false);
     assert.equal(isGenerationMessage(message({ payload: null })), false);
+    assert.equal(isGenerationMessage(message({
+        payload: {
+            templateId: 'food-copy-layout',
+            requirements: 'no image',
+        },
+    })), false);
     assert.equal(isGenerationMessage(message({
         apiUrl: 'https://evil.example/api/product-swap/generate',
     })), false);

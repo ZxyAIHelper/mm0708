@@ -304,15 +304,21 @@ test('generation binds schema fields and builds a template payload', () => {
 test('builds the versioned service worker generation message', () => {
     assert.deepEqual(createGenerationMessage(
         'task_local_1',
-        { targetImage: 'target' },
+        {
+            templateId: 'product-swap',
+            targetImage: 'target',
+        },
         'https://api.mm0708.top',
         'https://product-swap.mm0708.top',
     ), {
         type: 'product-swap:start',
-        version: 1,
+        version: 2,
         taskId: 'task_local_1',
         apiUrl: 'https://api.mm0708.top/api/product-swap/generate',
-        payload: { targetImage: 'target' },
+        payload: {
+            templateId: 'product-swap',
+            targetImage: 'target',
+        },
     });
 });
 

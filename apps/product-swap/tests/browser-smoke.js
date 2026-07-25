@@ -1,22 +1,19 @@
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { once } = require('node:events');
 const puppeteer = require('puppeteer-core');
+const sharp = require('sharp');
 const {
     createProductSwapServer,
 } = require('../server/dev-server');
 
 const appRoot = path.resolve(__dirname, '..');
 const targetPath = path.join(
-    appRoot,
-    'assets',
-    'example-template.jpg',
+    os.tmpdir(),
+    `product-swap-browser-smoke-${process.pid}.png`,
 );
-const productPath = path.join(
-    appRoot,
-    'assets',
-    'example-product.jpg',
-);
+const productPath = targetPath;
 const resultBuffer = fs.readFileSync(path.join(
     appRoot,
     'assets',
@@ -65,15 +62,33 @@ function attachPageErrorListeners(page, errors, label) {
 (async () => {
     let appUrl = '';
     let generationCount = 0;
+    await sharp({
+        create: {
+            width: 640,
+            height: 800,
+            channels: 3,
+            background: '#d6a15c',
+        },
+    }).png().toFile(targetPath);
     const server = createProductSwapServer({
         provider: async () => {
             generationCount += 1;
             if (generationCount === 1) {
                 await new Promise((resolve) => setTimeout(resolve, 1500));
             }
+            const imageBuffer = await sharp({
+                create: {
+                    width: 640,
+                    height: 800,
+                    channels: 3,
+                    background: generationCount % 2
+                        ? '#b6452c'
+                        : '#2c66b6',
+                },
+            }).png().toBuffer();
             return {
-                imageBuffer: resultBuffer,
-                mimeType: 'image/jpeg',
+                imageBuffer,
+                mimeType: 'image/png',
                 provider: 'browser-smoke',
                 assistantMessage: generationCount === 1
                     ? '已完成第一版。'
@@ -243,25 +258,48 @@ function attachPageErrorListeners(page, errors, label) {
         await page.waitForSelector('#templateGrid .template-card');
         const liveTemplateSelector =
             'a[href="/create.html?template=product-swap"]';
-        const homeState = await page.evaluate(() => ({
-            title: document.querySelector('h1')?.textContent || '',
-            liveHref: document.querySelector(
-                'a[href="/create.html?template=product-swap"]',
-            )?.getAttribute('href') || '',
-            navItems: document.querySelectorAll('.bottom-nav a').length,
-            comingSoon: document.querySelectorAll(
-                '#templateGrid article.template-card[aria-disabled="true"]',
-            ).length,
-            comingSoonCreatorHrefs: Array.from(document.querySelectorAll(
-                '#templateGrid article.template-card[aria-disabled="true"]',
-            )).filter((card) => (
-                card.hasAttribute('href')
-                || card.querySelector('a[href*="/create.html"]')
-            )).length,
-            creatorHrefs: document.querySelectorAll(
-                '#templateGrid a[href*="/create.html"]',
-            ).length,
-        }));
+        const homeState = await page.evaluate(() => {
+            const templates = window.ContentTemplates.listTemplates();
+            const liveTemplates = templates.filter(
+                (template) => template.status === 'live',
+            );
+            const foodTemplate = window.ContentTemplates.getTemplate(
+                'food-copy-layout',
+            );
+            const creatorCards = Array.from(document.querySelectorAll(
+                '#templateGrid .template-card',
+            ));
+            return {
+                title: document.querySelector('h1')?.textContent || '',
+                liveHrefs: Array.from(document.querySelectorAll(
+                    '#templateGrid a[href*="/create.html"]',
+                )).map((link) => link.getAttribute('href')).sort(),
+                expectedLiveHrefs: liveTemplates
+                    .map((template) => template.href)
+                    .sort(),
+                navItems: document.querySelectorAll('.bottom-nav a').length,
+                comingSoon: document.querySelectorAll(
+                    '#templateGrid article.template-card[aria-disabled="true"]',
+                ).length,
+                expectedComingSoon: templates.length - liveTemplates.length,
+                foodSearchable: window.ContentTemplates.searchTemplates(
+                    foodTemplate?.tags?.[0] || foodTemplate?.name || '',
+                ).some((template) => template.id === foodTemplate?.id),
+                genericCardBehavior: creatorCards.every((card, index) => {
+                    const template = templates[index];
+                    return template.status === 'live'
+                        ? (
+                            card.tagName === 'A'
+                            && card.getAttribute('href') === template.href
+                        )
+                        : (
+                            card.tagName === 'ARTICLE'
+                            && card.getAttribute('aria-disabled') === 'true'
+                            && !card.hasAttribute('href')
+                        );
+                }),
+            };
+        });
         await Promise.all([
             page.waitForNavigation({
                 waitUntil: 'networkidle0',
@@ -270,20 +308,36 @@ function attachPageErrorListeners(page, errors, label) {
             page.click(liveTemplateSelector),
         ]);
         homeState.creatorUrl = page.url();
-        const targetInput = await page.$('#targetInput');
+        const productSchema = await page.$$eval(
+            '#templateFields > [data-field-key]',
+            (sections) => sections.map(
+                (section) => section.dataset.fieldKey,
+            ),
+        );
+        const targetInput = await page.$(
+            '[data-field-key="targetImage"] input[type="file"]',
+        );
         await targetInput.uploadFile(targetPath);
-        await page.waitForSelector('[data-slot="target"].has-preview');
-        const productInput = await page.$('#productInput');
+        await page.waitForSelector(
+            '[data-field-key="targetImage"].has-preview',
+        );
+        const productInput = await page.$(
+            '[data-field-key="productImage"] input[type="file"]',
+        );
         await productInput.uploadFile(productPath);
-        await page.waitForSelector('[data-slot="product"].has-preview');
+        await page.waitForSelector(
+            '[data-field-key="productImage"].has-preview',
+        );
         await page.type(
-            '#requirementsInput',
+            '[data-field-key="requirements"] textarea',
             '保持三个托盘的排列方式',
         );
         await page.evaluate(() => navigator.serviceWorker.ready);
         await page.click('#generateButton');
         await page.waitForFunction(() =>
-            Boolean(sessionStorage.getItem('product_swap_active_task_id')),
+            Object.keys(sessionStorage).some(
+                (key) => key.startsWith('product_swap_active_task_id:'),
+            ),
         );
         await page.reload({ waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() =>
@@ -310,7 +364,11 @@ function attachPageErrorListeners(page, errors, label) {
                 (task) => task.status === 'completed',
             ).length;
             return (
-                !sessionStorage.getItem('product_swap_active_task_id')
+                !Object.keys(sessionStorage).some(
+                    (key) => key.startsWith(
+                        'product_swap_active_task_id:',
+                    ),
+                )
                 && document.querySelectorAll('.chat-message').length
                     > before.chatMessages
                 && tasks.length > before.taskCount
@@ -325,18 +383,18 @@ function attachPageErrorListeners(page, errors, label) {
             width: document.querySelector('.product-swap-shell')
                 ?.getBoundingClientRect().width || 0,
             targetPreview: document.querySelector(
-                '[data-slot="target"] img',
+                '[data-field-key="targetImage"] img',
             )?.getAttribute('src')?.startsWith('data:image/') || false,
             productPreview: document.querySelector(
-                '[data-slot="product"] img',
+                '[data-field-key="productImage"] img',
             )?.getAttribute('src')?.startsWith('data:image/') || false,
             resultVisible: !document.getElementById('resultSection')?.hidden,
             resultSource: document.getElementById('resultImage')
-                ?.getAttribute('src')?.startsWith('data:image/jpeg') || false,
+                ?.getAttribute('src')?.startsWith('data:image/png') || false,
             chatMessages: document.querySelectorAll('.chat-message').length,
             formError: document.getElementById('formError')?.textContent || '',
-            activeTaskCleared: !sessionStorage.getItem(
-                'product_swap_active_task_id',
+            activeTaskCleared: !Object.keys(sessionStorage).some(
+                (key) => key.startsWith('product_swap_active_task_id:'),
             ),
         }));
         state.taskStatuses = await page.evaluate(async () => {
@@ -660,10 +718,12 @@ function attachPageErrorListeners(page, errors, label) {
                     );
                 }
                 if (responsivePage.name === 'creator') {
-                    const responsiveTarget = await page.$('#targetInput');
+                    const responsiveTarget = await page.$(
+                        '[data-field-key="targetImage"] input[type="file"]',
+                    );
                     await responsiveTarget.uploadFile(targetPath);
                     await page.waitForSelector(
-                        '[data-slot="target"].has-preview',
+                        '[data-field-key="targetImage"].has-preview',
                     );
                 }
                 if (responsivePage.name === 'history') {
@@ -704,10 +764,10 @@ function attachPageErrorListeners(page, errors, label) {
                             '.product-swap-shell',
                         );
                         const preview = document.querySelector(
-                            '[data-slot="target"] img',
+                            '[data-field-key="targetImage"] img',
                         );
                         const previewSlot = document.querySelector(
-                            '[data-slot="target"]',
+                            '[data-field-key="targetImage"]',
                         );
                         const filters = document.querySelector(
                             '#workStatusFilters',
@@ -768,9 +828,119 @@ function attachPageErrorListeners(page, errors, label) {
             }
         }
 
+        await page.setViewport({
+            width: 456,
+            height: 980,
+            deviceScaleFactor: 1,
+        });
+        await page.goto(
+            `${appUrl}/create.html?template=food-copy-layout`,
+            {
+                waitUntil: 'networkidle0',
+                timeout: 60000,
+            },
+        );
+        await page.waitForSelector(
+            '[data-field-key="targetImage"] input[type="file"]',
+        );
+        const foodInitialState = await page.evaluate(() => ({
+            ratioText: document.querySelector(
+                '[data-field-key="aspectRatio"] '
+                    + '[data-value="3:4"][aria-checked="true"]',
+            )?.textContent?.trim() || '',
+            showDateTime: document.querySelector(
+                '[data-field-key="showDateTime"] [role="switch"]',
+            )?.getAttribute('aria-checked') || '',
+            hasProductImage: Boolean(document.querySelector(
+                '[data-field-key="productImage"]',
+            )),
+            fieldKeys: Array.from(document.querySelectorAll(
+                '#templateFields > [data-field-key]',
+            )).map((section) => section.dataset.fieldKey),
+        }));
+        const foodTargetInput = await page.$(
+            '[data-field-key="targetImage"] input[type="file"]',
+        );
+        await foodTargetInput.uploadFile(targetPath);
+        await page.waitForSelector(
+            '[data-field-key="targetImage"].has-preview',
+        );
+        await page.evaluate(() => navigator.serviceWorker.ready);
+        const foodGenerationStart = generationCount;
+        await page.click('#generateButton');
+        await page.waitForFunction(() => (
+            !document.getElementById('resultSection')?.hidden
+            && document.querySelectorAll('#versionRail .version-item')
+                .length === 1
+        ), { timeout: 60000 });
+        const requestsBeforeQuickPrompt = generationCount;
+        await page.click('#quickPrompts .quick-prompt');
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        const quickPromptState = await page.evaluate(() => ({
+            refineValue: document.getElementById('refineInput')?.value || '',
+            versionCount: document.querySelectorAll(
+                '#versionRail .version-item',
+            ).length,
+        }));
+        const requestsAfterQuickPrompt = generationCount;
+        await page.click('#refineButton');
+        await page.waitForFunction(() => (
+            document.querySelectorAll('#versionRail .version-item')
+                .length === 2
+        ), { timeout: 60000 });
+        const foodVersionSources = await page.$$eval(
+            '#versionRail .version-select img',
+            (images) => images.map((image) => image.src),
+        );
+        await page.click(
+            '#versionRail .version-item:first-child .version-select',
+        );
+        await page.waitForFunction((firstSource) => (
+            document.getElementById('resultImage')?.src === firstSource
+            && document.querySelector(
+                '#versionRail .version-item:first-child '
+                    + '.version-select[aria-current="true"]',
+            )
+        ), {}, foodVersionSources[0]);
+        await page.click(
+            '#versionRail .version-item:first-child .restore-version',
+        );
+        await page.waitForFunction((firstSource) => (
+            document.querySelectorAll('#versionRail .version-item')
+                .length === 3
+            && document.getElementById('resultImage')?.src === firstSource
+            && document.querySelector(
+                '#versionRail .version-item:last-child '
+                    + '.version-select[aria-current="true"]',
+            )
+        ), {}, foodVersionSources[0]);
+        const foodState = {
+            ...foodInitialState,
+            ...quickPromptState,
+            requestsBeforeQuickPrompt,
+            requestsAfterQuickPrompt,
+            generationDelta: generationCount - foodGenerationStart,
+            distinctGeneratedVersions:
+                foodVersionSources[0] !== foodVersionSources[1],
+            finalVersionCount: await page.$$eval(
+                '#versionRail .version-item',
+                (items) => items.length,
+            ),
+            resultVisible: await page.$eval(
+                '#resultSection',
+                (section) => !section.hidden,
+            ),
+            formError: await page.$eval(
+                '#formError',
+                (element) => element.textContent || '',
+            ),
+        };
+
         console.log(JSON.stringify({
             homeState,
+            productSchema,
             state,
+            foodState,
             historyState,
             profileState,
             restrictedProfileState,
@@ -781,14 +951,27 @@ function attachPageErrorListeners(page, errors, label) {
         if (
             errors.length
             || homeState.title !== '今天想发什么？'
-            || homeState.liveHref
-                !== '/create.html?template=product-swap'
+            || homeState.expectedLiveHrefs.length < 2
+            || JSON.stringify(homeState.liveHrefs)
+                !== JSON.stringify(homeState.expectedLiveHrefs)
+            || !homeState.liveHrefs.includes(
+                '/create.html?template=product-swap',
+            )
+            || !homeState.liveHrefs.includes(
+                '/create.html?template=food-copy-layout',
+            )
             || homeState.navItems !== 4
-            || homeState.comingSoon !== 3
-            || homeState.comingSoonCreatorHrefs !== 0
-            || homeState.creatorHrefs !== 1
+            || homeState.comingSoon !== homeState.expectedComingSoon
+            || !homeState.foodSearchable
+            || !homeState.genericCardBehavior
             || homeState.creatorUrl
                 !== `${appUrl}/create.html?template=product-swap`
+            || JSON.stringify(productSchema) !== JSON.stringify([
+                'targetImage',
+                'productImage',
+                'sceneImage',
+                'requirements',
+            ])
             || state.title !== '爆款场景同款图'
             || state.button !== '生成 1 张场景图（消耗 3 豆额度）'
             || state.width > 460
@@ -803,7 +986,25 @@ function attachPageErrorListeners(page, errors, label) {
             || state.taskStatuses.length <= refinementBefore.taskCount
             || state.taskStatuses.some((task) => task.status !== 'completed')
             || initialGenerationCount !== 1
-            || generationCount !== initialGenerationCount + 1
+            || generationCount !== initialGenerationCount + 3
+            || foodState.ratioText !== '3:4'
+            || foodState.showDateTime !== 'true'
+            || foodState.hasProductImage
+            || JSON.stringify(foodState.fieldKeys) !== JSON.stringify([
+                'targetImage',
+                'aspectRatio',
+                'showDateTime',
+                'requirements',
+            ])
+            || !foodState.refineValue.trim()
+            || foodState.versionCount !== 1
+            || foodState.requestsBeforeQuickPrompt
+                !== foodState.requestsAfterQuickPrompt
+            || foodState.generationDelta !== 2
+            || !foodState.distinctGeneratedVersions
+            || foodState.finalVersionCount !== 3
+            || !foodState.resultVisible
+            || foodState.formError.trim() !== ''
             || historyState.title !== '作品'
             || historyState.cards !== 2
             || historyState.expired !== 2
@@ -862,6 +1063,11 @@ function attachPageErrorListeners(page, errors, label) {
         }
         if (server.listening) {
             await new Promise((resolve) => server.close(resolve));
+        }
+        try {
+            fs.unlinkSync(targetPath);
+        } catch {
+            // The generated fixture may already have been cleaned up.
         }
     }
 })();

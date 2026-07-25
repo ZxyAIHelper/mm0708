@@ -31,10 +31,13 @@ function isAllowedApiUrl(apiUrl, workerOrigin = globalThis.location?.origin) {
 function isGenerationMessage(value, workerOrigin) {
     if (!value || typeof value !== 'object'
         || value.type !== 'product-swap:start'
-        || value.version !== 1
+        || value.version !== 2
         || !/^task_[A-Za-z0-9_-]+$/.test(value.taskId || '')
         || !value.payload || typeof value.payload !== 'object'
-        || typeof value.payload.targetImage !== 'string') {
+        || typeof value.payload.templateId !== 'string'
+        || !Object.entries(value.payload).some(([key, fieldValue]) => (
+            key.endsWith('Image') && typeof fieldValue === 'string'
+        ))) {
         return false;
     }
     return isAllowedApiUrl(value.apiUrl, workerOrigin);

@@ -181,7 +181,7 @@ function createGenerationMessage(taskId, payload, apiBase, origin) {
     const base = apiBase || origin;
     return {
         type: 'product-swap:start',
-        version: 1,
+        version: 2,
         taskId,
         apiUrl: new URL(
             `${String(base).replace(/\/$/, '')}/api/product-swap/generate`,
