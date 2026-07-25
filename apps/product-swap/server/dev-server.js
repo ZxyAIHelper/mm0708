@@ -8,7 +8,10 @@ const crypto = require('node:crypto');
 const {
     generateWithCodex,
 } = require('./codex-cli-provider');
-const { publicCatalog } = require('./template-registry');
+const {
+    getTemplatePackage,
+    publicCatalog,
+} = require('./template-registry');
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_REQUEST_BYTES = 42 * 1024 * 1024;
@@ -98,31 +101,103 @@ function decodeImageDataUrl(value, fieldName) {
 }
 
 function validateGenerateRequest(body = {}) {
-    if (!body.targetImage) {
-        throw new ProductSwapError('INVALID_INPUT', '请上传目标图');
-    }
+    const template = getTemplatePackage(
+        body.templateId || 'product-swap',
+    );
 
-    const requirements = String(body.requirements || '').trim();
-
-    if (requirements.length > (body.previousImage ? 500 : 200)) {
+    if (!template || template.manifest.status !== 'live') {
         throw new ProductSwapError(
-            'INVALID_INPUT',
-            '额外要求不能超过 200 字',
+            'INVALID_TEMPLATE',
+            '模板不可用',
         );
     }
 
+    const values = {};
+    const hasPreviousImage = Boolean(body.previousImage);
+
+    for (const field of template.manifest.fields) {
+        const rawValue = body[field.key];
+
+        if (field.type === 'image') {
+            if (!rawValue) {
+                if (field.required) {
+                    throw new ProductSwapError(
+                        'INVALID_INPUT',
+                        `请上传${field.label}`,
+                    );
+                }
+                values[field.key] = null;
+                continue;
+            }
+            values[field.key] = decodeImageDataUrl(
+                rawValue,
+                field.key,
+            );
+            continue;
+        }
+
+        if (field.type === 'choice') {
+            const value = rawValue ?? field.default;
+            const allowedValues = (field.options || []).map(
+                (option) => option.value,
+            );
+            if (!allowedValues.includes(value)) {
+                throw new ProductSwapError(
+                    'INVALID_INPUT',
+                    `${field.label}无效`,
+                );
+            }
+            values[field.key] = value;
+            continue;
+        }
+
+        if (field.type === 'boolean') {
+            const value = rawValue ?? field.default;
+            if (typeof value !== 'boolean') {
+                throw new ProductSwapError(
+                    'INVALID_INPUT',
+                    `${field.label}无效`,
+                );
+            }
+            values[field.key] = value;
+            continue;
+        }
+
+        if (field.type === 'text') {
+            const value = String(rawValue || '').trim();
+            const limit = hasPreviousImage
+                ? 500
+                : field.maxLength;
+            if (limit && value.length > limit) {
+                throw new ProductSwapError(
+                    'INVALID_INPUT',
+                    `${field.label}不能超过 ${limit} 字`,
+                );
+            }
+            values[field.key] = value;
+        }
+    }
+
+    if (values.showDateTime) {
+        const generatedAt = body.generatedAt || new Date().toISOString();
+        if (Number.isNaN(new Date(generatedAt).getTime())) {
+            throw new ProductSwapError(
+                'INVALID_INPUT',
+                '日期时间无效',
+            );
+        }
+        values.generatedAt = generatedAt;
+    }
+
     return {
-        targetImage: decodeImageDataUrl(body.targetImage, 'targetImage'),
-        productImage: body.productImage
-            ? decodeImageDataUrl(body.productImage, 'productImage')
-            : null,
-        sceneImage: body.sceneImage
-            ? decodeImageDataUrl(body.sceneImage, 'sceneImage')
-            : null,
+        template,
+        values,
         previousImage: body.previousImage
             ? decodeImageDataUrl(body.previousImage, 'previousImage')
             : null,
-        requirements,
+        messages: Array.isArray(body.messages)
+            ? body.messages.slice(-6)
+            : [],
     };
 }
 
@@ -239,44 +314,37 @@ async function handleGenerate(request, response, provider) {
             path.join(os.tmpdir(), 'product-swap-'),
         );
 
-        const targetPath = await writeInputImage(
-            taskDir,
-            'target',
-            input.targetImage,
-        );
-        const productPath = await writeInputImage(
-            taskDir,
-            'product',
-            input.productImage,
-        );
-        const scenePath = await writeInputImage(
-            taskDir,
-            'scene',
-            input.sceneImage,
-        );
         const previousPath = await writeInputImage(
             taskDir,
             'previous',
             input.previousImage,
         );
-        const imagePaths = previousPath
-            ? [previousPath, targetPath]
-            : [targetPath];
+        const imageEntries = input.template.manifest.fields.filter(
+            (field) => (
+                field.type === 'image'
+                && input.values[field.key]
+            ),
+        );
+        const imagePaths = previousPath ? [previousPath] : [];
 
-        if (productPath) {
-            imagePaths.push(productPath);
+        for (const field of imageEntries) {
+            imagePaths.push(await writeInputImage(
+                taskDir,
+                field.key,
+                input.values[field.key],
+            ));
         }
-        if (scenePath) {
-            imagePaths.push(scenePath);
-        }
+        const prompt = input.template.buildPrompt({
+            ...input.values,
+            hasPreviousImage: Boolean(previousPath),
+            imageRoles: imageEntries.map((field) => field.role),
+            messages: input.messages,
+        });
 
         const result = await provider({
             taskDir,
             imagePaths,
-            hasProductImage: Boolean(productPath),
-            hasSceneImage: Boolean(scenePath),
-            hasPreviousImage: Boolean(previousPath),
-            requirements: input.requirements,
+            prompt,
             requestId,
         });
 

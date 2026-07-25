@@ -1,0 +1,65 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+
+const {
+    buildPrompt,
+    displayTime,
+} = require('../template-packs/food-copy-layout/prompt');
+
+test('returns an empty display time for invalid input', () => {
+    assert.equal(displayTime(null), '');
+    assert.equal(displayTime('not-a-date'), '');
+});
+
+test('builds an initial food copy layout prompt from fixed inputs', () => {
+    const prompt = buildPrompt({
+        hasPreviousImage: false,
+        aspectRatio: '3:4',
+        showDateTime: true,
+        generatedAt: '2026-07-25T08:16:58.000Z',
+        requirements: '',
+    });
+
+    assert.equal(
+        displayTime('2026-07-25T08:16:58.000Z'),
+        '2026-07-25 16:16',
+    );
+    assert.match(prompt, /整桌菜或单品/);
+    assert.match(prompt, /真实随手分享/);
+    assert.match(prompt, /2026-07-25 16:16/);
+    assert.match(prompt, /3:4/);
+    assert.match(
+        prompt,
+        /不得编造店名、价格、地点、菜名或食材/,
+    );
+    assert.match(prompt, /只生成一张/);
+    assert.match(prompt, /result\.png/);
+});
+
+test('builds a constrained refinement prompt around the previous result', () => {
+    const correction = '日期改为 7 月 15 日，文案换到右上角';
+    const prompt = buildPrompt({
+        hasPreviousImage: true,
+        aspectRatio: '3:4',
+        showDateTime: true,
+        generatedAt: '2026-07-25T08:16:58.000Z',
+        requirements: correction,
+    });
+
+    assert.match(prompt, /上一版结果/);
+    assert.match(prompt, /只修改用户明确指定的内容/);
+    assert.match(prompt, new RegExp(correction));
+    assert.match(prompt, /未提及部分保持不变/);
+});
+
+test('omits a default time when showDateTime is false', () => {
+    const prompt = buildPrompt({
+        showDateTime: false,
+        generatedAt: '2026-07-25T08:16:58.000Z',
+        requirements: '',
+    });
+
+    assert.doesNotMatch(prompt, /2026-07-25 16:16/);
+});

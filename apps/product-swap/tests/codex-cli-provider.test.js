@@ -1,41 +1,18 @@
+'use strict';
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const os = require('node:os');
+const path = require('node:path');
+const { EventEmitter } = require('node:events');
 
 const {
-    buildCodexPrompt,
     buildCodexArgs,
     buildCodexSpawnOptions,
     createSerialQueue,
+    generateWithCodex,
 } = require('../server/codex-cli-provider');
-
-test('prompt assigns each image a stable role', () => {
-    const prompt = buildCodexPrompt({
-        hasProductImage: true,
-        hasSceneImage: true,
-        requirements: '保持三个托盘',
-    });
-
-    assert.match(prompt, /第一张图是目标模板/);
-    assert.match(prompt, /第二张图是需要换入的产品/);
-    assert.match(prompt, /第三张图只作为场景参考/);
-    assert.match(prompt, /保持三个托盘/);
-    assert.match(prompt, /result\.png/);
-    assert.match(prompt, /不要调用任何 HTTP/);
-    assert.match(prompt, /product-swap-image[\\/]SKILL\.md/);
-});
-
-test('refinement prompt assigns the previous result first', () => {
-    const prompt = buildCodexPrompt({
-        hasProductImage: true,
-        hasSceneImage: false,
-        hasPreviousImage: true,
-        requirements: '盘子改为白色',
-    });
-
-    assert.match(prompt, /第一张图是上一版结果/);
-    assert.match(prompt, /第二张图是原始目标模板/);
-    assert.match(prompt, /第三张图是产品图/);
-});
 
 test('child process receives a non-zero agent depth marker', () => {
     const options = buildCodexSpawnOptions('C:\\temp\\swap', {
@@ -64,6 +41,45 @@ test('CLI args use repeated image options without a shell', () => {
         ['-i', '-i'],
     );
     assert.equal(args.at(-1), '生成图片');
+});
+
+test('generateWithCodex passes the exact template prompt as the final CLI argument', async (t) => {
+    const taskDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'codex-provider-test-'),
+    );
+    t.after(() => fs.rm(taskDir, { recursive: true, force: true }));
+    await fs.writeFile(path.join(taskDir, 'result.png'), 'png');
+
+    let receivedArgs;
+    const spawnImpl = (_command, args) => {
+        receivedArgs = args;
+        const child = new EventEmitter();
+        child.stderr = new EventEmitter();
+        child.kill = () => {};
+        queueMicrotask(() => child.emit('close', 0));
+        return child;
+    };
+    const prompt = '模板策略给出的完整提示词';
+
+    await generateWithCodex({
+        taskDir,
+        imagePaths: [],
+        prompt,
+        spawnImpl,
+    });
+
+    assert.equal(receivedArgs.at(-1), prompt);
+});
+
+test('generateWithCodex rejects an empty template prompt', async () => {
+    await assert.rejects(
+        () => generateWithCodex({
+            taskDir: os.tmpdir(),
+            imagePaths: [],
+            prompt: '   ',
+        }),
+        (error) => error.code === 'INVALID_TEMPLATE',
+    );
 });
 
 test('serial queue does not overlap jobs', async () => {
