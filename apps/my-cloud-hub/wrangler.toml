@@ -7,9 +7,10 @@ DOUBAO_CHAT_ENDPOINT = "ep-20260716231326-d56zl"
 DOUBAO_IMAGE_ENDPOINT_ID = "ep-20260107231748-q2sw8"
 DOUBAO_PRODUCT_SWAP_ENDPOINT_ID = "ep-20260107231748-q2sw8"
 DOUBAO_ARK_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3"
+TENCENT_MAP_REFERER = "product-swap"
 
 [secrets]
-required = [ "DOUBAO_API_KEY" ]
+required = [ "DOUBAO_API_KEY", "TENCENT_MAP_KEY" ]
 
 [observability]
 enabled = true

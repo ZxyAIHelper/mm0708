@@ -12,6 +12,15 @@ import {
     type TemplateGeneration,
 } from './template-strategies'
 import { volcanoProductSwapProvider } from './volcano-provider'
+import {
+    ChatDraftValidationError,
+    validateChatDraftRequest,
+    type ChatDraftRequest,
+} from './chat-draft'
+import {
+    ChatDraftProviderError,
+    generateChatDraft,
+} from './chat-provider'
 
 type Bindings = ProductSwapEnv
 
@@ -76,6 +85,35 @@ const defaultTaskArchive: ProductSwapTaskArchive = {
     },
 }
 
+type ProductSwapRouterOptions = {
+    chatGenerator?: typeof generateChatDraft
+    fetchImpl?: typeof fetch
+}
+
+const MAX_MAP_BYTES = 2 * 1024 * 1024
+
+function chatProviderStatus(code: ChatDraftProviderError['code']) {
+    if (code === 'CHAT_PROVIDER_NOT_CONFIGURED') return 503 as const
+    if (code === 'PROVIDER_TIMEOUT') return 504 as const
+    return 502 as const
+}
+
+function mapCoordinates(c: Context<{ Bindings: Bindings }>) {
+    const lat = Number(c.req.query('lat'))
+    const lng = Number(c.req.query('lng'))
+    if (
+        !Number.isFinite(lat)
+        || !Number.isFinite(lng)
+        || lat < 3.5
+        || lat > 53.6
+        || lng < 73.5
+        || lng > 135.1
+    ) {
+        return null
+    }
+    return { lat, lng }
+}
+
 function providerStatus(code: ProductSwapProviderError['code']) {
     if (code === 'VOLCANO_PROVIDER_NOT_CONFIGURED') {
         return 503 as const
@@ -90,8 +128,158 @@ export function createProductSwapRouter(
     resolveProvider: () => ProductSwapProvider =
         () => volcanoProductSwapProvider,
     taskArchive: ProductSwapTaskArchive = defaultTaskArchive,
+    options: ProductSwapRouterOptions = {},
 ) {
     const router = new Hono<{ Bindings: Bindings }>()
+    const chatGenerator = options.chatGenerator || generateChatDraft
+    const fetchImpl = options.fetchImpl || fetch
+
+    router.post('/chat-draft', async (c) => {
+        const requestId = `chat_${crypto.randomUUID()}`
+        let input: ChatDraftRequest
+        try {
+            input = validateChatDraftRequest(
+                await c.req.json().catch(() => null),
+            )
+        } catch (error) {
+            if (!(error instanceof ChatDraftValidationError)) throw error
+            return c.json({
+                success: false,
+                error: {
+                    code: error.code,
+                    message: error.message,
+                },
+                requestId,
+            }, 400)
+        }
+        try {
+            const result = await chatGenerator(input, c.env)
+            return c.json({
+                success: true,
+                draft: result.draft,
+                provider: result.provider,
+                requestId,
+            })
+        } catch (error) {
+            if (!(error instanceof ChatDraftProviderError)) throw error
+            return c.json({
+                success: false,
+                error: {
+                    code: error.code,
+                    message: error.message,
+                },
+                requestId,
+            }, chatProviderStatus(error.code))
+        }
+    })
+
+    router.get('/map-config', (c) => {
+        const key = c.env?.TENCENT_MAP_KEY?.trim()
+        const referer = c.env?.TENCENT_MAP_REFERER?.trim()
+        if (!key || !referer) {
+            return c.json({
+                success: false,
+                error: {
+                    code: 'TENCENT_MAP_NOT_CONFIGURED',
+                    message: '腾讯地图尚未配置',
+                },
+            }, 503)
+        }
+        return c.json({
+            success: true,
+            key,
+            referer,
+        }, 200, {
+            'Cache-Control': 'public, max-age=300',
+        })
+    })
+
+    router.get('/map-preview', async (c) => {
+        const coordinates = mapCoordinates(c)
+        const key = c.env?.TENCENT_MAP_KEY?.trim()
+        if (!coordinates) {
+            return c.json({
+                success: false,
+                error: {
+                    code: 'INVALID_INPUT',
+                    message: '地图坐标无效',
+                },
+            }, 400)
+        }
+        if (!key) {
+            return c.json({
+                success: false,
+                error: {
+                    code: 'TENCENT_MAP_NOT_CONFIGURED',
+                    message: '腾讯地图尚未配置',
+                },
+            }, 503)
+        }
+        const upstreamUrl = new URL(
+            'https://apis.map.qq.com/ws/staticmap/v2/',
+        )
+        const center = `${coordinates.lat},${coordinates.lng}`
+        upstreamUrl.searchParams.set('center', center)
+        upstreamUrl.searchParams.set('zoom', '16')
+        upstreamUrl.searchParams.set('size', '720*260')
+        upstreamUrl.searchParams.set('maptype', 'roadmap')
+        upstreamUrl.searchParams.set(
+            'markers',
+            `size:large|color:0x07C160|${center}`,
+        )
+        upstreamUrl.searchParams.set('key', key)
+
+        let upstream: Response
+        try {
+            upstream = await fetchImpl(upstreamUrl.toString(), {
+                signal: AbortSignal.timeout(15_000),
+            })
+        } catch {
+            return c.json({
+                success: false,
+                error: {
+                    code: 'MAP_PREVIEW_FAILED',
+                    message: '地图预览暂时不可用',
+                },
+            }, 502)
+        }
+        const contentLength = Number(
+            upstream.headers.get('content-length'),
+        )
+        if (
+            !upstream.ok
+            || (
+                Number.isFinite(contentLength)
+                && contentLength > MAX_MAP_BYTES
+            )
+        ) {
+            return c.json({
+                success: false,
+                error: {
+                    code: 'MAP_PREVIEW_FAILED',
+                    message: '地图预览暂时不可用',
+                },
+            }, 502)
+        }
+        const bytes = await upstream.arrayBuffer()
+        if (bytes.byteLength > MAX_MAP_BYTES) {
+            return c.json({
+                success: false,
+                error: {
+                    code: 'MAP_PREVIEW_FAILED',
+                    message: '地图预览暂时不可用',
+                },
+            }, 502)
+        }
+        return new Response(bytes, {
+            status: 200,
+            headers: {
+                'Content-Type':
+                    upstream.headers.get('content-type') || 'image/png',
+                'Cache-Control': 'public, max-age=86400',
+            },
+        })
+    })
 
     router.post('/generate', async (c) => {
         const requestId = `swap_${crypto.randomUUID()}`

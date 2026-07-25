@@ -8,6 +8,9 @@ import {
     ProductSwapProviderError,
     type ProductSwapProvider,
 } from '../provider'
+import type {
+    ChatDraftRequest,
+} from '../chat-draft'
 
 const targetImage = 'data:image/png;base64,iVBORw0KGgo='
 
@@ -32,6 +35,144 @@ function createApp(
 }
 
 describe('product swap router', () => {
+    it('returns a structured chat draft', async () => {
+        const chatGenerator = vi.fn(async (
+            input: ChatDraftRequest,
+        ) => ({
+            provider: 'volcano' as const,
+            draft: {
+                version: 1 as const,
+                contactName: '小林',
+                messages: [
+                    { id: 'm1', side: 'right' as const, type: 'text' as const, text: input.storeName },
+                    { id: 'm2', side: 'left' as const, type: 'text' as const, text: '看着不错。' },
+                    { id: 'm3', side: 'right' as const, type: 'text' as const, text: '味道也很好。' },
+                    { id: 'm4', side: 'left' as const, type: 'text' as const, text: '下次一起去。' },
+                    { id: 'm5', side: 'right' as const, type: 'text' as const, text: '好呀。' },
+                    { id: 'm6', side: 'left' as const, type: 'text' as const, text: '说定了。' },
+                ],
+            },
+        }))
+        const provider: ProductSwapProvider = {
+            name: 'fake',
+            generate: async () => ({ imageUrl: targetImage }),
+        }
+        const app = new Hono()
+        app.route('/api/product-swap', createProductSwapRouter(
+            () => provider,
+            noOpArchive,
+            { chatGenerator },
+        ))
+        const response = await app.request(
+            '/api/product-swap/chat-draft',
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    templateId: 'wechat-chat-screenshot',
+                    storeName: '三山山',
+                    images: [],
+                    location: null,
+                    requirements: '',
+                }),
+            },
+        )
+        const data = await response.json() as any
+
+        expect(response.status).toBe(200)
+        expect(data.success).toBe(true)
+        expect(data.provider).toBe('volcano')
+        expect(data.draft.messages).toHaveLength(6)
+        expect(data.requestId).toMatch(/^chat_/)
+        expect(chatGenerator).toHaveBeenCalledOnce()
+    })
+
+    it('returns public Tencent picker configuration', async () => {
+        const provider: ProductSwapProvider = {
+            name: 'fake',
+            generate: async () => ({ imageUrl: targetImage }),
+        }
+        const response = await createApp(provider).request(
+            '/api/product-swap/map-config',
+            undefined,
+            {
+                TENCENT_MAP_KEY: 'map-key',
+                TENCENT_MAP_REFERER: 'product-swap',
+            },
+        )
+
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual({
+            success: true,
+            key: 'map-key',
+            referer: 'product-swap',
+        })
+    })
+
+    it('proxies only a fixed Tencent static map request', async () => {
+        const fetchMock = vi.fn(async () => new Response(
+            new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+            {
+                status: 200,
+                headers: { 'Content-Type': 'image/png' },
+            },
+        ))
+        const provider: ProductSwapProvider = {
+            name: 'fake',
+            generate: async () => ({ imageUrl: targetImage }),
+        }
+        const app = new Hono()
+        app.route('/api/product-swap', createProductSwapRouter(
+            () => provider,
+            noOpArchive,
+            { fetchImpl: fetchMock },
+        ))
+        const response = await app.request(
+            '/api/product-swap/map-preview?lat=39.998766&lng=116.273938',
+            undefined,
+            {
+                TENCENT_MAP_KEY: 'map-key',
+                TENCENT_MAP_REFERER: 'product-swap',
+            },
+        )
+        const url = new URL(fetchMock.mock.calls[0][0] as string)
+
+        expect(response.status).toBe(200)
+        expect(url.origin).toBe('https://apis.map.qq.com')
+        expect(url.pathname).toBe('/ws/staticmap/v2/')
+        expect(url.searchParams.get('zoom')).toBe('16')
+        expect(url.searchParams.get('size')).toBe('720*260')
+        expect(url.searchParams.get('maptype')).toBe('roadmap')
+        expect(url.searchParams.get('key')).toBe('map-key')
+        expect(url.searchParams.get('markers')).toContain(
+            '39.998766,116.273938',
+        )
+        expect(response.headers.get('Cache-Control')).toBe(
+            'public, max-age=86400',
+        )
+    })
+
+    it.each([
+        '',
+        '?lat=abc&lng=116',
+        '?lat=90&lng=116',
+        '?lat=39&lng=200',
+    ])('rejects invalid map coordinates %s', async (query) => {
+        const provider: ProductSwapProvider = {
+            name: 'fake',
+            generate: async () => ({ imageUrl: targetImage }),
+        }
+        const response = await createApp(provider).request(
+            `/api/product-swap/map-preview${query}`,
+            undefined,
+            {
+                TENCENT_MAP_KEY: 'map-key',
+                TENCENT_MAP_REFERER: 'product-swap',
+            },
+        )
+        expect(response.status).toBe(400)
+    })
+
     it('routes a browser-shaped dish ranking guide request', async () => {
         const ownedDishImage =
             'data:image/png;base64,b3duZWQ='
