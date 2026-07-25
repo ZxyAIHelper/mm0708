@@ -27,6 +27,8 @@ type GenerateBody = {
     generatedAt?: unknown
     conversationId?: unknown
     messages?: unknown
+    dishes?: unknown
+    layout?: unknown
 }
 
 export type ProductSwapArchiveInput = {
@@ -36,9 +38,12 @@ export type ProductSwapArchiveInput = {
     sceneImage?: string
     previousImage?: string
     requirements: string
-    aspectRatio?: '3:4' | 'original' | '9:16'
+    aspectRatio?: '3:4' | '1:1' | 'original' | '9:16'
     showDateTime?: boolean
     generatedAt?: string
+    layout?: 'tier' | 'grid' | 'quad' | 'collage'
+    dishCount?: number
+    ownedDishCount?: number
 }
 
 export type ProductSwapArchiveResult = {
@@ -131,6 +136,7 @@ export function createProductSwapRouter(
             requirements: generation.requirements,
             aspectRatio:
                 generation.templateId === 'food-copy-layout'
+                || generation.templateId === 'dish-ranking-guide'
                     ? generation.aspectRatio
                     : undefined,
             showDateTime:
@@ -140,6 +146,20 @@ export function createProductSwapRouter(
             generatedAt:
                 generation.templateId === 'food-copy-layout'
                     ? generation.generatedAt
+                    : undefined,
+            layout:
+                generation.templateId === 'dish-ranking-guide'
+                    ? generation.layout
+                    : undefined,
+            dishCount:
+                generation.templateId === 'dish-ranking-guide'
+                    ? generation.dishes.length
+                    : undefined,
+            ownedDishCount:
+                generation.templateId === 'dish-ranking-guide'
+                    ? generation.dishes.filter(
+                        (dish) => dish.owned,
+                    ).length
                     : undefined,
         }
         let archive: ProductSwapArchiveHandle

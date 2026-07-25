@@ -32,6 +32,55 @@ function createApp(
 }
 
 describe('product swap router', () => {
+    it('routes a browser-shaped dish ranking guide request', async () => {
+        const ownedDishImage =
+            'data:image/png;base64,b3duZWQ='
+        const otherDishImage =
+            'data:image/png;base64,b3RoZXI='
+        const provider: ProductSwapProvider = {
+            name: 'fake',
+            generate: async (input) => {
+                expect(input.templateId).toBe('dish-ranking-guide')
+                expect(input.images).toEqual([
+                    ownedDishImage,
+                    otherDishImage,
+                ])
+                expect(input.prompt).toContain(
+                    '自家菜品必须获得最高档位或最强视觉权重',
+                )
+                return { imageUrl: targetImage }
+            },
+        }
+        const response = await createApp(provider).request(
+            '/api/product-swap/generate',
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    templateId: 'dish-ranking-guide',
+                    dishes: [
+                        {
+                            image: ownedDishImage,
+                            owned: true,
+                            source: 'user',
+                        },
+                        {
+                            image: otherDishImage,
+                            owned: false,
+                            source: 'library',
+                        },
+                    ],
+                    layout: 'tier',
+                    aspectRatio: '3:4',
+                    requirements: '标题醒目一点',
+                    messages: [],
+                }),
+            },
+        )
+
+        expect(response.status).toBe(200)
+    })
+
     it('routes a browser-shaped food copy layout request', async () => {
         let archived: unknown
         const provider: ProductSwapProvider = {

@@ -251,6 +251,8 @@ export function createVolcanoProductSwapProvider(
                         `data:image/jpeg;base64,${encodedImage}`,
                     assistantMessage: input.previousImage
                         ? '已根据你的要求完成新一版修正。'
+                        : input.templateId === 'dish-ranking-guide'
+                            ? '已完成第一版菜品测评攻略图，可以继续告诉我需要调整的地方。'
                         : input.templateId === 'food-copy-layout'
                             ? '已完成第一版文案配图，可以继续告诉我需要调整的地方。'
                             : '已完成第一版换品，可以继续告诉我需要调整的地方。',

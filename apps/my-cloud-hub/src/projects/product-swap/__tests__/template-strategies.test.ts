@@ -8,6 +8,8 @@ const targetImage = 'data:image/png;base64,dGFyZ2V0'
 const previousImage = 'data:image/jpeg;base64,cHJldmlvdXM='
 const productImage = 'data:image/png;base64,cHJvZHVjdA=='
 const sceneImage = 'data:image/png;base64,c2NlbmU='
+const ownedDishImage = 'data:image/png;base64,b3duZWQ='
+const otherDishImage = 'data:image/png;base64,b3RoZXI='
 
 describe('template generation strategies', () => {
     it('builds the complete initial food-copy-layout contract', () => {
@@ -82,6 +84,52 @@ describe('template generation strategies', () => {
             '只修改用户明确指定的内容，未提及部分保持不变',
         )
         expect(generation.prompt).toContain('默认不要添加日期或时间')
+    })
+
+    it('builds a multi-dish ranking guide with owned dishes prioritized', () => {
+        const generation = buildTemplateGeneration(
+            validateTemplateRequest({
+                templateId: 'dish-ranking-guide',
+                dishes: [
+                    {
+                        image: ownedDishImage,
+                        owned: true,
+                        source: 'user',
+                    },
+                    {
+                        image: otherDishImage,
+                        owned: false,
+                        source: 'library',
+                    },
+                ],
+                layout: 'tier',
+                aspectRatio: '3:4',
+                requirements: '标题醒目一点',
+            }),
+        )
+
+        expect(generation).toMatchObject({
+            templateId: 'dish-ranking-guide',
+            layout: 'tier',
+            aspectRatio: '3:4',
+            requirements: '标题醒目一点',
+        })
+        expect(generation.images).toEqual([
+            ownedDishImage,
+            otherDishImage,
+        ])
+        expect(generation.prompt).toContain(
+            '自家菜品必须获得最高档位或最强视觉权重',
+        )
+        expect(generation.prompt).toContain(
+            '夯 / 顶级 / 人上人 / NPC / 拉完了',
+        )
+        expect(generation.prompt).toContain(
+            '第 1 张菜品图：自家菜品',
+        )
+        expect(generation.prompt).toContain(
+            '第 2 张菜品图：资源库补充菜品',
+        )
     })
 
     it('bounds requirements differently for initial and refinement', () => {

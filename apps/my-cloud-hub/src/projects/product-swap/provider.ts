@@ -1,5 +1,8 @@
 export type ProductSwapInput = {
-    templateId: 'product-swap' | 'food-copy-layout'
+    templateId:
+        | 'product-swap'
+        | 'food-copy-layout'
+        | 'dish-ranking-guide'
     prompt: string
     images: string[]
     targetImage: string
