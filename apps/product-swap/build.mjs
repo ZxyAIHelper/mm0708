@@ -13,6 +13,7 @@ const publicEntries = [
     'generation-worker.js',
     'script.js',
     'history.js',
+    'templates.js',
     'assets',
 ];
 

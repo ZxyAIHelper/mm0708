@@ -22,6 +22,7 @@ test('build emits only deployable public assets', async () => {
         'local-history.js',
         'script.js',
         'style.css',
+        'templates.js',
     ]);
     assert.equal(
         await fs.stat(
