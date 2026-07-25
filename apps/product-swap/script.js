@@ -201,12 +201,13 @@ function exchangeWorkerMessage(
     return new Promise((resolve) => {
         let timer = null;
         let settled = false;
-        const finish = (value) => {
+        let posted = false;
+        const finish = (response) => {
             if (settled) return;
             settled = true;
             if (timer !== null) clearTimeout(timer);
             serviceWorkers.removeEventListener('message', onMessage);
-            resolve(value);
+            resolve({ posted, response });
         };
         const onMessage = (event) => {
             if (accepts(event?.data)) finish(event.data);
@@ -215,6 +216,7 @@ function exchangeWorkerMessage(
         timer = setTimeout(() => finish(null), timeoutMs);
         try {
             worker.postMessage(outbound);
+            posted = true;
         } catch {
             finish(null);
         }
@@ -241,7 +243,7 @@ async function dispatchGenerationMessage(
         0,
         Math.min(1000, Number(timeoutMs) || 0),
     );
-    const capabilities = await exchangeWorkerMessage(
+    const capabilityExchange = await exchangeWorkerMessage(
         worker,
         serviceWorkers,
         {
@@ -255,6 +257,10 @@ async function dispatchGenerationMessage(
         ),
         boundedTimeout,
     );
+    if (!capabilityExchange.posted) {
+        return false;
+    }
+    const capabilities = capabilityExchange.response;
     if (!capabilities?.supportedGenerationVersions.includes(2)) {
         try {
             worker.postMessage({
@@ -266,7 +272,7 @@ async function dispatchGenerationMessage(
             return false;
         }
     }
-    const acknowledgement = await exchangeWorkerMessage(
+    const startExchange = await exchangeWorkerMessage(
         worker,
         serviceWorkers,
         message,
@@ -277,7 +283,7 @@ async function dispatchGenerationMessage(
         ),
         boundedTimeout,
     );
-    return Boolean(acknowledgement);
+    return startExchange.posted;
 }
 
 function pollingDelay(milliseconds) {

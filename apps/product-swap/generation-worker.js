@@ -52,11 +52,18 @@ function normalizeGenerationMessage(value, workerOrigin) {
             || !payload.targetImage.trim()) {
             return null;
         }
+        let templateId = 'product-swap';
+        if (Object.hasOwn(payload, 'templateId')) {
+            if (typeof payload.templateId !== 'string') {
+                return null;
+            }
+            templateId = payload.templateId.trim() || templateId;
+        }
         return {
             ...value,
             payload: {
                 ...payload,
-                templateId: 'product-swap',
+                templateId,
             },
         };
     }

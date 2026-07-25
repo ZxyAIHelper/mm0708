@@ -55,7 +55,7 @@ test('rejects malformed or unsafe generation messages', () => {
     })), false);
 });
 
-test('accepts and normalizes a legacy version 1 product-swap message', () => {
+test('defaults a legacy version 1 message without a template id', () => {
     const legacy = message({
         version: 1,
         payload: {
@@ -69,6 +69,26 @@ test('accepts and normalizes a legacy version 1 product-swap message', () => {
         targetImage: 'data:image/png;base64,aW1hZ2U=',
         productImage: 'data:image/png;base64,cHJvZHVjdA==',
         templateId: 'product-swap',
+    });
+});
+
+test('preserves a trimmed food template id in a version 1 message', () => {
+    const legacyFood = message({
+        version: 1,
+        payload: {
+            templateId: '  food-copy-layout  ',
+            targetImage: 'data:image/png;base64,aW1hZ2U=',
+            aspectRatio: '3:4',
+            showDateTime: true,
+        },
+    });
+
+    assert.equal(isGenerationMessage(legacyFood), true);
+    assert.deepEqual(normalizeGenerationMessage(legacyFood).payload, {
+        templateId: 'food-copy-layout',
+        targetImage: 'data:image/png;base64,aW1hZ2U=',
+        aspectRatio: '3:4',
+        showDateTime: true,
     });
 });
 
