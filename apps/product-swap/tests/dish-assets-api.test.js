@@ -3,10 +3,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createProductSwapServer } = require('../server/dev-server');
+const { listenOnSafePort } = require('./safe-port');
 
 async function withServer(callback) {
     const server = createProductSwapServer();
-    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    await listenOnSafePort(server);
     const { port } = server.address();
     try {
         await callback(`http://127.0.0.1:${port}`);
@@ -40,4 +41,3 @@ test('rejects invalid resource api parameters', async () => {
         assert.equal(body.error.code, 'INVALID_INPUT');
     });
 });
-
