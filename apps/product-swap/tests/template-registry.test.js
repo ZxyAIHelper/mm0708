@@ -5,6 +5,7 @@ const {
     getTemplatePackage,
     listTemplatePackages,
     publicCatalog,
+    publicManifest,
     validateManifest,
 } = require('../server/template-registry');
 
@@ -25,6 +26,47 @@ function validManifest(overrides = {}) {
         fields: [],
         ...overrides,
     };
+}
+
+function validField(type, overrides = {}) {
+    const fields = {
+        image: {
+            key: 'targetImage',
+            type: 'image',
+            role: 'target',
+            label: 'Target image',
+            required: true,
+            accept: ['image/jpeg', 'image/png', 'image/webp'],
+        },
+        choice: {
+            key: 'ratio',
+            type: 'choice',
+            label: 'Ratio',
+            required: true,
+            default: 'square',
+            options: [
+                { value: 'square', label: 'Square' },
+                { value: 'portrait', label: 'Portrait' },
+            ],
+        },
+        boolean: {
+            key: 'showLabel',
+            type: 'boolean',
+            label: 'Show label',
+            required: false,
+            default: true,
+        },
+        text: {
+            key: 'requirements',
+            type: 'text',
+            label: 'Requirements',
+            required: false,
+            maxLength: 200,
+            placeholder: 'Optional details',
+        },
+    };
+
+    return { ...fields[type], ...overrides };
 }
 
 test('discovers all template packages in stable id order', () => {
@@ -139,7 +181,7 @@ test('allows only safe non-prototype field identifiers', () => {
     assert.equal(
         validateManifest(
             validManifest({
-                fields: [{ key: 'targetImage2' }],
+                fields: [validField('text', { key: 'targetImage2' })],
             }),
             'sample',
         ).fields[0].key,
@@ -152,6 +194,283 @@ test('rejects a non-object manifest with a clear registry error', () => {
         () => validateManifest(null, 'sample'),
         /Template sample manifest must be an object/,
     );
+});
+
+test('rejects unknown top-level manifest properties', () => {
+    for (const key of ['prompt', 'internalNotes']) {
+        assert.throws(
+            () => validateManifest(
+                validManifest({ [key]: 'private' }),
+                'sample',
+            ),
+            new RegExp(`Template sample has unknown property ${key}`),
+        );
+    }
+});
+
+test('validates top-level public catalog scalar and array contracts', () => {
+    for (const key of [
+        'id',
+        'taskType',
+        'name',
+        'summary',
+        'category',
+        'href',
+        'outputLabel',
+    ]) {
+        assert.throws(
+            () => validateManifest(validManifest({ [key]: 42 }), 'sample'),
+            new RegExp(`Template sample ${key} must be a string`),
+        );
+    }
+
+    assert.throws(
+        () => validateManifest(
+            validManifest({ creditCost: '3' }),
+            'sample',
+        ),
+        /Template sample creditCost must be a non-negative number/,
+    );
+    assert.throws(
+        () => validateManifest(
+            validManifest({ status: 'draft' }),
+            'sample',
+        ),
+        /Template sample status must be live or coming_soon/,
+    );
+    assert.throws(
+        () => validateManifest(
+            validManifest({ status: 'live', href: '' }),
+            'sample',
+        ),
+        /Live template sample href must be a non-empty string/,
+    );
+    assert.throws(
+        () => validateManifest(
+            validManifest({ quickPrompts: 'Try this' }),
+            'sample',
+        ),
+        /Template sample quickPrompts must be an array/,
+    );
+    assert.throws(
+        () => validateManifest(
+            validManifest({ quickPrompts: ['valid', ' '] }),
+            'sample',
+        ),
+        /Template sample quickPrompts entries must be non-empty strings/,
+    );
+});
+
+test('rejects reserved request transport field keys', () => {
+    for (const key of [
+        'templateId',
+        'previousImage',
+        'messages',
+        'conversationId',
+        'generatedAt',
+        'requestId',
+    ]) {
+        assert.throws(
+            () => validateManifest(
+                validManifest({
+                    fields: [validField('text', { key })],
+                }),
+                'sample',
+            ),
+            new RegExp(`Template sample field key ${key} is reserved`),
+        );
+    }
+});
+
+test('rejects invalid field types and properties outside the type contract', () => {
+    assert.throws(
+        () => validateManifest({
+            ...validManifest(),
+            fields: [{
+                key: 'mystery',
+                type: 'upload',
+                label: 'Mystery',
+            }],
+        }, 'sample'),
+        /Template sample field mystery has unknown type upload/,
+    );
+
+    for (const [type, property] of [
+        ['image', 'default'],
+        ['choice', 'role'],
+        ['boolean', 'options'],
+        ['text', 'accept'],
+    ]) {
+        const field = validField(type, { [property]: 'not public' });
+        assert.throws(
+            () => validateManifest(
+                validManifest({ fields: [field] }),
+                'sample',
+            ),
+            new RegExp(
+                `Template sample field ${field.key} has unknown property ${property}`,
+            ),
+        );
+    }
+});
+
+test('validates common field labels and required flags', () => {
+    for (const type of ['image', 'choice', 'boolean', 'text']) {
+        const field = validField(type, { label: '' });
+        assert.throws(
+            () => validateManifest(
+                validManifest({ fields: [field] }),
+                'sample',
+            ),
+            new RegExp(
+                `Template sample field ${field.key} label must be a non-empty string`,
+            ),
+        );
+
+        const invalidRequired = validField(type, { required: 'yes' });
+        assert.throws(
+            () => validateManifest(
+                validManifest({ fields: [invalidRequired] }),
+                'sample',
+            ),
+            new RegExp(
+                `Template sample field ${invalidRequired.key} required must be a boolean`,
+            ),
+        );
+    }
+});
+
+test('validates image field role and accepted media types', () => {
+    for (const role of ['', 42]) {
+        assert.throws(
+            () => validateManifest(validManifest({
+                fields: [validField('image', { role })],
+            }), 'sample'),
+            /Template sample field targetImage role must be a non-empty string/,
+        );
+    }
+    assert.throws(
+        () => validateManifest(validManifest({
+            fields: [validField('image', { accept: 'image/png' })],
+        }), 'sample'),
+        /Template sample field targetImage accept must be an array/,
+    );
+    for (const accept of [
+        [],
+        ['image/gif'],
+        ['image/jpeg', 'image/png', 42],
+    ]) {
+        assert.throws(
+            () => validateManifest(validManifest({
+                fields: [validField('image', { accept })],
+            }), 'sample'),
+            /Template sample field targetImage accept may only contain image\/jpeg, image\/png, or image\/webp/,
+        );
+    }
+});
+
+test('validates choice options and defaults', () => {
+    for (const options of [
+        [],
+        [{ value: '', label: 'Blank value' }],
+        [{ value: 'one', label: '' }],
+        [
+            { value: 'same', label: 'One' },
+            { value: 'same', label: 'Two' },
+        ],
+        [
+            { value: 'one', label: 'Same' },
+            { value: 'two', label: 'Same' },
+        ],
+    ]) {
+        assert.throws(
+            () => validateManifest(validManifest({
+                fields: [validField('choice', { options })],
+            }), 'sample'),
+            /Template sample field ratio options must have unique non-empty string values and labels/,
+        );
+    }
+    assert.throws(
+        () => validateManifest(validManifest({
+            fields: [validField('choice', { default: 'landscape' })],
+        }), 'sample'),
+        /Template sample field ratio default must match an option value/,
+    );
+    assert.throws(
+        () => validateManifest(validManifest({
+            fields: [validField('choice', {
+                options: [{
+                    value: 'square',
+                    label: 'Square',
+                    internalNotes: 'private',
+                }],
+            })],
+        }), 'sample'),
+        /Template sample field ratio option has unknown property internalNotes/,
+    );
+});
+
+test('validates boolean defaults and text presentation properties', () => {
+    assert.throws(
+        () => validateManifest(validManifest({
+            fields: [validField('boolean', { default: 'true' })],
+        }), 'sample'),
+        /Template sample field showLabel default must be a boolean/,
+    );
+    for (const maxLength of [0, -1, 1.5, '200']) {
+        assert.throws(
+            () => validateManifest(validManifest({
+                fields: [validField('text', { maxLength })],
+            }), 'sample'),
+            /Template sample field requirements maxLength must be a positive integer/,
+        );
+    }
+    assert.throws(
+        () => validateManifest(validManifest({
+            fields: [validField('text', { placeholder: 42 })],
+        }), 'sample'),
+        /Template sample field requirements placeholder must be a string/,
+    );
+});
+
+test('publicManifest projects and deeply clones only public properties', () => {
+    const source = validManifest({
+        fields: [validField('choice')],
+        quickPrompts: ['Try square'],
+        internalNotes: {
+            secret: true,
+        },
+    });
+    const published = publicManifest(source);
+
+    assert.deepEqual(
+        Object.keys(published),
+        [
+            'id',
+            'taskType',
+            'name',
+            'summary',
+            'category',
+            'platforms',
+            'tags',
+            'status',
+            'href',
+            'cover',
+            'outputLabel',
+            'creditCost',
+            'fields',
+            'quickPrompts',
+        ],
+    );
+    assert.equal('internalNotes' in published, false);
+    assert.notEqual(published.fields, source.fields);
+    assert.notEqual(published.fields[0].options, source.fields[0].options);
+
+    published.fields[0].options[0].label = 'Changed';
+    published.quickPrompts.push('Changed');
+
+    assert.equal(source.fields[0].options[0].label, 'Square');
+    assert.deepEqual(source.quickPrompts, ['Try square']);
 });
 
 test('package manifests cannot be mutated through registry results', () => {

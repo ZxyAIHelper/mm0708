@@ -9,6 +9,9 @@ const {
     listTemplates,
     searchTemplates,
 } = require('../templates');
+const {
+    publicCatalog,
+} = require('../server/template-registry');
 
 test('exposes the live product-swap template with its creation details', () => {
     const template = getTemplate('product-swap');
@@ -87,4 +90,61 @@ test('browser catalog does not assume a partial module global has require', () =
         Array.from(context.ContentTemplates.listTemplates()),
         [],
     );
+});
+
+test('public catalog exposes only the manifest DTO contract', () => {
+    const allowedManifestKeys = [
+        'category',
+        'cover',
+        'creditCost',
+        'fields',
+        'href',
+        'id',
+        'name',
+        'outputLabel',
+        'platforms',
+        'quickPrompts',
+        'status',
+        'summary',
+        'tags',
+        'taskType',
+    ];
+    const allowedFieldKeys = {
+        image: ['accept', 'key', 'label', 'required', 'role', 'type'],
+        choice: [
+            'default',
+            'key',
+            'label',
+            'options',
+            'required',
+            'type',
+        ],
+        boolean: ['default', 'key', 'label', 'required', 'type'],
+        text: [
+            'key',
+            'label',
+            'maxLength',
+            'placeholder',
+            'required',
+            'type',
+        ],
+    };
+
+    for (const template of publicCatalog()) {
+        assert.deepEqual(
+            Object.keys(template).sort(),
+            allowedManifestKeys.filter(
+                (key) => key !== 'quickPrompts'
+                    || Object.hasOwn(template, key),
+            ),
+        );
+        for (const field of template.fields) {
+            assert.deepEqual(
+                Object.keys(field).sort(),
+                allowedFieldKeys[field.type].filter(
+                    (key) => Object.hasOwn(field, key),
+                ),
+            );
+        }
+    }
 });
