@@ -111,9 +111,15 @@ test('refinement preserves the initial template payload', () => {
     });
 });
 
-test('uses same-origin locally and the shared API in production', () => {
-    assert.equal(resolveApiBase('', 'localhost'), '');
-    assert.equal(resolveApiBase('', '127.0.0.1'), '');
+test('uses the shared Volcano-backed API by default', () => {
+    assert.equal(
+        resolveApiBase('', 'localhost'),
+        'https://api.mm0708.top',
+    );
+    assert.equal(
+        resolveApiBase('', '127.0.0.1'),
+        'https://api.mm0708.top',
+    );
     assert.equal(
         resolveApiBase('', 'swap.mm0708.top'),
         'https://api.mm0708.top',
@@ -207,9 +213,21 @@ test('builds the stable request and maps provider errors', () => {
         },
     );
     assert.equal(
-        mapErrorCode('CODEX_TIMEOUT'),
-        '生成超时，请稍后重试',
+        mapErrorCode('PROVIDER_TIMEOUT'),
+        '图片生成超时，请稍后重试',
     );
+});
+
+test('does not ship a local Codex CLI provider', () => {
+    assert.equal(
+        fs.existsSync(path.join(root, 'server', 'codex-cli-provider.js')),
+        false,
+    );
+    const source = fs.readFileSync(
+        path.join(root, 'server', 'dev-server.js'),
+        'utf8',
+    );
+    assert.doesNotMatch(source, /codex-cli-provider|generateWithCodex/);
 });
 
 test('generation does not initialize a remote task session', () => {

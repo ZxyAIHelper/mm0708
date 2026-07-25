@@ -9,8 +9,11 @@ const {
     apiJson,
 } = require('../api-client');
 
-test('resolves local and production API bases', () => {
-    assert.equal(resolveApiBase('', 'localhost'), '');
+test('uses the shared Volcano-backed API by default', () => {
+    assert.equal(
+        resolveApiBase('', 'localhost'),
+        'https://api.mm0708.top',
+    );
     assert.equal(
         resolveApiBase('', 'product-swap.mm0708.top'),
         'https://api.mm0708.top',

@@ -6,9 +6,6 @@ const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const {
-    generateWithCodex,
-} = require('./codex-cli-provider');
-const {
     getTemplatePackage,
     publicCatalog,
 } = require('./template-registry');
@@ -64,6 +61,14 @@ class ProductSwapError extends Error {
         this.code = code;
         this.status = status;
     }
+}
+
+async function unavailableLocalProvider() {
+    const error = new Error(
+        'Local generation uses the shared Volcano-backed API',
+    );
+    error.code = 'VOLCANO_PROVIDER_NOT_CONFIGURED';
+    throw error;
 }
 
 function decodeImageDataUrl(value, fieldName) {
@@ -755,51 +760,30 @@ function mapServerError(error) {
 
     const knownErrors = new Map([
         [
-            'CODEX_CLI_UNAVAILABLE',
+            'VOLCANO_PROVIDER_NOT_CONFIGURED',
             {
                 status: 503,
-                message: '本机没有可用的 Codex CLI',
+                message: '火山图片服务尚未配置',
             },
         ],
         [
-            'CODEX_GENERATION_FAILED',
-            {
-                status: 500,
-                message: '本地生成失败，请稍后重试',
-            },
-        ],
-        [
-            'CODEX_TIMEOUT',
+            'PROVIDER_TIMEOUT',
             {
                 status: 504,
-                message: '生成超时，请稍后重试',
+                message: '图片生成超时，请稍后重试',
             },
         ],
         [
-            'RESULT_IMAGE_NOT_FOUND',
+            'PROVIDER_REQUEST_FAILED',
             {
-                status: 500,
-                message: 'Codex 没有生成结果图片',
-            },
-        ],
-        [
-            'INVALID_RESULT_IMAGE',
-            {
-                status: 500,
-                message: '生成结果图片无效',
-            },
-        ],
-        [
-            'AGENT_LOOP_GUARD',
-            {
-                status: 409,
-                message: '检测到嵌套生成请求，已阻止 agent 循环',
+                status: 502,
+                message: '图片服务请求失败',
             },
         ],
     ]);
     const code = knownErrors.has(error?.code)
         ? error.code
-        : 'CODEX_GENERATION_FAILED';
+        : 'PROVIDER_REQUEST_FAILED';
     const mapped = knownErrors.get(code);
 
     return {
@@ -1004,7 +988,7 @@ function sendTemplateCatalog(
 }
 
 function createProductSwapServer({
-    provider = generateWithCodex,
+    provider = unavailableLocalProvider,
     catalogProvider = publicCatalog,
     bodyTimeoutMs = 15000,
     maxRequestBytes = MAX_REQUEST_BYTES,

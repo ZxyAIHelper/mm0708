@@ -111,6 +111,9 @@ function attachPageErrorListeners(page, errors, label) {
             args: ['--no-sandbox'],
         });
         page = await browser.newPage();
+        await page.evaluateOnNewDocument((apiBase) => {
+            window.API_BASE_URL = apiBase;
+        }, appUrl);
         await page.setViewport({
             width: 456,
             height: 980,

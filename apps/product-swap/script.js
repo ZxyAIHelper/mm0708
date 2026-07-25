@@ -43,13 +43,6 @@ function resolveApiBase(explicitBase, hostname) {
         return String(explicitBase).replace(/\/+$/, '');
     }
 
-    if (
-        hostname === 'localhost'
-        || hostname === '127.0.0.1'
-    ) {
-        return '';
-    }
-
     return 'https://api.mm0708.top';
 }
 
@@ -397,10 +390,6 @@ const ERROR_MESSAGES = {
     INVALID_INPUT: '请检查上传图片和额外要求',
     FILE_TOO_LARGE: '单张图片不能超过 10MB',
     UNSUPPORTED_IMAGE: '仅支持 JPG、PNG、WebP',
-    CODEX_CLI_UNAVAILABLE: '本机没有可用的 Codex CLI',
-    CODEX_GENERATION_FAILED: '本地生成失败，请稍后重试',
-    CODEX_TIMEOUT: '生成超时，请稍后重试',
-    RESULT_IMAGE_NOT_FOUND: 'Codex 没有生成结果图片',
     VOLCANO_PROVIDER_NOT_CONFIGURED: '火山换品服务尚未配置',
     PROVIDER_REQUEST_FAILED: '图片服务请求失败',
     PROVIDER_TIMEOUT: '图片生成超时，请稍后重试',

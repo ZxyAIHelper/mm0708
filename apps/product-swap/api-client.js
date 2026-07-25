@@ -4,9 +4,6 @@ function resolveApiBase(explicitBase, hostname) {
     if (explicitBase) {
         return String(explicitBase).replace(/\/+$/, '');
     }
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        return '';
-    }
     return 'https://api.mm0708.top';
 }
 class ApiClientError extends Error {
