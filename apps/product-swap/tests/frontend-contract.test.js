@@ -120,6 +120,18 @@ test('generation does not initialize a remote task session', () => {
     assert.doesNotMatch(source, /await sessionReady/);
 });
 
+test('root generator safely falls back without creator metadata', () => {
+    const source = fs.readFileSync(
+        path.join(root, 'script.js'),
+        'utf8',
+    );
+
+    assert.match(
+        source,
+        /window\.CreatorMeta\?\.resolveCreatorTemplate/,
+    );
+});
+
 test('preserves the complete non-image refinement input in history', () => {
     const payload = buildRefinePayload({
         target: 'data:image/png;base64,dGFyZ2V0',

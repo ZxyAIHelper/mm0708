@@ -199,7 +199,7 @@ function readFileAsDataUrl(file) {
 }
 
 function boot() {
-    const activeTemplate = window.CreatorMeta.resolveCreatorTemplate(window.location.search);
+    const activeTemplate = window.CreatorMeta?.resolveCreatorTemplate(window.location.search);
     const state = {
         target: '',
         product: '',
