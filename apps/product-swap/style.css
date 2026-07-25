@@ -574,7 +574,7 @@ body[data-template-id="food-copy-layout"] .example-card {
 
 @media (max-width: 360px) {
     .product-swap-shell {
-        padding-inline: 14px;
+        padding-inline: 16px;
     }
 
     .example-card {

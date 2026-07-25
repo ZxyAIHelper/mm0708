@@ -56,6 +56,10 @@ test('food creator has explicit desktop and 640px responsive layout contracts', 
         creatorCss,
         /@media\s*\(max-width:\s*640px\)[\s\S]*?body\[data-template-id="food-copy-layout"\] \.template-field-image \.upload-box\s*\{[^}]*min-height:\s*220px/,
     );
+    assert.match(
+        creatorCss,
+        /@media\s*\(max-width:\s*360px\)[\s\S]*?\.product-swap-shell\s*\{[^}]*padding-inline:\s*16px/,
+    );
 });
 
 test('creator inputs and Works surfaces retain readable light-theme contrast', () => {
