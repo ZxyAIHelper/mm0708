@@ -16,7 +16,7 @@ test('exposes the live product-swap template with its creation details', () => {
     assert.deepEqual(template.platforms, ['小红书', '抖音图文']);
     assert.deepEqual(
         template.fields.map((field) => field.key),
-        ['target', 'product', 'scene', 'requirements'],
+        ['targetImage', 'productImage', 'sceneImage', 'requirements'],
     );
 });
 
@@ -24,13 +24,21 @@ test('lists, filters, and searches the catalog', () => {
     const templates = listTemplates();
     const imageRemakes = listTemplates({ category: '改造图片' });
 
-    assert.ok(templates.length >= 4);
+    assert.equal(templates.length, 5);
+    assert.equal(
+        templates.filter((template) => template.status === 'live').length,
+        2,
+    );
     assert.ok(templates.some((template) => template.status === 'coming_soon'));
     assert.ok(imageRemakes.length > 0);
     assert.ok(imageRemakes.every((template) => template.category === '改造图片'));
     assert.deepEqual(
         searchTemplates('背景').map((template) => template.id),
         ['product-swap'],
+    );
+    assert.deepEqual(
+        searchTemplates('美食').map((template) => template.id),
+        ['food-copy-layout'],
     );
     assert.equal(getTemplate('unknown-template'), null);
 });
