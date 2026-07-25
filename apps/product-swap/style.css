@@ -453,6 +453,7 @@ button {
 
 .history-shell {
     width: min(100%, 980px);
+    padding-bottom: calc(112px + env(safe-area-inset-bottom));
 }
 
 .history-heading {

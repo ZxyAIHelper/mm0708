@@ -3,7 +3,7 @@
 (function bootTaskHistory() {
     const history = window.LocalTaskHistory;
     const elements = {
-        filters: document.getElementById('taskTypeFilters'),
+        filters: document.getElementById('workStatusFilters'),
         list: document.getElementById('taskList'),
         loading: document.getElementById('historyLoading'),
         empty: document.getElementById('historyEmpty'),
@@ -14,8 +14,8 @@
         detailClose: document.getElementById('taskDetailClose'),
         detailContent: document.getElementById('taskDetailContent'),
     };
+    let activeStatus = '';
     const state = {
-        taskType: '',
         cursor: null,
         loading: false,
         tasks: new Map(),
@@ -219,7 +219,7 @@
         elements.loadMore.hidden = true;
         try {
             const data = await history.listTasks({
-                taskType: state.taskType,
+                status: activeStatus,
                 cursor: state.cursor,
                 limit: 30,
             });
@@ -405,14 +405,14 @@
     }
 
     elements.filters.addEventListener('click', (event) => {
-        const button = event.target.closest('[data-task-type]');
+        const button = event.target.closest('button[data-status]');
         if (!button || state.loading) {
             return;
         }
         for (const item of elements.filters.querySelectorAll('button')) {
             item.classList.toggle('active', item === button);
         }
-        state.taskType = button.dataset.taskType || '';
+        activeStatus = button.dataset.status || '';
         loadTasks({ reset: true });
     });
     elements.retry.addEventListener('click', () => loadTasks({ reset: true }));

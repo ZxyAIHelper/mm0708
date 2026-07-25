@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>所有任务 · AI 产品工具</title>
-    <meta name="description" content="查看当前浏览器创建的所有 AI 产品任务。">
+    <title>作品 · 商家内容助手</title>
+    <meta name="description" content="查看生成中的任务、草稿和已经完成的发布内容。">
     <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/app.css">
     <link rel="stylesheet" href="/style.css">
 </head>
 <body class="task-history-page">
@@ -16,13 +17,15 @@
 
         <header class="history-heading">
             <p class="history-eyebrow">AI PRODUCT TASKS</p>
-            <h1>所有任务</h1>
-            <p>当前浏览器的生成记录，图片保留 30 天，任务文字长期保留。</p>
+            <h1>作品</h1>
+            <p>查看生成中的任务、草稿和已经完成的发布内容。</p>
         </header>
 
-        <div id="taskTypeFilters" class="task-filters" aria-label="任务类型">
-            <button class="active" type="button" data-task-type="">全部</button>
-            <button type="button" data-task-type="product_swap">一键换产品</button>
+        <div id="workStatusFilters" class="task-filters" aria-label="作品状态">
+            <button class="active" type="button" data-status="">全部</button>
+            <button type="button" data-status="processing">生成中</button>
+            <button type="button" data-status="completed">已完成</button>
+            <button type="button" data-status="failed">失败</button>
         </div>
 
         <p id="historyLoading" class="history-state" role="status">正在加载任务…</p>
@@ -34,7 +37,7 @@
         <section id="historyEmpty" class="history-state state-card" hidden>
             <h2>还没有任务记录</h2>
             <p>完成一次生成后，输入和结果会自动出现在这里。</p>
-            <a class="primary-link" href="/">去生成</a>
+            <a class="primary-link" href="/">去找模板</a>
         </section>
 
         <section id="taskList" class="task-grid" aria-live="polite"></section>
@@ -46,6 +49,13 @@
             记录属于当前浏览器。清除浏览器站点数据后，将无法找回匿名身份。
         </p>
     </main>
+
+    <nav class="bottom-nav" aria-label="主导航">
+        <a href="/" data-nav="home">首页</a>
+        <a href="/create.html" data-nav="create">创作</a>
+        <a class="active" href="/history.html" data-nav="works" aria-current="page">作品</a>
+        <a href="/profile.html" data-nav="profile">我的</a>
+    </nav>
 
     <div
         id="taskDetailLayer"

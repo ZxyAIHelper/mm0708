@@ -11,13 +11,13 @@ test('creator links to Works', () => {
     assert.match(html, /href="\/history\.html"/);
 });
 
-test('task center exposes list, filters, states, pagination and detail', () => {
+test('Works exposes list, status filters, states, pagination and detail', () => {
     const html = fs.readFileSync(
         path.join(root, 'history.html'),
         'utf8',
     );
     for (const id of [
-        'taskTypeFilters',
+        'workStatusFilters',
         'taskList',
         'historyLoading',
         'historyEmpty',
@@ -30,8 +30,11 @@ test('task center exposes list, filters, states, pagination and detail', () => {
     ]) {
         assert.match(html, new RegExp(`id="${id}"`));
     }
-    assert.match(html, /所有任务/);
-    assert.match(html, /一键换产品/);
+    assert.match(html, />作品</);
+    assert.match(html, /data-status="processing"/);
+    assert.match(html, /data-status="completed"/);
+    assert.match(html, /data-status="failed"/);
+    assert.match(html, /data-nav="works"/);
 });
 
 test('task center reads local blobs, urls, expiry and deletion', () => {

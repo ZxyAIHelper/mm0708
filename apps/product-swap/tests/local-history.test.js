@@ -5,6 +5,19 @@ const path = require('node:path');
 
 const history = require('../local-history');
 
+test('filters works by status', () => {
+    const tasks = [
+        { id: 'a', status: 'completed' },
+        { id: 'b', status: 'processing' },
+        { id: 'c', status: 'failed' },
+    ];
+
+    assert.deepEqual(
+        history.filterTasks(tasks, { status: 'completed' }).map(({ id }) => id),
+        ['a'],
+    );
+});
+
 test('defines stable local task history helpers', () => {
     assert.equal(
         history.ASSET_TTL_MS,

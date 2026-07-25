@@ -366,16 +366,28 @@ async function getTask(taskId) {
     return { ...task, assets: await assetsForTask(database, taskId) };
 }
 
-async function listTasks({ taskType = '', cursor, limit = 30 } = {}) {
+function filterTasks(tasks, { taskType = '', status = '' } = {}) {
+    return tasks
+        .filter((task) => !taskType || task.taskType === taskType)
+        .filter((task) => !status || task.status === status);
+}
+
+async function listTasks({
+    taskType = '',
+    status = '',
+    cursor,
+    limit = 30,
+} = {}) {
     const database = await openDatabase();
     const transaction = database.transaction('tasks', 'readonly');
     const all = await requestValue(
         transaction.objectStore('tasks').getAll(),
     );
     const userId = ensureUserId();
-    const filtered = all
-        .filter((task) => task.userId === userId)
-        .filter((task) => !taskType || task.taskType === taskType)
+    const filtered = filterTasks(
+        all.filter((task) => task.userId === userId),
+        { taskType, status },
+    )
         .sort((left, right) => right.createdAt - left.createdAt
             || right.id.localeCompare(left.id));
     const offset = Math.max(0, Number(cursor) || 0);
@@ -578,6 +590,7 @@ const localHistory = {
     completeTask,
     completeTaskMetadata,
     failTask,
+    filterTasks,
     listTasks,
     selectLatestProcessingTask,
     latestProcessingTask,
