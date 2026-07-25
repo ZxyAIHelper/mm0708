@@ -3,8 +3,10 @@ const assert = require('node:assert/strict');
 
 const {
     isGenerationMessage,
+    normalizeGenerationMessage,
     runGenerationMessage,
     handleGenerationMessage,
+    handleCapabilityMessage,
 } = require('../generation-worker');
 
 function message(overrides = {}) {
@@ -37,7 +39,6 @@ test('rejects a version 2 generation message without a template id', () => {
 });
 
 test('rejects malformed or unsafe generation messages', () => {
-    assert.equal(isGenerationMessage(message({ version: 1 })), false);
     assert.equal(isGenerationMessage(message({ taskId: '' })), false);
     assert.equal(isGenerationMessage(message({ payload: null })), false);
     assert.equal(isGenerationMessage(message({
@@ -52,6 +53,82 @@ test('rejects malformed or unsafe generation messages', () => {
     assert.equal(isGenerationMessage(message({
         apiUrl: 'http://api.mm0708.top/api/product-swap/generate',
     })), false);
+});
+
+test('accepts and normalizes a legacy version 1 product-swap message', () => {
+    const legacy = message({
+        version: 1,
+        payload: {
+            targetImage: 'data:image/png;base64,aW1hZ2U=',
+            productImage: 'data:image/png;base64,cHJvZHVjdA==',
+        },
+    });
+
+    assert.equal(isGenerationMessage(legacy), true);
+    assert.deepEqual(normalizeGenerationMessage(legacy).payload, {
+        targetImage: 'data:image/png;base64,aW1hZ2U=',
+        productImage: 'data:image/png;base64,cHJvZHVjdA==',
+        templateId: 'product-swap',
+    });
+});
+
+test('strictly rejects arrays, inherited fields, and empty v2 fields', () => {
+    const inherited = Object.create({
+        templateId: 'food-copy-layout',
+        targetImage: 'data:image/png;base64,aW1hZ2U=',
+    });
+    const inheritedImage = Object.create({
+        targetImage: 'data:image/png;base64,aW1hZ2U=',
+    });
+    inheritedImage.templateId = 'food-copy-layout';
+
+    assert.equal(isGenerationMessage(message({ payload: [] })), false);
+    assert.equal(isGenerationMessage(message({ payload: inherited })), false);
+    assert.equal(
+        isGenerationMessage(message({ payload: inheritedImage })),
+        false,
+    );
+    assert.equal(isGenerationMessage(message({
+        payload: {
+            templateId: '   ',
+            targetImage: 'data:image/png;base64,aW1hZ2U=',
+        },
+    })), false);
+    assert.equal(isGenerationMessage(message({
+        payload: {
+            templateId: 'food-copy-layout',
+            targetImage: '   ',
+        },
+    })), false);
+});
+
+test('accepts a null-prototype v2 payload with own nonempty fields', () => {
+    const payload = Object.assign(Object.create(null), {
+        templateId: 'food-copy-layout',
+        targetImage: 'data:image/png;base64,aW1hZ2U=',
+    });
+
+    assert.equal(isGenerationMessage(message({ payload })), true);
+});
+
+test('replies to correlated capability requests with v1 and v2 support', () => {
+    const replies = [];
+    const accepted = handleCapabilityMessage({
+        data: {
+            type: 'product-swap:capabilities:request',
+            requestId: 'cap_request_1',
+        },
+        source: {
+            postMessage: (reply) => replies.push(reply),
+        },
+    });
+
+    assert.equal(accepted, true);
+    assert.deepEqual(replies, [{
+        type: 'product-swap:capabilities:response',
+        requestId: 'cap_request_1',
+        supportedGenerationVersions: [1, 2],
+    }]);
 });
 
 test('writes a successful generation response to local task history', async () => {

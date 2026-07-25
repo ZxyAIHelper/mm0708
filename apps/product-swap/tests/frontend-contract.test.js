@@ -20,6 +20,7 @@ const {
     buildRefinePayload,
     historyInputFromPayload,
     createGenerationMessage,
+    dispatchGenerationMessage,
     pollLocalTask,
     mapErrorCode,
 } = require('../script');
@@ -320,6 +321,133 @@ test('builds the versioned service worker generation message', () => {
             targetImage: 'target',
         },
     });
+});
+
+function workerHarness(onPostMessage) {
+    const listeners = new Set();
+    const sent = [];
+    const serviceWorkers = {
+        addEventListener(type, listener) {
+            assert.equal(type, 'message');
+            listeners.add(listener);
+        },
+        removeEventListener(type, listener) {
+            assert.equal(type, 'message');
+            listeners.delete(listener);
+        },
+    };
+    const emit = (data) => {
+        for (const listener of [...listeners]) {
+            listener({ data });
+        }
+    };
+    const worker = {
+        postMessage(value) {
+            sent.push(value);
+            onPostMessage?.(value, emit);
+        },
+    };
+    return {
+        worker,
+        serviceWorkers,
+        sent,
+        listenerCount: () => listeners.size,
+    };
+}
+
+test('dispatches exactly one v2 start after a correlated capability ACK', async () => {
+    const harness = workerHarness((value, emit) => {
+        if (value.type === 'product-swap:capabilities:request') {
+            queueMicrotask(() => emit({
+                type: 'product-swap:capabilities:response',
+                requestId: value.requestId,
+                supportedGenerationVersions: [1, 2],
+            }));
+        } else if (value.type === 'product-swap:start') {
+            queueMicrotask(() => emit({
+                type: 'product-swap:start:ack',
+                taskId: value.taskId,
+                version: value.version,
+            }));
+        }
+    });
+    const generationMessage = createGenerationMessage(
+        'task_local_1',
+        {
+            templateId: 'food-copy-layout',
+            targetImage: 'target',
+        },
+        'https://api.mm0708.top',
+        'https://product-swap.mm0708.top',
+    );
+
+    assert.equal(await dispatchGenerationMessage(
+        harness.worker,
+        harness.serviceWorkers,
+        generationMessage,
+        { timeoutMs: 20, requestId: 'cap_1' },
+    ), true);
+    assert.deepEqual(
+        harness.sent.filter((value) => value.type === 'product-swap:start')
+            .map((value) => value.version),
+        [2],
+    );
+    assert.equal(harness.listenerCount(), 0);
+});
+
+test('falls back to exactly one v1 start when an old worker stays silent', async () => {
+    const harness = workerHarness();
+    const generationMessage = createGenerationMessage(
+        'task_local_2',
+        {
+            templateId: 'food-copy-layout',
+            targetImage: 'target',
+        },
+        'https://api.mm0708.top',
+        'https://product-swap.mm0708.top',
+    );
+
+    assert.equal(await dispatchGenerationMessage(
+        harness.worker,
+        harness.serviceWorkers,
+        generationMessage,
+        { timeoutMs: 1, requestId: 'cap_2' },
+    ), true);
+    const starts = harness.sent.filter(
+        (value) => value.type === 'product-swap:start',
+    );
+    assert.equal(starts.length, 1);
+    assert.equal(starts[0].version, 1);
+    assert.deepEqual(starts[0].payload, generationMessage.payload);
+    assert.equal(harness.listenerCount(), 0);
+});
+
+test('cleans listeners and rejects a v2 dispatch without a start ACK', async () => {
+    const harness = workerHarness((value, emit) => {
+        if (value.type === 'product-swap:capabilities:request') {
+            queueMicrotask(() => emit({
+                type: 'product-swap:capabilities:response',
+                requestId: value.requestId,
+                supportedGenerationVersions: [2],
+            }));
+        }
+    });
+
+    assert.equal(await dispatchGenerationMessage(
+        harness.worker,
+        harness.serviceWorkers,
+        createGenerationMessage(
+            'task_local_3',
+            {
+                templateId: 'product-swap',
+                targetImage: 'target',
+            },
+            'https://api.mm0708.top',
+            'https://product-swap.mm0708.top',
+        ),
+        { timeoutMs: 1, requestId: 'cap_3' },
+    ), false);
+    assert.equal(harness.listenerCount(), 0);
 });
 
 test('polls one local task until it reaches a terminal state', async () => {

@@ -1,12 +1,12 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { once } = require('node:events');
 const puppeteer = require('puppeteer-core');
 const sharp = require('sharp');
 const {
     createProductSwapServer,
 } = require('../server/dev-server');
+const { listenOnSafePort } = require('./safe-port');
 
 const appRoot = path.resolve(__dirname, '..');
 const targetPath = path.join(
@@ -62,14 +62,6 @@ function attachPageErrorListeners(page, errors, label) {
 (async () => {
     let appUrl = '';
     let generationCount = 0;
-    await sharp({
-        create: {
-            width: 640,
-            height: 800,
-            channels: 3,
-            background: '#d6a15c',
-        },
-    }).png().toFile(targetPath);
     const server = createProductSwapServer({
         provider: async () => {
             generationCount += 1;
@@ -102,9 +94,15 @@ function attachPageErrorListeners(page, errors, label) {
     const errors = [];
 
     try {
-        server.listen(0, '127.0.0.1');
-        await once(server, 'listening');
-        const address = server.address();
+        await sharp({
+            create: {
+                width: 640,
+                height: 800,
+                channels: 3,
+                background: '#d6a15c',
+            },
+        }).png().toFile(targetPath);
+        const address = await listenOnSafePort(server);
         appUrl = `http://127.0.0.1:${address.port}`;
         browser = await puppeteer.launch({
             executablePath:
@@ -843,6 +841,16 @@ function attachPageErrorListeners(page, errors, label) {
         await page.waitForSelector(
             '[data-field-key="targetImage"] input[type="file"]',
         );
+        await page.evaluate(() => {
+            window.__refineSubmitCount = 0;
+            document.getElementById('refineForm').addEventListener(
+                'submit',
+                () => {
+                    window.__refineSubmitCount += 1;
+                },
+                true,
+            );
+        });
         const foodInitialState = await page.evaluate(() => ({
             ratioText: document.querySelector(
                 '[data-field-key="aspectRatio"] '
@@ -875,12 +883,12 @@ function attachPageErrorListeners(page, errors, label) {
         ), { timeout: 60000 });
         const requestsBeforeQuickPrompt = generationCount;
         await page.click('#quickPrompts .quick-prompt');
-        await new Promise((resolve) => setTimeout(resolve, 100));
         const quickPromptState = await page.evaluate(() => ({
             refineValue: document.getElementById('refineInput')?.value || '',
             versionCount: document.querySelectorAll(
                 '#versionRail .version-item',
             ).length,
+            submitCount: window.__refineSubmitCount,
         }));
         const requestsAfterQuickPrompt = generationCount;
         await page.click('#refineButton');
@@ -933,6 +941,9 @@ function attachPageErrorListeners(page, errors, label) {
             formError: await page.$eval(
                 '#formError',
                 (element) => element.textContent || '',
+            ),
+            refineSubmitCount: await page.evaluate(
+                () => window.__refineSubmitCount,
             ),
         };
 
@@ -998,6 +1009,7 @@ function attachPageErrorListeners(page, errors, label) {
             ])
             || !foodState.refineValue.trim()
             || foodState.versionCount !== 1
+            || foodState.submitCount !== 0
             || foodState.requestsBeforeQuickPrompt
                 !== foodState.requestsAfterQuickPrompt
             || foodState.generationDelta !== 2
@@ -1005,6 +1017,7 @@ function attachPageErrorListeners(page, errors, label) {
             || foodState.finalVersionCount !== 3
             || !foodState.resultVisible
             || foodState.formError.trim() !== ''
+            || foodState.refineSubmitCount !== 1
             || historyState.title !== '作品'
             || historyState.cards !== 2
             || historyState.expired !== 2
@@ -1055,19 +1068,19 @@ function attachPageErrorListeners(page, errors, label) {
             process.exitCode = 1;
         }
     } finally {
-        if (restrictedPage && !restrictedPage.isClosed()) {
-            await restrictedPage.close();
-        }
-        if (browser) {
-            await browser.close();
-        }
-        if (server.listening) {
-            await new Promise((resolve) => server.close(resolve));
-        }
-        try {
-            fs.unlinkSync(targetPath);
-        } catch {
-            // The generated fixture may already have been cleaned up.
-        }
+        await Promise.allSettled([
+            (async () => {
+                if (restrictedPage && !restrictedPage.isClosed()) {
+                    await restrictedPage.close();
+                }
+            })(),
+            browser ? browser.close() : Promise.resolve(),
+            server.listening
+                ? new Promise((resolve) => server.close(resolve))
+                : Promise.resolve(),
+            fs.promises.unlink(targetPath).catch((error) => {
+                if (error?.code !== 'ENOENT') throw error;
+            }),
+        ]);
     }
 })();

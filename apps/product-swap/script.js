@@ -191,6 +191,95 @@ function createGenerationMessage(taskId, payload, apiBase, origin) {
     };
 }
 
+function exchangeWorkerMessage(
+    worker,
+    serviceWorkers,
+    outbound,
+    accepts,
+    timeoutMs,
+) {
+    return new Promise((resolve) => {
+        let timer = null;
+        let settled = false;
+        const finish = (value) => {
+            if (settled) return;
+            settled = true;
+            if (timer !== null) clearTimeout(timer);
+            serviceWorkers.removeEventListener('message', onMessage);
+            resolve(value);
+        };
+        const onMessage = (event) => {
+            if (accepts(event?.data)) finish(event.data);
+        };
+        serviceWorkers.addEventListener('message', onMessage);
+        timer = setTimeout(() => finish(null), timeoutMs);
+        try {
+            worker.postMessage(outbound);
+        } catch {
+            finish(null);
+        }
+    });
+}
+
+async function dispatchGenerationMessage(
+    worker,
+    serviceWorkers,
+    message,
+    {
+        timeoutMs = 300,
+        requestId = `cap_${Date.now()}_${
+            Math.random().toString(36).slice(2)
+        }`,
+    } = {},
+) {
+    if (typeof worker?.postMessage !== 'function'
+        || typeof serviceWorkers?.addEventListener !== 'function'
+        || typeof serviceWorkers?.removeEventListener !== 'function') {
+        return false;
+    }
+    const boundedTimeout = Math.max(
+        0,
+        Math.min(1000, Number(timeoutMs) || 0),
+    );
+    const capabilities = await exchangeWorkerMessage(
+        worker,
+        serviceWorkers,
+        {
+            type: 'product-swap:capabilities:request',
+            requestId,
+        },
+        (value) => (
+            value?.type === 'product-swap:capabilities:response'
+            && value.requestId === requestId
+            && Array.isArray(value.supportedGenerationVersions)
+        ),
+        boundedTimeout,
+    );
+    if (!capabilities?.supportedGenerationVersions.includes(2)) {
+        try {
+            worker.postMessage({
+                ...message,
+                version: 1,
+            });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+    const acknowledgement = await exchangeWorkerMessage(
+        worker,
+        serviceWorkers,
+        message,
+        (value) => (
+            value?.type === 'product-swap:start:ack'
+            && value.taskId === message.taskId
+            && value.version === 2
+        ),
+        boundedTimeout,
+    );
+    return Boolean(acknowledgement);
+}
+
 function pollingDelay(milliseconds) {
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
@@ -543,16 +632,21 @@ function boot() {
         }
         rememberActiveTask(localTask.id);
         const registration = await workerRegistration;
-        if (!registration?.active) {
+        const worker = registration?.active
+            || navigator.serviceWorker.controller;
+        if (!worker) {
             return false;
         }
-        registration.active.postMessage(createGenerationMessage(
-            localTask.id,
-            payload,
-            apiBase,
-            window.location.origin,
-        ));
-        return true;
+        return dispatchGenerationMessage(
+            worker,
+            navigator.serviceWorker,
+            createGenerationMessage(
+                localTask.id,
+                payload,
+                apiBase,
+                window.location.origin,
+            ),
+        );
     }
 
     function taskFailure(task) {
@@ -1291,6 +1385,7 @@ if (typeof module !== 'undefined') {
         buildRefinePayload,
         historyInputFromPayload,
         createGenerationMessage,
+        dispatchGenerationMessage,
         pollLocalTask,
         mapErrorCode,
     };

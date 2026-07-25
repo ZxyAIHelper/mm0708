@@ -6,6 +6,15 @@ if (typeof importScripts === 'function') {
 
 const runningTaskIds = new Set();
 const PRODUCTION_API_ORIGIN = 'https://api.mm0708.top';
+const SUPPORTED_GENERATION_VERSIONS = [1, 2];
+
+function isPlainRecord(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return false;
+    }
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+}
 
 function isAllowedApiUrl(apiUrl, workerOrigin = globalThis.location?.origin) {
     try {
@@ -28,19 +37,67 @@ function isAllowedApiUrl(apiUrl, workerOrigin = globalThis.location?.origin) {
     }
 }
 
-function isGenerationMessage(value, workerOrigin) {
+function normalizeGenerationMessage(value, workerOrigin) {
     if (!value || typeof value !== 'object'
         || value.type !== 'product-swap:start'
-        || value.version !== 2
         || !/^task_[A-Za-z0-9_-]+$/.test(value.taskId || '')
-        || !value.payload || typeof value.payload !== 'object'
-        || typeof value.payload.templateId !== 'string'
-        || !Object.entries(value.payload).some(([key, fieldValue]) => (
-            key.endsWith('Image') && typeof fieldValue === 'string'
+        || !isPlainRecord(value.payload)
+        || !isAllowedApiUrl(value.apiUrl, workerOrigin)) {
+        return null;
+    }
+    const payload = value.payload;
+    if (value.version === 1) {
+        if (!Object.hasOwn(payload, 'targetImage')
+            || typeof payload.targetImage !== 'string'
+            || !payload.targetImage.trim()) {
+            return null;
+        }
+        return {
+            ...value,
+            payload: {
+                ...payload,
+                templateId: 'product-swap',
+            },
+        };
+    }
+    if (value.version !== 2
+        || !Object.hasOwn(payload, 'templateId')
+        || typeof payload.templateId !== 'string'
+        || !payload.templateId.trim()
+        || !Object.keys(payload).some((key) => (
+            key.endsWith('Image')
+            && typeof payload[key] === 'string'
+            && Boolean(payload[key].trim())
         ))) {
+        return null;
+    }
+    return {
+        ...value,
+        payload: { ...payload },
+    };
+}
+
+function isGenerationMessage(value, workerOrigin) {
+    return Boolean(normalizeGenerationMessage(value, workerOrigin));
+}
+
+function handleCapabilityMessage(event) {
+    const message = event?.data;
+    if (!message
+        || message.type !== 'product-swap:capabilities:request'
+        || typeof message.requestId !== 'string'
+        || !message.requestId.trim()
+        || typeof event.source?.postMessage !== 'function') {
         return false;
     }
-    return isAllowedApiUrl(value.apiUrl, workerOrigin);
+    event.source.postMessage({
+        type: 'product-swap:capabilities:response',
+        requestId: message.requestId,
+        supportedGenerationVersions: [
+            ...SUPPORTED_GENERATION_VERSIONS,
+        ],
+    });
+    return true;
 }
 
 async function runGenerationMessage(
@@ -110,12 +167,17 @@ async function runGenerationMessage(
 }
 
 function handleGenerationMessage(event, dependencies) {
-    const message = event?.data;
-    if (!isGenerationMessage(message)
+    const message = normalizeGenerationMessage(event?.data);
+    if (!message
         || runningTaskIds.has(message.taskId)) {
         return false;
     }
     runningTaskIds.add(message.taskId);
+    event.source?.postMessage?.({
+        type: 'product-swap:start:ack',
+        taskId: message.taskId,
+        version: message.version,
+    });
     const work = runGenerationMessage(message, dependencies)
         .finally(() => runningTaskIds.delete(message.taskId));
     event.waitUntil(work);
@@ -124,13 +186,19 @@ function handleGenerationMessage(event, dependencies) {
 
 if (typeof globalThis.addEventListener === 'function'
     && typeof importScripts === 'function') {
-    globalThis.addEventListener('message', handleGenerationMessage);
+    globalThis.addEventListener('message', (event) => {
+        if (!handleCapabilityMessage(event)) {
+            handleGenerationMessage(event);
+        }
+    });
 }
 
 if (typeof module !== 'undefined') {
     module.exports = {
         isGenerationMessage,
+        normalizeGenerationMessage,
         runGenerationMessage,
         handleGenerationMessage,
+        handleCapabilityMessage,
     };
 }

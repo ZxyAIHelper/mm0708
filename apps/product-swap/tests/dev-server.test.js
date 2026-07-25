@@ -1,7 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
-const { once } = require('node:events');
 const { PassThrough } = require('node:stream');
 
 const {
@@ -10,6 +9,7 @@ const {
 } = require('../server/dev-server');
 const { publicCatalog } = require('../server/template-registry');
 const { createZeroIdatPng } = require('./image-fixtures');
+const { listenOnSafePort } = require('./safe-port');
 
 const tinyPng = [
     'data:image/png;base64,',
@@ -26,8 +26,7 @@ test('serves the app and returns an injected generated image', async (t) => {
         }),
     });
 
-    server.listen(0, '127.0.0.1');
-    await once(server, 'listening');
+    await listenOnSafePort(server);
     t.after(() => server.close());
 
     const { port } = server.address();
@@ -60,8 +59,7 @@ test('passes through an injected provider image URL', async (t) => {
             provider: 'fake-url',
         }),
     });
-    server.listen(0, '127.0.0.1');
-    await once(server, 'listening');
+    await listenOnSafePort(server);
     t.after(() => server.close());
     const { port } = server.address();
     const response = await fetch(
@@ -82,8 +80,7 @@ test('returns stable validation errors', async (t) => {
         provider: async () => null,
     });
 
-    server.listen(0, '127.0.0.1');
-    await once(server, 'listening');
+    await listenOnSafePort(server);
     t.after(() => server.close());
 
     const { port } = server.address();
@@ -108,8 +105,7 @@ test('rejects an undecodable upload before invoking the provider', async (t) => 
             providerCalls += 1;
         },
     });
-    server.listen(0, '127.0.0.1');
-    await once(server, 'listening');
+    await listenOnSafePort(server);
     t.after(() => server.close());
     const { port } = server.address();
     const invalidPng = createZeroIdatPng();
@@ -152,8 +148,7 @@ test('rejects a concurrent generation with SERVER_BUSY', async (t) => {
         },
     });
 
-    server.listen(0, '127.0.0.1');
-    await once(server, 'listening');
+    await listenOnSafePort(server);
     t.after(() => server.close());
 
     const { port } = server.address();
@@ -191,8 +186,7 @@ test('rejects an explicitly nested agent generation', async (t) => {
             throw new Error('provider must not run');
         },
     });
-    server.listen(0, '127.0.0.1');
-    await once(server, 'listening');
+    await listenOnSafePort(server);
     t.after(() => server.close());
 
     const { port } = server.address();
@@ -225,8 +219,7 @@ test('rejects foreign API origins before generation and preflight', async (t) =>
             };
         },
     });
-    server.listen(0, '127.0.0.1');
-    await once(server, 'listening');
+    await listenOnSafePort(server);
     t.after(() => server.close());
 
     const { port } = server.address();
@@ -262,8 +255,7 @@ test('allows same-origin browser generation without wildcard CORS', async (t) =>
             provider: 'fake',
         }),
     });
-    server.listen(0, '127.0.0.1');
-    await once(server, 'listening');
+    await listenOnSafePort(server);
     t.after(() => server.close());
 
     const { port } = server.address();
@@ -311,8 +303,7 @@ test('returns a flushed 408 JSON response to a real slow client', async (t) => {
             providerCalls += 1;
         },
     });
-    server.listen(0, '127.0.0.1');
-    await once(server, 'listening');
+    await listenOnSafePort(server);
     t.after(() => server.close());
     const { port } = server.address();
 
@@ -364,8 +355,7 @@ test('returns a flushed 413 JSON response to a real oversized client', async (t)
             providerCalls += 1;
         },
     });
-    server.listen(0, '127.0.0.1');
-    await once(server, 'listening');
+    await listenOnSafePort(server);
     t.after(() => server.close());
     const { port } = server.address();
 
@@ -402,8 +392,7 @@ test('returns a flushed 413 JSON response to a real oversized client', async (t)
 
 test('rejects private application files from static GET and HEAD', async (t) => {
     const server = createProductSwapServer();
-    server.listen(0, '127.0.0.1');
-    await once(server, 'listening');
+    await listenOnSafePort(server);
     t.after(() => server.close());
 
     const { port } = server.address();
@@ -429,8 +418,7 @@ test('rejects private application files from static GET and HEAD', async (t) => 
 
 test('serves the public template catalog for GET and HEAD', async (t) => {
     const server = createProductSwapServer();
-    server.listen(0, '127.0.0.1');
-    await once(server, 'listening');
+    await listenOnSafePort(server);
     t.after(() => server.close());
 
     const { port } = server.address();
@@ -462,8 +450,7 @@ test('serves the public template catalog for GET and HEAD', async (t) => {
 
 test('serves the schema-driven creator form helper', async (t) => {
     const server = createProductSwapServer();
-    server.listen(0, '127.0.0.1');
-    await once(server, 'listening');
+    await listenOnSafePort(server);
     t.after(() => server.close());
 
     const { port } = server.address();
@@ -477,8 +464,7 @@ test('serves the schema-driven creator form helper', async (t) => {
 
 test('serves the version history helper', async (t) => {
     const server = createProductSwapServer();
-    server.listen(0, '127.0.0.1');
-    await once(server, 'listening');
+    await listenOnSafePort(server);
     t.after(() => server.close());
 
     const { port } = server.address();
@@ -498,8 +484,7 @@ test('returns 500 when the public template catalog cannot serialize', async (t) 
             return recursiveCatalog;
         },
     });
-    server.listen(0, '127.0.0.1');
-    await once(server, 'listening');
+    await listenOnSafePort(server);
     t.after(() => server.close());
 
     const { port } = server.address();
