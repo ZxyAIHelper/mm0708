@@ -72,7 +72,7 @@
         return templates.find((template) => template.id === id) || null;
     }
 
-    function listTemplates(category) {
+    function listTemplates({ category = '' } = {}) {
         if (!category) return templates.slice();
         return templates.filter((template) => template.category === category);
     }

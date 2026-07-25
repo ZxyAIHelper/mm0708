@@ -22,7 +22,7 @@ test('exposes the live product-swap template with its creation details', () => {
 
 test('lists, filters, and searches the catalog', () => {
     const templates = listTemplates();
-    const imageRemakes = listTemplates('改造图片');
+    const imageRemakes = listTemplates({ category: '改造图片' });
 
     assert.ok(templates.length >= 4);
     assert.ok(templates.some((template) => template.status === 'coming_soon'));
