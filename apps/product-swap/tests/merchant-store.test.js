@@ -47,3 +47,27 @@ test('saves a merchant profile and lists newest products first', () => {
     assert.equal(store.loadProfile().shop.name, '山野咖啡');
     assert.deepEqual(store.listProducts().map((product) => product.id), ['p2', 'p1']);
 });
+
+test('keeps valid profile data when stored entries are malformed', () => {
+    const storage = memoryStorage();
+    const key = 'social_content_merchant_profile_v1';
+    storage.setItem(key, JSON.stringify({
+        shop: { name: 'Mountain Coffee', industry: 'Coffee', slogan: 'Carefully made' },
+        products: [
+            { id: 'latte', name: 'Latte', sellingPoint: 'Smooth', price: '18' },
+            null,
+            'not a product',
+            { id: '', name: 'Missing id' },
+        ],
+    }));
+    const store = createMerchantStore(storage);
+
+    assert.equal(store.loadProfile().shop.name, 'Mountain Coffee');
+    assert.deepEqual(store.listProducts().map((product) => product.id), ['latte']);
+
+    storage.setItem(key, JSON.stringify({
+        shop: null,
+        products: [{ id: 'cake', name: 'Cake' }],
+    }));
+    assert.deepEqual(store.listProducts().map((product) => product.id), ['cake']);
+});

@@ -6,6 +6,9 @@
     }
 
     function normalizeShop(shop = {}) {
+        shop = shop && Object.prototype.toString.call(shop) === '[object Object]'
+            ? shop
+            : {};
         return {
             name: text(shop.name, 60),
             industry: text(shop.industry, 40),
@@ -14,6 +17,9 @@
     }
 
     function normalizeProduct(product = {}) {
+        product = product && Object.prototype.toString.call(product) === '[object Object]'
+            ? product
+            : {};
         return {
             id: text(product.id, 80),
             name: text(product.name, 80),
