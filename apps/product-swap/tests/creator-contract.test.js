@@ -72,7 +72,21 @@ test('creator metadata renders all supported schema field types', () => {
 
     assert.equal(typeof meta.renderTemplateFields, 'function');
     assert.match(source, /template-field-\$\{field\.type\}/);
+    assert.match(source, /hint\.textContent = '点击或拖拽上传'/);
+    assert.match(source, /group\.className = 'choice-group'/);
     assert.match(source, /role', 'radiogroup'/);
+    assert.match(source, /button\.className = 'switch-control'/);
     assert.match(source, /role', 'switch'/);
+    assert.match(source, /button\.appendChild\(text\)/);
     assert.match(source, /field\.maxLength/);
+});
+
+test('schema field rerenders preserve creator metadata structure', () => {
+    const source = fs.readFileSync(
+        path.join(root, 'script.js'),
+        'utf8',
+    );
+
+    assert.match(source, /hint\.textContent = '点击或拖拽上传'/);
+    assert.match(source, /button\.firstElementChild\.textContent/);
 });

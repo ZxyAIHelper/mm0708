@@ -44,7 +44,7 @@
         upload.type = 'button';
         upload.dataset.upload = field.key;
         const hint = global.document.createElement('span');
-        hint.textContent = '点击上传';
+        hint.textContent = '点击或拖拽上传';
         upload.appendChild(hint);
         section.appendChild(upload);
 
@@ -61,6 +61,7 @@
         appendLabel(section, field, controlId);
         const group = global.document.createElement('div');
         group.id = controlId;
+        group.className = 'choice-group';
         group.setAttribute('role', 'radiogroup');
         for (const option of field.options || []) {
             const button = global.document.createElement('button');
@@ -80,10 +81,13 @@
         appendLabel(section, field, controlId);
         const button = global.document.createElement('button');
         button.id = controlId;
+        button.className = 'switch-control';
         button.type = 'button';
         button.setAttribute('role', 'switch');
         button.setAttribute('aria-checked', String(Boolean(field.default)));
-        button.textContent = field.default ? '已开启' : '已关闭';
+        const text = global.document.createElement('span');
+        text.textContent = field.default ? '已开启' : '已关闭';
+        button.appendChild(text);
         section.appendChild(button);
     }
 

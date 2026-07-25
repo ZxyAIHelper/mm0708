@@ -491,7 +491,7 @@ function boot() {
             box.appendChild(preview);
         } else {
             const hint = document.createElement('span');
-            hint.textContent = '点击上传';
+            hint.textContent = '点击或拖拽上传';
             box.appendChild(hint);
         }
     }
@@ -516,7 +516,8 @@ function boot() {
             const button = section.querySelector('[role="switch"]');
             const checked = Boolean(state.values[field.key]);
             button.setAttribute('aria-checked', String(checked));
-            button.textContent = checked ? '已开启' : '已关闭';
+            button.firstElementChild.textContent =
+                checked ? '已开启' : '已关闭';
         } else if (field.type === 'text') {
             section.querySelector('textarea').value =
                 state.values[field.key] || '';
