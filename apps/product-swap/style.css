@@ -278,6 +278,88 @@ body[data-template-id="food-copy-layout"] .example-card {
     display: none;
 }
 
+body[data-template-id="dish-ranking-guide"] .example-card {
+    display: none;
+}
+
+.dish-upload-box {
+    width: 100%;
+    min-height: 88px;
+    border: 1px dashed #d7c5b5;
+    border-radius: 16px;
+    padding: 16px;
+    background: #fffaf4;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.dish-upload-box.dragover {
+    border-color: var(--accent);
+    background: #fff1ed;
+}
+
+.dish-list-status {
+    margin: 8px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.dish-card-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.dish-card {
+    overflow: hidden;
+    border: 2px solid var(--line);
+    border-radius: 14px;
+    background: var(--panel);
+}
+
+.dish-card.is-owned {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgb(244 81 91 / 12%);
+}
+
+.dish-card img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    background: var(--panel-soft);
+}
+
+.dish-card-actions {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px;
+    padding: 7px;
+}
+
+.dish-owned-toggle,
+.dish-remove {
+    min-height: 44px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 0 9px;
+    background: var(--panel-soft);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.dish-owned-toggle[aria-pressed="true"] {
+    border-color: var(--danger);
+    background: var(--danger);
+    color: #fff;
+}
+
+.dish-remove {
+    color: var(--danger);
+}
+
 .generate-button {
     width: 100%;
     min-height: 48px;
@@ -503,6 +585,9 @@ body[data-template-id="food-copy-layout"] .example-card {
 }
 
 .upload-box:focus-visible,
+.dish-upload-box:focus-visible,
+.dish-owned-toggle:focus-visible,
+.dish-remove:focus-visible,
 .choice-group button:focus-visible,
 .switch-control:focus-visible,
 .template-field-text textarea:focus-visible,
@@ -570,6 +655,10 @@ body[data-template-id="food-copy-layout"] .example-card {
 @media (max-width: 640px) {
     .product-swap-shell {
         padding-inline: 16px;
+    }
+
+    .dish-card-list {
+        grid-template-columns: 1fr;
     }
 
     body[data-template-id="food-copy-layout"] .template-field-image .upload-box {

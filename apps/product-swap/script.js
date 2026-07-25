@@ -1184,8 +1184,8 @@ function boot() {
     async function acceptDishFiles(field, fileList) {
         const input = fieldSections[field.key]
             .querySelector('input[type="file"]');
-        input.value = '';
         const files = Array.from(fileList || []);
+        input.value = '';
         if (!files.length || state.isGenerating) return;
         const current = state.values[field.key];
         const available = Math.max(

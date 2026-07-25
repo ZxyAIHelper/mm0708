@@ -924,7 +924,7 @@ async function handleGenerate(
             for (let index = 0; index < dishes.length; index += 1) {
                 imagePaths.push(await writeInputImage(
                     taskDir,
-                    `${field.key}-${index}`,
+                    `${field.key}_${index}`,
                     dishes[index].image,
                 ));
             }
