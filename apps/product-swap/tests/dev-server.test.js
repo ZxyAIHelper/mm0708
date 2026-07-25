@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const http = require('node:http');
 const { once } = require('node:events');
 const { PassThrough } = require('node:stream');
 
@@ -268,6 +269,103 @@ test('readJsonBody reports request timeout and abort with stable codes', async (
         () => reading,
         (error) => error.code === 'REQUEST_ABORTED',
     );
+});
+
+test('returns a flushed 408 JSON response to a real slow client', async (t) => {
+    let providerCalls = 0;
+    const server = createProductSwapServer({
+        bodyTimeoutMs: 25,
+        provider: async () => {
+            providerCalls += 1;
+        },
+    });
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    t.after(() => server.close());
+    const { port } = server.address();
+
+    const result = await new Promise((resolve, reject) => {
+        const request = http.request({
+            host: '127.0.0.1',
+            port,
+            path: '/api/product-swap/generate',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': '100',
+            },
+        });
+        const guard = setTimeout(() => {
+            request.destroy();
+            reject(new Error('slow request did not receive a response'));
+        }, 500);
+        request.once('error', reject);
+        request.once('response', (response) => {
+            const chunks = [];
+            response.on('data', (chunk) => chunks.push(chunk));
+            response.once('end', () => {
+                clearTimeout(guard);
+                resolve({
+                    status: response.statusCode,
+                    headers: response.headers,
+                    body: Buffer.concat(chunks).toString('utf8'),
+                });
+            });
+        });
+        request.write('{');
+    });
+
+    assert.equal(result.status, 408);
+    assert.equal(result.headers.connection, 'close');
+    assert.equal(
+        JSON.parse(result.body).error.code,
+        'REQUEST_TIMEOUT',
+    );
+    assert.equal(providerCalls, 0);
+});
+
+test('returns a flushed 413 JSON response to a real oversized client', async (t) => {
+    let providerCalls = 0;
+    const server = createProductSwapServer({
+        maxRequestBytes: 64,
+        provider: async () => {
+            providerCalls += 1;
+        },
+    });
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    t.after(() => server.close());
+    const { port } = server.address();
+
+    const result = await new Promise((resolve, reject) => {
+        const request = http.request({
+            host: '127.0.0.1',
+            port,
+            path: '/api/product-swap/generate',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        }, (response) => {
+            const chunks = [];
+            response.on('data', (chunk) => chunks.push(chunk));
+            response.once('end', () => resolve({
+                status: response.statusCode,
+                headers: response.headers,
+                body: Buffer.concat(chunks).toString('utf8'),
+            }));
+        });
+        request.once('error', reject);
+        request.end('x'.repeat(65));
+    });
+
+    assert.equal(result.status, 413);
+    assert.equal(result.headers.connection, 'close');
+    assert.equal(
+        JSON.parse(result.body).error.code,
+        'FILE_TOO_LARGE',
+    );
+    assert.equal(providerCalls, 0);
 });
 
 test('rejects private application files from static GET and HEAD', async (t) => {

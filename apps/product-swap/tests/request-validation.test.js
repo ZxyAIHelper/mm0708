@@ -303,6 +303,52 @@ test('rejects zero and oversized image dimensions', () => {
         ),
         (error) => error.code === 'INVALID_IMAGE',
     );
+    assert.throws(
+        () => decodeImageDataUrl(
+            pngHeader(1, 1),
+            'targetImage',
+        ),
+        (error) => error.code === 'INVALID_IMAGE',
+    );
+});
+
+test('rejects JPEG and WebP files with dimensions but no image data', () => {
+    const jpegHeaderOnly = Buffer.from([
+        0xff, 0xd8,
+        0xff, 0xc0, 0x00, 0x0b,
+        0x08, 0x00, 0x01, 0x00, 0x01,
+        0x01, 0x01, 0x11, 0x00,
+        0xff, 0xd9,
+    ]);
+    const jpegEmptyScan = Buffer.from([
+        0xff, 0xd8,
+        0xff, 0xc0, 0x00, 0x0b,
+        0x08, 0x00, 0x01, 0x00, 0x01,
+        0x01, 0x01, 0x11, 0x00,
+        0xff, 0xda, 0x00, 0x08,
+        0x01, 0x01, 0x00, 0x00, 0x3f, 0x00,
+        0xff, 0xd9,
+    ]);
+    const webpHeaderOnly = Buffer.alloc(30);
+    webpHeaderOnly.write('RIFF', 0, 'ascii');
+    webpHeaderOnly.writeUInt32LE(22, 4);
+    webpHeaderOnly.write('WEBP', 8, 'ascii');
+    webpHeaderOnly.write('VP8X', 12, 'ascii');
+    webpHeaderOnly.writeUInt32LE(10, 16);
+
+    for (const [mimeType, buffer] of [
+        ['image/jpeg', jpegHeaderOnly],
+        ['image/jpeg', jpegEmptyScan],
+        ['image/webp', webpHeaderOnly],
+    ]) {
+        assert.throws(
+            () => decodeImageDataUrl(
+                `data:${mimeType};base64,${buffer.toString('base64')}`,
+                'targetImage',
+            ),
+            (error) => error.code === 'INVALID_IMAGE',
+        );
+    }
 });
 
 test('resolves image files directly inside the task directory', () => {

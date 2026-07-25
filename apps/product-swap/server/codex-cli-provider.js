@@ -1,12 +1,15 @@
 'use strict';
 
 const crypto = require('node:crypto');
+const { constants: fsConstants } = require('node:fs');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
+const {
+    validatePng,
+} = require('./image-validation');
 
 const MAX_RESULT_IMAGE_BYTES = 10 * 1024 * 1024;
-const PNG_MAGIC = Buffer.from('89504e470d0a1a0a', 'hex');
 
 function buildCodexArgs({ taskDir, imagePaths, prompt }) {
     const args = [
@@ -247,11 +250,19 @@ async function runCodexProcess({
         });
     });
 
-    const resultPath = path.join(taskDir, 'result.png');
-    let resultStat;
+    return readResultImage(path.join(taskDir, 'result.png'));
+}
 
+async function readResultImage(
+    resultPath,
+    {
+        fsImpl = fs,
+        constants = fsConstants,
+    } = {},
+) {
+    let linkStat;
     try {
-        resultStat = await fs.stat(resultPath);
+        linkStat = await fsImpl.lstat(resultPath);
     } catch {
         const error = new Error('Codex did not create result.png');
         error.code = 'RESULT_IMAGE_NOT_FOUND';
@@ -259,22 +270,49 @@ async function runCodexProcess({
     }
 
     if (
-        !resultStat.isFile()
-        || resultStat.size < PNG_MAGIC.length
-        || resultStat.size > MAX_RESULT_IMAGE_BYTES
+        linkStat.isSymbolicLink()
+        || !linkStat.isFile()
     ) {
         const error = new Error('Codex created an invalid result.png');
         error.code = 'INVALID_RESULT_IMAGE';
         throw error;
     }
 
+    let fileHandle;
     try {
-        const imageBuffer = await fs.readFile(resultPath);
+        const flags = constants.O_RDONLY
+            | (constants.O_NOFOLLOW || 0);
+        fileHandle = await fsImpl.open(resultPath, flags);
+        const resultStat = await fileHandle.stat();
         if (
-            imageBuffer.length > MAX_RESULT_IMAGE_BYTES
-            || !imageBuffer.subarray(0, PNG_MAGIC.length)
-                .equals(PNG_MAGIC)
+            !resultStat.isFile()
+            || resultStat.size <= 0
+            || resultStat.size > MAX_RESULT_IMAGE_BYTES
         ) {
+            throw new Error('invalid PNG result');
+        }
+        const imageBuffer = Buffer.alloc(resultStat.size);
+        let offset = 0;
+        while (offset < imageBuffer.length) {
+            const { bytesRead } = await fileHandle.read(
+                imageBuffer,
+                offset,
+                imageBuffer.length - offset,
+                offset,
+            );
+            if (!bytesRead) {
+                throw new Error('truncated PNG result');
+            }
+            offset += bytesRead;
+        }
+        const extra = Buffer.alloc(1);
+        const { bytesRead: extraBytes } = await fileHandle.read(
+            extra,
+            0,
+            1,
+            imageBuffer.length,
+        );
+        if (extraBytes || !validatePng(imageBuffer)) {
             throw new Error('invalid PNG result');
         }
         return {
@@ -287,6 +325,8 @@ async function runCodexProcess({
         const error = new Error('Codex created an invalid result.png');
         error.code = 'INVALID_RESULT_IMAGE';
         throw error;
+    } finally {
+        await fileHandle?.close().catch(() => undefined);
     }
 }
 
@@ -317,6 +357,7 @@ module.exports = {
     buildCodexArgs,
     buildCodexSpawnOptions,
     createSerialQueue,
+    readResultImage,
     terminateProcessTree,
     runCodexProcess,
     generateWithCodex,

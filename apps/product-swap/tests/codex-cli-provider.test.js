@@ -12,10 +12,18 @@ const {
     buildCodexSpawnOptions,
     createSerialQueue,
     generateWithCodex,
+    readResultImage,
     runCodexProcess,
 } = require('../server/codex-cli-provider');
 
 const pngMagic = Buffer.from('89504e470d0a1a0a', 'hex');
+const validPngBuffer = Buffer.from(
+    [
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwC',
+        'AAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    ].join(''),
+    'base64',
+);
 
 function createSuccessfulChild() {
     const child = new EventEmitter();
@@ -69,7 +77,10 @@ test('generateWithCodex passes the exact template prompt as the final CLI argume
         path.join(os.tmpdir(), 'codex-provider-test-'),
     );
     t.after(() => fs.rm(taskDir, { recursive: true, force: true }));
-    await fs.writeFile(path.join(taskDir, 'result.png'), pngMagic);
+    await fs.writeFile(
+        path.join(taskDir, 'result.png'),
+        validPngBuffer,
+    );
 
     let receivedArgs;
     const spawnImpl = (_command, args) => {
@@ -117,13 +128,96 @@ test('generateWithCodex rejects a non-PNG result', async (t) => {
     );
 });
 
+test('generateWithCodex rejects header-only PNG results', async (t) => {
+    const taskDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'codex-provider-test-'),
+    );
+    t.after(() => fs.rm(taskDir, { recursive: true, force: true }));
+    const resultPath = path.join(taskDir, 'result.png');
+
+    for (const buffer of [
+        pngMagic,
+        validPngBuffer.subarray(0, 24),
+    ]) {
+        await fs.writeFile(resultPath, buffer);
+        await assert.rejects(
+            () => generateWithCodex({
+                taskDir,
+                imagePaths: [],
+                prompt: '生成图片',
+                spawnImpl: createSuccessfulChild,
+            }),
+            (error) => error.code === 'INVALID_RESULT_IMAGE',
+        );
+    }
+});
+
+test('generateWithCodex rejects a symlink result', async (t) => {
+    const taskDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'codex-provider-test-'),
+    );
+    t.after(() => fs.rm(taskDir, { recursive: true, force: true }));
+    const targetPath = path.join(taskDir, 'target');
+    const resultPath = path.join(taskDir, 'result.png');
+    await fs.mkdir(targetPath);
+    await fs.symlink(targetPath, resultPath, 'junction');
+
+    await assert.rejects(
+        () => generateWithCodex({
+            taskDir,
+            imagePaths: [],
+            prompt: '生成图片',
+            spawnImpl: createSuccessfulChild,
+        }),
+        (error) => error.code === 'INVALID_RESULT_IMAGE',
+    );
+});
+
+test('readResultImage does not read an oversized open handle', async () => {
+    let readCalled = false;
+    let closeCalled = false;
+    const fileHandle = {
+        async stat() {
+            return {
+                isFile: () => true,
+                size: 10 * 1024 * 1024 + 1,
+            };
+        },
+        async read() {
+            readCalled = true;
+            return { bytesRead: 0 };
+        },
+        async close() {
+            closeCalled = true;
+        },
+    };
+    const fsImpl = {
+        async lstat() {
+            return {
+                isFile: () => true,
+                isSymbolicLink: () => false,
+            };
+        },
+        async open() {
+            return fileHandle;
+        },
+    };
+
+    await assert.rejects(
+        () => readResultImage('result.png', { fsImpl }),
+        (error) => error.code === 'INVALID_RESULT_IMAGE',
+    );
+    assert.equal(readCalled, false);
+    assert.equal(closeCalled, true);
+});
+
 test('generateWithCodex rejects an oversized PNG result', async (t) => {
     const taskDir = await fs.mkdtemp(
         path.join(os.tmpdir(), 'codex-provider-test-'),
     );
     t.after(() => fs.rm(taskDir, { recursive: true, force: true }));
     const resultPath = path.join(taskDir, 'result.png');
-    await fs.writeFile(resultPath, pngMagic);
+    await fs.writeFile(resultPath, validPngBuffer);
     await fs.truncate(resultPath, 10 * 1024 * 1024 + 1);
 
     await assert.rejects(

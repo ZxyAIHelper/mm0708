@@ -12,6 +12,7 @@ const {
     getTemplatePackage,
     publicCatalog,
 } = require('./template-registry');
+const { validatePng } = require('./image-validation');
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_IMAGE_DIMENSION = 16384;
@@ -147,18 +148,11 @@ function decodeImageDataUrl(value, fieldName) {
 }
 
 function readImageDimensions(buffer, mimeType) {
-    if (
-        mimeType === 'image/png'
-        && buffer.length >= 24
-        && buffer.subarray(0, 8).equals(
-            Buffer.from('89504e470d0a1a0a', 'hex'),
-        )
-        && buffer.toString('ascii', 12, 16) === 'IHDR'
-    ) {
-        return {
-            width: buffer.readUInt32BE(16),
-            height: buffer.readUInt32BE(20),
-        };
+    if (mimeType === 'image/png') {
+        const dimensions = validatePng(buffer);
+        if (dimensions) {
+            return dimensions;
+        }
     }
 
     if (
@@ -166,8 +160,12 @@ function readImageDimensions(buffer, mimeType) {
         && buffer.length >= 4
         && buffer[0] === 0xff
         && buffer[1] === 0xd8
+        && buffer.at(-2) === 0xff
+        && buffer.at(-1) === 0xd9
     ) {
         let offset = 2;
+        let dimensions = null;
+        let seenScan = false;
         const startOfFrame = new Set([
             0xc0, 0xc1, 0xc2, 0xc3,
             0xc5, 0xc6, 0xc7,
@@ -187,7 +185,7 @@ function readImageDimensions(buffer, mimeType) {
             }
             const marker = buffer[offset];
             offset += 1;
-            if (marker === 0xd9 || marker === 0xda) {
+            if (marker === 0xd9) {
                 break;
             }
             if (offset + 1 >= buffer.length) {
@@ -200,16 +198,24 @@ function readImageDimensions(buffer, mimeType) {
             ) {
                 break;
             }
+            if (marker === 0xda) {
+                seenScan = offset + segmentLength
+                    < buffer.length - 2;
+                break;
+            }
             if (
                 startOfFrame.has(marker)
                 && segmentLength >= 7
             ) {
-                return {
+                dimensions = {
                     height: buffer.readUInt16BE(offset + 3),
                     width: buffer.readUInt16BE(offset + 5),
                 };
             }
             offset += segmentLength;
+        }
+        if (dimensions && seenScan) {
+            return dimensions;
         }
     }
 
@@ -218,17 +224,67 @@ function readImageDimensions(buffer, mimeType) {
         && buffer.length >= 30
         && buffer.toString('ascii', 0, 4) === 'RIFF'
         && buffer.toString('ascii', 8, 12) === 'WEBP'
+        && buffer.readUInt32LE(4) + 8 === buffer.length
     ) {
         const format = buffer.toString('ascii', 12, 16);
-        if (format === 'VP8X') {
-            return {
+        const chunkLength = buffer.readUInt32LE(16);
+        const paddedChunkEnd = 20
+            + chunkLength
+            + (chunkLength % 2);
+        if (paddedChunkEnd > buffer.length) {
+            throw new ProductSwapError(
+                'INVALID_IMAGE',
+                '图片格式无效',
+            );
+        }
+        if (format === 'VP8X' && chunkLength >= 10) {
+            const dimensions = {
                 width: 1 + buffer.readUIntLE(24, 3),
                 height: 1 + buffer.readUIntLE(27, 3),
             };
+            let chunkOffset = paddedChunkEnd;
+            let seenImageChunk = false;
+            while (chunkOffset < buffer.length) {
+                if (buffer.length - chunkOffset < 8) {
+                    throw new ProductSwapError(
+                        'INVALID_IMAGE',
+                        '图片格式无效',
+                    );
+                }
+                const nestedType = buffer.toString(
+                    'ascii',
+                    chunkOffset,
+                    chunkOffset + 4,
+                );
+                const nestedLength = buffer.readUInt32LE(
+                    chunkOffset + 4,
+                );
+                const nestedEnd = chunkOffset
+                    + 8
+                    + nestedLength
+                    + (nestedLength % 2);
+                if (nestedEnd > buffer.length) {
+                    throw new ProductSwapError(
+                        'INVALID_IMAGE',
+                        '图片格式无效',
+                    );
+                }
+                if (
+                    ['VP8 ', 'VP8L', 'ANMF'].includes(nestedType)
+                    && nestedLength > 0
+                ) {
+                    seenImageChunk = true;
+                }
+                chunkOffset = nestedEnd;
+            }
+            if (seenImageChunk) {
+                return dimensions;
+            }
         }
         if (
             format === 'VP8 '
-            && buffer.length >= 30
+            && chunkLength >= 10
+            && paddedChunkEnd === buffer.length
             && buffer[23] === 0x9d
             && buffer[24] === 0x01
             && buffer[25] === 0x2a
@@ -238,7 +294,12 @@ function readImageDimensions(buffer, mimeType) {
                 height: buffer.readUInt16LE(28) & 0x3fff,
             };
         }
-        if (format === 'VP8L' && buffer[20] === 0x2f) {
+        if (
+            format === 'VP8L'
+            && chunkLength >= 5
+            && paddedChunkEnd === buffer.length
+            && buffer[20] === 0x2f
+        ) {
             return {
                 width: 1 + (
                     buffer[21]
@@ -537,7 +598,13 @@ function validateGenerateRequest(body = {}) {
     };
 }
 
-function readJsonBody(request, { timeoutMs = 15000 } = {}) {
+function readJsonBody(
+    request,
+    {
+        timeoutMs = 15000,
+        maxBytes = MAX_REQUEST_BYTES,
+    } = {},
+) {
     return new Promise((resolve, reject) => {
         const chunks = [];
         let size = 0;
@@ -565,13 +632,13 @@ function readJsonBody(request, { timeoutMs = 15000 } = {}) {
         };
         const onData = (chunk) => {
             size += chunk.length;
-            if (size > MAX_REQUEST_BYTES) {
+            if (size > maxBytes) {
+                request.pause();
                 rejectWith(
                     'FILE_TOO_LARGE',
                     '上传内容过大',
                     413,
                 );
-                request.destroy();
                 return;
             }
             chunks.push(chunk);
@@ -593,8 +660,8 @@ function readJsonBody(request, { timeoutMs = 15000 } = {}) {
             rejectWith('REQUEST_ABORTED', '请求已中止', 400);
         };
         const timer = setTimeout(() => {
+            request.pause();
             rejectWith('REQUEST_TIMEOUT', '请求体读取超时', 408);
-            request.destroy();
         }, timeoutMs);
 
         request.on('data', onData);
@@ -711,12 +778,17 @@ function mapServerError(error) {
     };
 }
 
-async function handleGenerate(request, response, provider) {
+async function handleGenerate(
+    request,
+    response,
+    provider,
+    bodyOptions,
+) {
     const requestId = `swap_${crypto.randomUUID()}`;
     let taskDir = '';
 
     try {
-        const body = await readJsonBody(request);
+        const body = await readJsonBody(request, bodyOptions);
         const input = validateGenerateRequest(body);
         taskDir = await fs.mkdtemp(
             path.join(os.tmpdir(), 'product-swap-'),
@@ -765,7 +837,24 @@ async function handleGenerate(request, response, provider) {
             requestId,
         });
     } catch (error) {
+        if (
+            error?.code === 'REQUEST_ABORTED'
+            || response.destroyed
+            || response.writableEnded
+        ) {
+            return;
+        }
         const mapped = mapServerError(error);
+        const closeAfterResponse = [
+            'REQUEST_TIMEOUT',
+            'FILE_TOO_LARGE',
+        ].includes(error?.code);
+        if (closeAfterResponse) {
+            response.setHeader('Connection', 'close');
+            response.once('finish', () => {
+                request.socket.destroy();
+            });
+        }
         sendJson(response, mapped.status, {
             success: false,
             error: {
@@ -886,6 +975,8 @@ function sendTemplateCatalog(
 function createProductSwapServer({
     provider = generateWithCodex,
     catalogProvider = publicCatalog,
+    bodyTimeoutMs = 15000,
+    maxRequestBytes = MAX_REQUEST_BYTES,
 } = {}) {
     let generationActive = false;
 
@@ -977,7 +1068,15 @@ function createProductSwapServer({
 
             generationActive = true;
             try {
-                await handleGenerate(request, response, provider);
+                await handleGenerate(
+                    request,
+                    response,
+                    provider,
+                    {
+                        timeoutMs: bodyTimeoutMs,
+                        maxBytes: maxRequestBytes,
+                    },
+                );
             } finally {
                 generationActive = false;
             }
