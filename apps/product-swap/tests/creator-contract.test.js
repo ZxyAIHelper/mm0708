@@ -28,6 +28,16 @@ test('creator page exposes the template-driven generator controls', () => {
     assert.match(html, /templates\.js/);
     assert.match(html, /creator-meta\.js/);
     assert.match(html, /script\.js/);
+
+    const catalogScript = html.indexOf(
+        '<script src="/template-catalog.js"></script>',
+    );
+    const templateScript = html.indexOf(
+        '<script src="/templates.js"></script>',
+    );
+    assert.ok(catalogScript >= 0);
+    assert.ok(templateScript >= 0);
+    assert.ok(catalogScript < templateScript);
 });
 
 test('resolves only live creator templates', () => {

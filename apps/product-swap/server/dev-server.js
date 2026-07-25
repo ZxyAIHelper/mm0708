@@ -8,6 +8,7 @@ const crypto = require('node:crypto');
 const {
     generateWithCodex,
 } = require('./codex-cli-provider');
+const { publicCatalog } = require('./template-registry');
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_REQUEST_BYTES = 42 * 1024 * 1024;
@@ -342,6 +343,24 @@ async function serveStatic(request, response) {
     }
 }
 
+function sendTemplateCatalog(response, method = 'GET') {
+    const source = `globalThis.__TEMPLATE_CATALOG__ = ${JSON.stringify(
+        publicCatalog(),
+    )};\n`;
+
+    response.writeHead(200, {
+        'Content-Type': 'text/javascript; charset=utf-8',
+        'Cache-Control': 'no-store',
+    });
+
+    if (method === 'HEAD') {
+        response.end();
+        return;
+    }
+
+    response.end(source);
+}
+
 function createProductSwapServer({
     provider = generateWithCodex,
 } = {}) {
@@ -396,6 +415,17 @@ function createProductSwapServer({
             } finally {
                 generationActive = false;
             }
+            return;
+        }
+
+        if (
+            pathname === '/template-catalog.js'
+            && (
+                request.method === 'GET'
+                || request.method === 'HEAD'
+            )
+        ) {
+            sendTemplateCatalog(response, request.method);
             return;
         }
 

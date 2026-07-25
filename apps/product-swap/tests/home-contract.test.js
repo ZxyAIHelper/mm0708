@@ -25,10 +25,15 @@ test('homepage exposes the hotspot template discovery contract', () => {
     assert.match(html, /平台精选/);
     assert.match(html, /试试“产品”“门店”“活动”或“背景”。/);
 
+    const catalogScript = html.indexOf(
+        '<script src="/template-catalog.js"></script>',
+    );
     const templateScript = html.indexOf('<script src="/templates.js"></script>');
     const merchantScript = html.indexOf('<script src="/merchant-store.js"></script>');
     const homeScript = html.indexOf('<script src="/home.js"></script>');
+    assert.ok(catalogScript >= 0);
     assert.ok(templateScript >= 0);
+    assert.ok(catalogScript < templateScript);
     assert.ok(templateScript < merchantScript);
     assert.ok(merchantScript < homeScript);
 

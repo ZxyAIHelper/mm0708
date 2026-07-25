@@ -1,7 +1,10 @@
-import { cp, mkdir, rm } from 'node:fs/promises';
+import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+const require = createRequire(import.meta.url);
+const { publicCatalog } = require('./server/template-registry');
 const appRoot = path.dirname(fileURLToPath(import.meta.url));
 const distRoot = path.join(appRoot, 'dist');
 const publicEntries = [
@@ -24,6 +27,14 @@ const publicEntries = [
     'assets',
 ];
 
+function browserCatalogSource() {
+    return `globalThis.__TEMPLATE_CATALOG__ = ${JSON.stringify(
+        publicCatalog(),
+        null,
+        2,
+    )};\n`;
+}
+
 export async function build() {
     await rm(distRoot, { recursive: true, force: true });
     await mkdir(distRoot, { recursive: true });
@@ -35,6 +46,12 @@ export async function build() {
             { recursive: true },
         );
     }
+
+    await writeFile(
+        path.join(distRoot, 'template-catalog.js'),
+        browserCatalogSource(),
+        'utf8',
+    );
 }
 
 if (

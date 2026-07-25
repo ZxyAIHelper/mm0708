@@ -29,6 +29,7 @@ test('build emits only deployable public assets', async () => {
         'profile.js',
         'script.js',
         'style.css',
+        'template-catalog.js',
         'templates.js',
     ]);
     assert.equal(
@@ -37,4 +38,18 @@ test('build emits only deployable public assets', async () => {
         ).then((stat) => stat.isFile()),
         true,
     );
+});
+
+test('build emits a browser-safe generated template catalog', async () => {
+    const { build } = await import('../build.mjs');
+    await build();
+
+    const source = await fs.readFile(
+        path.join(appRoot, 'dist', 'template-catalog.js'),
+        'utf8',
+    );
+
+    assert.match(source, /globalThis\.__TEMPLATE_CATALOG__ =/);
+    assert.match(source, /food-copy-layout/);
+    assert.doesNotMatch(source, /buildPrompt/);
 });
