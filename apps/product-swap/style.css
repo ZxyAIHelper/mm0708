@@ -1,7 +1,7 @@
 :root {
     color-scheme: light;
     --page: #f7f6f2;
-    --panel: #fff;
+    --panel: #ffffff;
     --panel-soft: #f0eee8;
     --line: #e4e0da;
     --line-strong: #c9c3bb;
@@ -326,7 +326,7 @@ button {
     border-radius: 7px;
     padding: 10px;
     outline: none;
-    background: #070a12;
+    background: var(--panel-soft);
     color: var(--text);
     font: inherit;
     font-size: 12px;
@@ -520,7 +520,7 @@ button {
     padding: 42px 20px;
     border: 1px dashed var(--line);
     border-radius: 14px;
-    background: rgba(16, 20, 34, 0.45);
+    background: var(--panel-soft);
 }
 
 .state-card h2 {
@@ -621,18 +621,18 @@ button {
     padding: 4px 8px;
     border-radius: 999px;
     color: var(--muted);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--panel-soft);
     font-size: 11px;
 }
 
 .status-completed {
-    color: #73e1b5;
-    background: rgba(58, 197, 139, 0.12);
+    color: #176c43;
+    background: #e8f7ef;
 }
 
 .status-failed {
-    color: #ff9da4;
-    background: rgba(255, 124, 134, 0.1);
+    color: #a92f3c;
+    background: #fdecef;
 }
 
 .task-card time {
@@ -645,7 +645,7 @@ button {
 .task-requirement {
     min-height: 42px;
     margin: 14px 0;
-    color: #c8ccda;
+    color: var(--text);
     font-size: 13px;
     line-height: 1.6;
     display: -webkit-box;
@@ -713,7 +713,7 @@ button {
     justify-content: space-between;
     padding: 14px 18px;
     border-bottom: 1px solid var(--line);
-    background: rgba(7, 10, 21, 0.94);
+    background: rgb(255 255 255 / 94%);
     backdrop-filter: blur(12px);
 }
 
