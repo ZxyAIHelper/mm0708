@@ -4,6 +4,9 @@ const assert = require('node:assert/strict');
 const manifest = require(
     '../template-packs/food-copy-layout/manifest',
 );
+const chatManifest = require(
+    '../template-packs/wechat-chat-screenshot/manifest',
+);
 const {
     initialValues,
     buildTemplatePayload,
@@ -119,6 +122,31 @@ test('initializes values from the food template schema', () => {
         showDateTime: true,
         requirements: '',
     });
+});
+
+test('initializes and validates chat material values', () => {
+    assert.deepEqual(initialValues(chatManifest), {
+        chatSource: {
+            storeName: '',
+            images: [],
+            location: null,
+            requirements: '',
+        },
+    });
+    assert.deepEqual(validateValues(chatManifest, initialValues(
+        chatManifest,
+    )), {
+        field: 'chatSource',
+        message: '请至少填写店铺名称、上传图片或选择地点',
+    });
+    assert.equal(validateValues(chatManifest, {
+        chatSource: {
+            storeName: '三山山',
+            images: [],
+            location: null,
+            requirements: '',
+        },
+    }), null);
 });
 
 test('builds an exact food-template payload', () => {

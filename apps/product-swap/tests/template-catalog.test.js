@@ -30,10 +30,10 @@ test('lists, filters, and searches the catalog', () => {
     const templates = listTemplates();
     const imageRemakes = listTemplates({ category: '改造图片' });
 
-    assert.equal(templates.length, 6);
+    assert.equal(templates.length, 7);
     assert.equal(
         templates.filter((template) => template.status === 'live').length,
-        3,
+        4,
     );
     assert.ok(templates.some((template) => template.status === 'coming_soon'));
     assert.ok(imageRemakes.length > 0);
@@ -120,6 +120,15 @@ test('public catalog exposes only the manifest DTO contract', () => {
             'minOwned',
             'required',
             'role',
+            'type',
+        ],
+        'chat-materials': [
+            'accept',
+            'key',
+            'label',
+            'maxImages',
+            'minSources',
+            'required',
             'type',
         ],
         choice: [

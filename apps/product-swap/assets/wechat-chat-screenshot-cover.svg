@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1200" viewBox="0 0 900 1200">
+  <rect width="900" height="1200" rx="48" fill="#ededed"/>
+  <rect width="900" height="150" rx="48" fill="#f7f7f7"/>
+  <rect y="102" width="900" height="48" fill="#f7f7f7"/>
+  <text x="450" y="105" text-anchor="middle" font-family="sans-serif" font-size="42" font-weight="700" fill="#202020">小林</text>
+  <rect x="92" y="238" width="90" height="90" rx="18" fill="#f5a66f"/>
+  <rect x="210" y="238" width="420" height="118" rx="22" fill="#fff"/>
+  <text x="244" y="307" font-family="sans-serif" font-size="34" fill="#1d1d1d">这家看着很舒服呀</text>
+  <rect x="718" y="410" width="90" height="90" rx="18" fill="#6ea9e8"/>
+  <rect x="270" y="410" width="420" height="118" rx="22" fill="#95ec69"/>
+  <text x="304" y="479" font-family="sans-serif" font-size="34" fill="#1d1d1d">位置也很好找</text>
+  <rect x="92" y="586" width="90" height="90" rx="18" fill="#f5a66f"/>
+  <rect x="210" y="586" width="560" height="350" rx="22" fill="#fff"/>
+  <rect x="210" y="586" width="560" height="214" rx="22" fill="#dce7df"/>
+  <path d="M487 674c0-39 32-71 71-71s71 32 71 71c0 52-71 106-71 106s-71-54-71-106Z" fill="#07c160"/>
+  <circle cx="558" cy="674" r="24" fill="#fff"/>
+  <text x="246" y="854" font-family="sans-serif" font-size="38" font-weight="700" fill="#222">真实店铺位置</text>
+  <text x="246" y="905" font-family="sans-serif" font-size="27" fill="#777">腾讯地图搜索选择</text>
+  <rect x="718" y="1000" width="90" height="90" rx="18" fill="#6ea9e8"/>
+  <rect x="380" y="1000" width="310" height="112" rx="22" fill="#95ec69"/>
+  <text x="418" y="1068" font-family="sans-serif" font-size="34" fill="#1d1d1d">周末一起去</text>
+</svg>

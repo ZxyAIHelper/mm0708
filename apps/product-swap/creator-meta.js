@@ -145,6 +145,12 @@
         section.appendChild(textarea);
     }
 
+    function renderChatMaterialsField(section) {
+        const slot = global.document.createElement('div');
+        slot.className = 'chat-editor-slot';
+        section.appendChild(slot);
+    }
+
     function renderTemplateFields(container, manifest) {
         if (!container || !global.document) return container;
         container.replaceChildren();
@@ -164,6 +170,8 @@
                 renderBooleanField(section, field, controlId);
             } else if (field.type === 'text') {
                 renderTextField(section, field, controlId);
+            } else if (field.type === 'chat-materials') {
+                renderChatMaterialsField(section);
             }
             container.appendChild(section);
         }
@@ -188,7 +196,9 @@
             ),
         ).length;
         global.document.getElementById('creatorTip').textContent =
-            imageFieldCount > 1
+            template.id === 'wechat-chat-screenshot'
+                ? '提示：真实地点由腾讯地图选择，AI 只负责生成聊天内容。'
+                : imageFieldCount > 1
                 ? '提示：请按字段准备清晰图片，尽量保留完整主体内容。'
                 : '提示：上传一张清晰原图，尽量保留完整主体内容。';
         global.document.getElementById('generateButton').textContent =

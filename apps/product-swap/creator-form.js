@@ -1,5 +1,12 @@
 (function (global) {
     'use strict';
+    const ChatMaterials = (
+        typeof module !== 'undefined'
+        && module.exports
+        && typeof require === 'function'
+    )
+        ? require('./chat-materials')
+        : global.ChatMaterials;
 
     function fieldsFor(manifest) {
         return Array.isArray(manifest?.fields) ? manifest.fields : [];
@@ -99,7 +106,9 @@
     function initialValues(manifest) {
         return Object.fromEntries(fieldsFor(manifest).map((field) => [
             field.key,
-            field.type === 'dish-list'
+            field.type === 'chat-materials'
+                ? ChatMaterials.normalizeChatMaterials({})
+                : field.type === 'dish-list'
                 ? []
                 : (
                     field.default
@@ -120,6 +129,16 @@
     function validateValues(manifest, values) {
         for (const field of fieldsFor(manifest)) {
             const value = values?.[field.key];
+            if (field.type === 'chat-materials') {
+                const validation = ChatMaterials.validateChatMaterials(value);
+                if (validation) {
+                    return {
+                        ...validation,
+                        field: field.key,
+                    };
+                }
+                continue;
+            }
             if (field.type === 'dish-list') {
                 const dishes = normalizeDishItems(value).filter(
                     (dish) => dish.image,
@@ -181,7 +200,9 @@
         const payload = { templateId: manifest.id };
         for (const field of fieldsFor(manifest)) {
             const value = values?.[field.key];
-            payload[field.key] = field.type === 'dish-list'
+            payload[field.key] = field.type === 'chat-materials'
+                ? ChatMaterials.normalizeChatMaterials(value)
+                : field.type === 'dish-list'
                 ? normalizeDishItems(value)
                 : (
                     typeof value === 'string'

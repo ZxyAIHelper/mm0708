@@ -497,6 +497,16 @@ h2 {
     color: #c63d48;
 }
 /* WeChat chat screenshot template */
+body[data-template-id="wechat-chat-screenshot"] .example-card,
+body[data-template-id="wechat-chat-screenshot"] #generateButton,
+body[data-template-id="wechat-chat-screenshot"] #resultSection {
+    display: none;
+}
+
+body[data-template-id="wechat-chat-screenshot"] #swapForm {
+    max-width: 1180px;
+}
+
 .wechat-chat-editor {
     display: grid;
     grid-template-columns: minmax(300px, 1fr) minmax(340px, 0.95fr);

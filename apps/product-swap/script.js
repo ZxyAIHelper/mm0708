@@ -458,8 +458,11 @@ function readImageDimensions(source) {
 function boot() {
     const activeTemplate = window.CreatorMeta?.resolveCreatorTemplate(window.location.search);
     if (!activeTemplate) return;
+    const isChatTemplate =
+        activeTemplate.id === 'wechat-chat-screenshot';
     const CreatorForm = window.CreatorForm;
     const DishLibraryClient = window.DishLibraryClient;
+    const WechatChatEditor = window.WechatChatEditor;
     const versions = VersionHistory.createVersionHistory();
     let selectedVersionIndex = -1;
     const activeTaskKey = activeTaskStorageKey(activeTemplate);
@@ -479,7 +482,8 @@ function boot() {
     );
     const apiClient = window.ProductSwapApi;
     const localHistory = window.LocalTaskHistory;
-    const workerRegistration = 'serviceWorker' in navigator
+    const workerRegistration = !isChatTemplate
+        && 'serviceWorker' in navigator
         ? navigator.serviceWorker.register('/generation-worker.js', {
             scope: '/',
         }).then(() => navigator.serviceWorker.ready)
@@ -1243,7 +1247,15 @@ function boot() {
 
     for (const field of fields) {
         const section = fieldSections[field.key];
-        if (field.type === 'image') {
+        if (field.type === 'chat-materials') {
+            WechatChatEditor.mountWechatChatEditor({
+                section,
+                field,
+                api: window.ChatDraftClient,
+                map: window.TencentMapPicker,
+                renderer: window.WechatChatRenderer,
+            });
+        } else if (field.type === 'image') {
             const input = section.querySelector('input[type="file"]');
             const box = section.querySelector('.upload-box');
             input.addEventListener('change', () => {
@@ -1331,6 +1343,18 @@ function boot() {
                 });
             renderNonImageField(field);
         }
+    }
+
+    if (isChatTemplate) {
+        form.addEventListener('submit', (event) => {
+            event.preventDefault();
+        });
+        document
+            .getElementById('backButton')
+            .addEventListener('click', () => {
+                window.history.back();
+            });
+        return;
     }
 
     async function submitGeneration() {

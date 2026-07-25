@@ -35,9 +35,14 @@ test('creator page exposes the template-driven generator controls', () => {
     const scripts = [
         '/template-catalog.js',
         '/templates.js',
+        '/chat-materials.js',
         '/creator-form.js',
         '/creator-meta.js',
         '/api-client.js',
+        '/tencent-map-picker.js',
+        '/chat-draft-client.js',
+        '/wechat-chat-renderer.js',
+        '/wechat-chat-editor.js',
         '/local-history.js',
         '/script.js',
     ];
@@ -93,6 +98,39 @@ test('creator metadata renders all supported schema field types', () => {
     assert.match(source, /button\.appendChild\(text\)/);
     assert.match(source, /CreatorForm\.choiceTabIndex/);
     assert.match(source, /field\.maxLength/);
+    assert.match(source, /field\.type === 'chat-materials'/);
+    assert.match(source, /chat-editor-slot/);
+});
+
+test('chat template mounts its own editor and skips image generation', () => {
+    const source = fs.readFileSync(
+        path.join(root, 'script.js'),
+        'utf8',
+    );
+    const css = fs.readFileSync(path.join(root, 'app.css'), 'utf8');
+
+    assert.match(source, /const isChatTemplate\s*=/);
+    assert.match(source, /WechatChatEditor\.mountWechatChatEditor/);
+    assert.match(source, /field\.type === 'chat-materials'/);
+    assert.match(source, /if \(isChatTemplate\)[\s\S]*?return;/);
+    assert.match(
+        source,
+        /!isChatTemplate[\s\S]*?'serviceWorker' in navigator/,
+    );
+    assert.match(
+        css,
+        /body\[data-template-id="wechat-chat-screenshot"\][\s\S]*?#generateButton/,
+    );
+});
+
+test('chat template cover exists as a local svg', () => {
+    const cover = path.join(
+        root,
+        'assets',
+        'wechat-chat-screenshot-cover.svg',
+    );
+    assert.equal(fs.existsSync(cover), true);
+    assert.match(fs.readFileSync(cover, 'utf8'), /<svg/);
 });
 
 test('creator styles every schema-driven food template control', () => {
