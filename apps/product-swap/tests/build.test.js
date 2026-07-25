@@ -37,6 +37,7 @@ test('build emits only deployable public assets', async () => {
         'templates.js',
         'tencent-map-picker.js',
         'version-history.js',
+        'wechat-chat-editor.js',
         'wechat-chat-renderer.js',
     ]);
     assert.equal(

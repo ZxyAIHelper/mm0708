@@ -149,15 +149,23 @@
     </main>
 
     <nav class="bottom-nav" aria-label="主导航">
-        <a href="/" data-nav="home">首页</a>
+        <a href="/" data-nav="home">
+            <span aria-hidden="true">⌂</span>首页
+        </a>
         <a
             class="active"
             href="/create.html?template=product-swap"
             data-nav="create"
             aria-current="page"
-        >创作</a>
-        <a href="/history.html" data-nav="works">作品</a>
-        <a href="/profile.html" data-nav="profile">我的</a>
+        >
+            <span aria-hidden="true">＋</span>创作
+        </a>
+        <a href="/history.html" data-nav="works">
+            <span aria-hidden="true">▤</span>作品
+        </a>
+        <a href="/profile.html" data-nav="profile">
+            <span aria-hidden="true">○</span>我的
+        </a>
     </nav>
 
     <script src="/template-catalog.js"></script>
@@ -168,6 +176,7 @@
     <script src="/tencent-map-picker.js"></script>
     <script src="/chat-draft-client.js"></script>
     <script src="/wechat-chat-renderer.js"></script>
+    <script src="/wechat-chat-editor.js"></script>
     <script src="/dish-library-client.js"></script>
     <script src="/api-client.js"></script>
     <script src="/local-history.js"></script>
