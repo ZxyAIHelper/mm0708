@@ -119,6 +119,34 @@ test('requires a non-empty cover and non-empty field keys', () => {
     );
 });
 
+test('allows only safe non-prototype field identifiers', () => {
+    for (const key of [
+        '../escape',
+        'nested/path',
+        '__proto__',
+        'constructor',
+        'prototype',
+        'has-dash',
+    ]) {
+        assert.throws(
+            () => validateManifest(
+                validManifest({ fields: [{ key }] }),
+                'sample',
+            ),
+            /Template sample field key/,
+        );
+    }
+    assert.equal(
+        validateManifest(
+            validManifest({
+                fields: [{ key: 'targetImage2' }],
+            }),
+            'sample',
+        ).fields[0].key,
+        'targetImage2',
+    );
+});
+
 test('rejects a non-object manifest with a clear registry error', () => {
     assert.throws(
         () => validateManifest(null, 'sample'),

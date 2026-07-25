@@ -14,6 +14,8 @@ const {
 } = require('./template-registry');
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGE_DIMENSION = 16384;
+const MAX_IMAGE_PIXELS = 64 * 1024 * 1024;
 const MAX_REQUEST_BYTES = 42 * 1024 * 1024;
 const APP_ROOT = path.resolve(__dirname, '..');
 const PUBLIC_ASSETS_ROOT = path.join(APP_ROOT, 'assets');
@@ -60,8 +62,15 @@ class ProductSwapError extends Error {
 }
 
 function decodeImageDataUrl(value, fieldName) {
+    if (typeof value !== 'string') {
+        throw new ProductSwapError(
+            'INVALID_INPUT',
+            `${fieldName} 不是有效图片`,
+        );
+    }
+
     const match = /^data:([^;,]+);base64,([A-Za-z0-9+/=\r\n]+)$/.exec(
-        String(value || ''),
+        value,
     );
 
     if (!match) {
@@ -81,9 +90,26 @@ function decodeImageDataUrl(value, fieldName) {
         );
     }
 
-    const buffer = Buffer.from(match[2], 'base64');
+    const base64 = match[2];
+    const canonicalBase64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 
-    if (!buffer.length) {
+    if (
+        !canonicalBase64.test(base64)
+        || Math.floor(base64.length / 4) * 3
+            > MAX_IMAGE_BYTES + 2
+    ) {
+        throw new ProductSwapError(
+            'INVALID_INPUT',
+            `${fieldName} 不是有效图片`,
+        );
+    }
+
+    const buffer = Buffer.from(base64, 'base64');
+
+    if (
+        !buffer.length
+        || buffer.toString('base64') !== base64
+    ) {
         throw new ProductSwapError(
             'INVALID_INPUT',
             `${fieldName} 图片为空`,
@@ -97,10 +123,219 @@ function decodeImageDataUrl(value, fieldName) {
         );
     }
 
-    return { buffer, mimeType, extension };
+    const { width, height } = readImageDimensions(
+        buffer,
+        mimeType,
+    );
+
+    if (
+        !Number.isInteger(width)
+        || !Number.isInteger(height)
+        || width <= 0
+        || height <= 0
+        || width > MAX_IMAGE_DIMENSION
+        || height > MAX_IMAGE_DIMENSION
+        || width * height > MAX_IMAGE_PIXELS
+    ) {
+        throw new ProductSwapError(
+            'INVALID_IMAGE',
+            '图片尺寸无效',
+        );
+    }
+
+    return { buffer, mimeType, extension, width, height };
+}
+
+function readImageDimensions(buffer, mimeType) {
+    if (
+        mimeType === 'image/png'
+        && buffer.length >= 24
+        && buffer.subarray(0, 8).equals(
+            Buffer.from('89504e470d0a1a0a', 'hex'),
+        )
+        && buffer.toString('ascii', 12, 16) === 'IHDR'
+    ) {
+        return {
+            width: buffer.readUInt32BE(16),
+            height: buffer.readUInt32BE(20),
+        };
+    }
+
+    if (
+        mimeType === 'image/jpeg'
+        && buffer.length >= 4
+        && buffer[0] === 0xff
+        && buffer[1] === 0xd8
+    ) {
+        let offset = 2;
+        const startOfFrame = new Set([
+            0xc0, 0xc1, 0xc2, 0xc3,
+            0xc5, 0xc6, 0xc7,
+            0xc9, 0xca, 0xcb,
+            0xcd, 0xce, 0xcf,
+        ]);
+
+        while (offset + 3 < buffer.length) {
+            if (buffer[offset] !== 0xff) {
+                break;
+            }
+            while (
+                offset < buffer.length
+                && buffer[offset] === 0xff
+            ) {
+                offset += 1;
+            }
+            const marker = buffer[offset];
+            offset += 1;
+            if (marker === 0xd9 || marker === 0xda) {
+                break;
+            }
+            if (offset + 1 >= buffer.length) {
+                break;
+            }
+            const segmentLength = buffer.readUInt16BE(offset);
+            if (
+                segmentLength < 2
+                || offset + segmentLength > buffer.length
+            ) {
+                break;
+            }
+            if (
+                startOfFrame.has(marker)
+                && segmentLength >= 7
+            ) {
+                return {
+                    height: buffer.readUInt16BE(offset + 3),
+                    width: buffer.readUInt16BE(offset + 5),
+                };
+            }
+            offset += segmentLength;
+        }
+    }
+
+    if (
+        mimeType === 'image/webp'
+        && buffer.length >= 30
+        && buffer.toString('ascii', 0, 4) === 'RIFF'
+        && buffer.toString('ascii', 8, 12) === 'WEBP'
+    ) {
+        const format = buffer.toString('ascii', 12, 16);
+        if (format === 'VP8X') {
+            return {
+                width: 1 + buffer.readUIntLE(24, 3),
+                height: 1 + buffer.readUIntLE(27, 3),
+            };
+        }
+        if (
+            format === 'VP8 '
+            && buffer.length >= 30
+            && buffer[23] === 0x9d
+            && buffer[24] === 0x01
+            && buffer[25] === 0x2a
+        ) {
+            return {
+                width: buffer.readUInt16LE(26) & 0x3fff,
+                height: buffer.readUInt16LE(28) & 0x3fff,
+            };
+        }
+        if (format === 'VP8L' && buffer[20] === 0x2f) {
+            return {
+                width: 1 + (
+                    buffer[21]
+                    | ((buffer[22] & 0x3f) << 8)
+                ),
+                height: 1 + (
+                    (buffer[22] >> 6)
+                    | (buffer[23] << 2)
+                    | ((buffer[24] & 0x0f) << 10)
+                ),
+            };
+        }
+    }
+
+    throw new ProductSwapError(
+        'INVALID_IMAGE',
+        '图片格式无效',
+    );
+}
+
+function isPlainObject(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return false;
+    }
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+}
+
+function normalizeGeneratedAt(value) {
+    if (typeof value !== 'string') {
+        return '';
+    }
+    const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(Z|([+-])(\d{2}):(\d{2}))$/.exec(
+        value,
+    );
+    if (!match) {
+        return '';
+    }
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const hour = Number(match[4]);
+    const minute = Number(match[5]);
+    const second = Number(match[6]);
+    const offsetHour = Number(match[9] || 0);
+    const offsetMinute = Number(match[10] || 0);
+    const daysInMonth = new Date(
+        Date.UTC(year, month, 0),
+    ).getUTCDate();
+
+    if (
+        month < 1
+        || month > 12
+        || day < 1
+        || day > daysInMonth
+        || hour > 23
+        || minute > 59
+        || second > 59
+        || offsetHour > 23
+        || offsetMinute > 59
+    ) {
+        return '';
+    }
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '' : date.toISOString();
 }
 
 function validateGenerateRequest(body = {}) {
+    if (!isPlainObject(body)) {
+        throw new ProductSwapError(
+            'INVALID_INPUT',
+            '请求内容无效',
+        );
+    }
+    const dangerousKeys = new Set([
+        '__proto__',
+        'constructor',
+        'prototype',
+    ]);
+    if (Object.keys(body).some((key) => dangerousKeys.has(key))) {
+        throw new ProductSwapError(
+            'INVALID_INPUT',
+            '请求包含危险字段',
+        );
+    }
+    if (
+        body.templateId !== undefined
+        && (
+            typeof body.templateId !== 'string'
+            || !body.templateId
+        )
+    ) {
+        throw new ProductSwapError(
+            'INVALID_INPUT',
+            '模板标识无效',
+        );
+    }
     const template = getTemplatePackage(
         body.templateId || 'product-swap',
     );
@@ -112,14 +347,33 @@ function validateGenerateRequest(body = {}) {
         );
     }
 
-    const values = {};
+    const allowedKeys = new Set([
+        ...template.manifest.fields.map((field) => field.key),
+        'previousImage',
+        'messages',
+        'conversationId',
+        'generatedAt',
+        'templateId',
+    ]);
+    if (Object.keys(body).some((key) => !allowedKeys.has(key))) {
+        throw new ProductSwapError(
+            'INVALID_INPUT',
+            '请求包含未知字段',
+        );
+    }
+
+    const values = Object.create(null);
     const hasPreviousImage = Boolean(body.previousImage);
 
     for (const field of template.manifest.fields) {
         const rawValue = body[field.key];
+        const hasRawValue = Object.prototype.hasOwnProperty.call(
+            body,
+            field.key,
+        );
 
         if (field.type === 'image') {
-            if (!rawValue) {
+            if (!hasRawValue || rawValue === '') {
                 if (field.required) {
                     throw new ProductSwapError(
                         'INVALID_INPUT',
@@ -129,6 +383,12 @@ function validateGenerateRequest(body = {}) {
                 values[field.key] = null;
                 continue;
             }
+            if (typeof rawValue !== 'string') {
+                throw new ProductSwapError(
+                    'INVALID_INPUT',
+                    `${field.label}无效`,
+                );
+            }
             values[field.key] = decodeImageDataUrl(
                 rawValue,
                 field.key,
@@ -137,7 +397,16 @@ function validateGenerateRequest(body = {}) {
         }
 
         if (field.type === 'choice') {
-            const value = rawValue ?? field.default;
+            if (
+                hasRawValue
+                && typeof rawValue !== 'string'
+            ) {
+                throw new ProductSwapError(
+                    'INVALID_INPUT',
+                    `${field.label}无效`,
+                );
+            }
+            const value = hasRawValue ? rawValue : field.default;
             const allowedValues = (field.options || []).map(
                 (option) => option.value,
             );
@@ -152,7 +421,7 @@ function validateGenerateRequest(body = {}) {
         }
 
         if (field.type === 'boolean') {
-            const value = rawValue ?? field.default;
+            const value = hasRawValue ? rawValue : field.default;
             if (typeof value !== 'boolean') {
                 throw new ProductSwapError(
                     'INVALID_INPUT',
@@ -164,7 +433,22 @@ function validateGenerateRequest(body = {}) {
         }
 
         if (field.type === 'text') {
-            const value = String(rawValue || '').trim();
+            if (
+                hasRawValue
+                && typeof rawValue !== 'string'
+            ) {
+                throw new ProductSwapError(
+                    'INVALID_INPUT',
+                    `${field.label}无效`,
+                );
+            }
+            const value = (hasRawValue ? rawValue : '').trim();
+            if (field.required && !value) {
+                throw new ProductSwapError(
+                    'INVALID_INPUT',
+                    `${field.label}不能为空`,
+                );
+            }
             const limit = hasPreviousImage
                 ? 500
                 : field.maxLength;
@@ -178,16 +462,70 @@ function validateGenerateRequest(body = {}) {
         }
     }
 
-    if (values.showDateTime) {
-        const generatedAt = body.generatedAt || new Date().toISOString();
-        if (Number.isNaN(new Date(generatedAt).getTime())) {
+    let generatedAt = '';
+    if (body.generatedAt !== undefined) {
+        generatedAt = normalizeGeneratedAt(body.generatedAt);
+        if (!generatedAt) {
             throw new ProductSwapError(
                 'INVALID_INPUT',
                 '日期时间无效',
             );
         }
+    }
+    if (values.showDateTime) {
+        generatedAt = generatedAt || new Date().toISOString();
         values.generatedAt = generatedAt;
     }
+
+    if (
+        body.previousImage !== undefined
+        && typeof body.previousImage !== 'string'
+    ) {
+        throw new ProductSwapError(
+            'INVALID_INPUT',
+            'previousImage 无效',
+        );
+    }
+    if (
+        body.conversationId !== undefined
+        && (
+            typeof body.conversationId !== 'string'
+            || body.conversationId.length > 128
+        )
+    ) {
+        throw new ProductSwapError(
+            'INVALID_INPUT',
+            'conversationId 无效',
+        );
+    }
+    if (
+        body.messages !== undefined
+        && !Array.isArray(body.messages)
+    ) {
+        throw new ProductSwapError(
+            'INVALID_INPUT',
+            'messages 无效',
+        );
+    }
+    const messages = (body.messages || []).slice(-6).map(
+        (message) => {
+            if (
+                !isPlainObject(message)
+                || !['user', 'assistant'].includes(message.role)
+                || typeof message.content !== 'string'
+                || message.content.length > 1000
+            ) {
+                throw new ProductSwapError(
+                    'INVALID_INPUT',
+                    'messages 无效',
+                );
+            }
+            return {
+                role: message.role,
+                content: message.content,
+            };
+        },
+    );
 
     return {
         template,
@@ -195,36 +533,95 @@ function validateGenerateRequest(body = {}) {
         previousImage: body.previousImage
             ? decodeImageDataUrl(body.previousImage, 'previousImage')
             : null,
-        messages: Array.isArray(body.messages)
-            ? body.messages.slice(-6)
-            : [],
+        messages,
     };
 }
 
-async function readJsonBody(request) {
-    const chunks = [];
-    let size = 0;
+function readJsonBody(request, { timeoutMs = 15000 } = {}) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        let size = 0;
+        let settled = false;
 
-    for await (const chunk of request) {
-        size += chunk.length;
-        if (size > MAX_REQUEST_BYTES) {
-            throw new ProductSwapError(
-                'FILE_TOO_LARGE',
-                '上传内容过大',
-                413,
-            );
-        }
-        chunks.push(chunk);
-    }
+        const cleanup = () => {
+            clearTimeout(timer);
+            request.off('data', onData);
+            request.off('end', onEnd);
+            request.off('aborted', onAborted);
+            request.off('error', onError);
+        };
+        const finish = (callback) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            cleanup();
+            callback();
+        };
+        const rejectWith = (code, message, status) => {
+            finish(() => reject(
+                new ProductSwapError(code, message, status),
+            ));
+        };
+        const onData = (chunk) => {
+            size += chunk.length;
+            if (size > MAX_REQUEST_BYTES) {
+                rejectWith(
+                    'FILE_TOO_LARGE',
+                    '上传内容过大',
+                    413,
+                );
+                request.destroy();
+                return;
+            }
+            chunks.push(chunk);
+        };
+        const onEnd = () => {
+            try {
+                const value = JSON.parse(
+                    Buffer.concat(chunks).toString('utf8') || '{}',
+                );
+                finish(() => resolve(value));
+            } catch {
+                rejectWith('INVALID_INPUT', '请求格式无效');
+            }
+        };
+        const onAborted = () => {
+            rejectWith('REQUEST_ABORTED', '请求已中止', 400);
+        };
+        const onError = () => {
+            rejectWith('REQUEST_ABORTED', '请求已中止', 400);
+        };
+        const timer = setTimeout(() => {
+            rejectWith('REQUEST_TIMEOUT', '请求体读取超时', 408);
+            request.destroy();
+        }, timeoutMs);
 
-    try {
-        return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
-    } catch {
+        request.on('data', onData);
+        request.once('end', onEnd);
+        request.once('aborted', onAborted);
+        request.once('error', onError);
+    });
+}
+
+function resolveTaskImagePath(taskDir, name, extension) {
+    const taskRoot = path.resolve(taskDir);
+    const filePath = path.resolve(
+        taskRoot,
+        `${name}${extension}`,
+    );
+
+    if (
+        !/^[A-Za-z][A-Za-z0-9_]*$/.test(name)
+        || !/^\.[a-z0-9]+$/i.test(extension)
+        || path.dirname(filePath) !== taskRoot
+    ) {
         throw new ProductSwapError(
-            'INVALID_INPUT',
-            '请求格式无效',
+            'INVALID_TEMPLATE',
+            '模板图片字段无效',
         );
     }
+    return filePath;
 }
 
 async function writeInputImage(taskDir, name, image) {
@@ -232,7 +629,11 @@ async function writeInputImage(taskDir, name, image) {
         return null;
     }
 
-    const filePath = path.join(taskDir, `${name}${image.extension}`);
+    const filePath = resolveTaskImagePath(
+        taskDir,
+        name,
+        image.extension,
+    );
     await fs.writeFile(filePath, image.buffer);
     return filePath;
 }
@@ -281,6 +682,13 @@ function mapServerError(error) {
             {
                 status: 500,
                 message: 'Codex 没有生成结果图片',
+            },
+        ],
+        [
+            'INVALID_RESULT_IMAGE',
+            {
+                status: 500,
+                message: '生成结果图片无效',
             },
         ],
         [
@@ -481,44 +889,87 @@ function createProductSwapServer({
 } = {}) {
     let generationActive = false;
 
-    return http.createServer(async (request, response) => {
-        response.setHeader('Access-Control-Allow-Origin', '*');
-        response.setHeader(
-            'Access-Control-Allow-Headers',
-            'Content-Type',
-            'X-Product-Swap-Agent-Depth',
-        );
-        response.setHeader(
-            'Access-Control-Allow-Methods',
-            'GET,HEAD,POST,OPTIONS',
-        );
+    const server = http.createServer(async (request, response) => {
+        const pathname = new URL(
+            request.url || '/',
+            'http://local',
+        ).pathname;
+        const isGenerateApi = pathname.replace(/\/+$/, '')
+            === '/api/product-swap/generate';
+        const origin = request.headers.origin;
+
+        if ((isGenerateApi || request.method === 'OPTIONS') && origin) {
+            let parsedOrigin;
+            const address = server.address();
+
+            try {
+                parsedOrigin = new URL(origin);
+            } catch {
+                parsedOrigin = null;
+            }
+            const allowedHost = parsedOrigin
+                && parsedOrigin.protocol === 'http:'
+                && (
+                    parsedOrigin.hostname === '127.0.0.1'
+                    || parsedOrigin.hostname === 'localhost'
+                )
+                && Number(parsedOrigin.port) === address?.port;
+
+            if (!allowedHost) {
+                sendJson(response, 403, {
+                    success: false,
+                    error: {
+                        code: 'FORBIDDEN_ORIGIN',
+                        message: '请求来源不受信任',
+                    },
+                });
+                return;
+            }
+            response.setHeader(
+                'Access-Control-Allow-Origin',
+                parsedOrigin.origin,
+            );
+            response.setHeader('Vary', 'Origin');
+        }
 
         if (request.method === 'OPTIONS') {
+            response.setHeader(
+                'Access-Control-Allow-Headers',
+                'Content-Type, X-Product-Swap-Agent-Depth',
+            );
+            response.setHeader(
+                'Access-Control-Allow-Methods',
+                'POST, OPTIONS',
+            );
             response.writeHead(204);
             response.end();
             return;
         }
 
-        const pathname = new URL(
-            request.url || '/',
-            'http://local',
-        ).pathname;
-
         if (
-            pathname.replace(/\/+$/, '')
-                === '/api/product-swap/generate'
+            isGenerateApi
             && request.method === 'POST'
         ) {
             const requestedDepth = Number(
                 request.headers['x-product-swap-agent-depth'] || 0,
             );
 
-            if (generationActive || requestedDepth > 0) {
+            if (requestedDepth > 0) {
                 sendJson(response, 409, {
                     success: false,
                     error: {
                         code: 'AGENT_LOOP_GUARD',
                         message: '检测到嵌套生成请求，已阻止 agent 循环',
+                    },
+                });
+                return;
+            }
+            if (generationActive) {
+                sendJson(response, 409, {
+                    success: false,
+                    error: {
+                        code: 'SERVER_BUSY',
+                        message: '已有生成任务正在进行',
                     },
                 });
                 return;
@@ -559,6 +1010,8 @@ function createProductSwapServer({
 
         await serveStatic(request, response);
     });
+
+    return server;
 }
 
 if (require.main === module) {
@@ -576,6 +1029,8 @@ module.exports = {
     MAX_IMAGE_BYTES,
     ProductSwapError,
     decodeImageDataUrl,
+    readJsonBody,
+    resolveTaskImagePath,
     validateGenerateRequest,
     createProductSwapServer,
 };

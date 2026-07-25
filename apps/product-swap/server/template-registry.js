@@ -87,6 +87,21 @@ function validateManifest(manifest, directoryName) {
     }
 
     const fieldKeys = manifest.fields.map((field) => field.key);
+    const reservedFieldKeys = new Set([
+        '__proto__',
+        'constructor',
+        'prototype',
+    ]);
+    for (const fieldKey of fieldKeys) {
+        if (
+            !/^[A-Za-z][A-Za-z0-9_]*$/.test(fieldKey)
+            || reservedFieldKeys.has(fieldKey)
+        ) {
+            throw new Error(
+                `Template ${manifest.id} field key ${fieldKey} is unsafe`,
+            );
+        }
+    }
     if (new Set(fieldKeys).size !== fieldKeys.length) {
         throw new Error(`Template ${manifest.id} has duplicate field keys`);
     }

@@ -1,13 +1,19 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { once } = require('node:events');
+const { PassThrough } = require('node:stream');
 
 const {
     createProductSwapServer,
+    readJsonBody,
 } = require('../server/dev-server');
 const { publicCatalog } = require('../server/template-registry');
 
-const tinyPng = 'data:image/png;base64,iVBORw0KGgo=';
+const tinyPng = [
+    'data:image/png;base64,',
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwC',
+    'AAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+].join('');
 
 test('serves the app and returns an injected generated image', async (t) => {
     const server = createProductSwapServer({
@@ -93,7 +99,7 @@ test('returns stable validation errors', async (t) => {
     assert.equal(data.error.code, 'INVALID_INPUT');
 });
 
-test('rejects a nested generation while the local agent is active', async (t) => {
+test('rejects a concurrent generation with SERVER_BUSY', async (t) => {
     let releaseProvider;
     let markStarted;
     const started = new Promise((resolve) => {
@@ -139,11 +145,129 @@ test('rejects a nested generation while the local agent is active', async (t) =>
     const nestedData = await nestedResponse.json();
 
     assert.equal(nestedResponse.status, 409);
-    assert.equal(nestedData.error.code, 'AGENT_LOOP_GUARD');
+    assert.equal(nestedData.error.code, 'SERVER_BUSY');
 
     releaseProvider();
     const firstResponse = await firstRequest;
     assert.equal(firstResponse.status, 200);
+});
+
+test('rejects an explicitly nested agent generation', async (t) => {
+    const server = createProductSwapServer({
+        provider: async () => {
+            throw new Error('provider must not run');
+        },
+    });
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    t.after(() => server.close());
+
+    const { port } = server.address();
+    const response = await fetch(
+        `http://127.0.0.1:${port}/api/product-swap/generate`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Product-Swap-Agent-Depth': '1',
+            },
+            body: JSON.stringify({ targetImage: tinyPng }),
+        },
+    );
+    const data = await response.json();
+
+    assert.equal(response.status, 409);
+    assert.equal(data.error.code, 'AGENT_LOOP_GUARD');
+});
+
+test('rejects foreign API origins before generation and preflight', async (t) => {
+    let providerCalls = 0;
+    const server = createProductSwapServer({
+        provider: async () => {
+            providerCalls += 1;
+            return {
+                imageBuffer: Buffer.from('result'),
+                mimeType: 'image/png',
+                provider: 'fake',
+            };
+        },
+    });
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    t.after(() => server.close());
+
+    const { port } = server.address();
+    const url = `http://127.0.0.1:${port}/api/product-swap/generate`;
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Origin: 'https://evil.example',
+        },
+        body: JSON.stringify({ targetImage: tinyPng }),
+    });
+    const preflight = await fetch(url, {
+        method: 'OPTIONS',
+        headers: { Origin: 'https://evil.example' },
+    });
+
+    assert.equal(response.status, 403);
+    assert.equal((await response.json()).error.code, 'FORBIDDEN_ORIGIN');
+    assert.equal(preflight.status, 403);
+    assert.equal(providerCalls, 0);
+    assert.notEqual(
+        response.headers.get('access-control-allow-origin'),
+        '*',
+    );
+});
+
+test('allows same-origin browser generation without wildcard CORS', async (t) => {
+    const server = createProductSwapServer({
+        provider: async () => ({
+            imageBuffer: Buffer.from('result'),
+            mimeType: 'image/png',
+            provider: 'fake',
+        }),
+    });
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    t.after(() => server.close());
+
+    const { port } = server.address();
+    const origin = `http://127.0.0.1:${port}`;
+    const response = await fetch(
+        `${origin}/api/product-swap/generate`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Origin: origin,
+            },
+            body: JSON.stringify({ targetImage: tinyPng }),
+        },
+    );
+
+    assert.equal(response.status, 200);
+    assert.equal(
+        response.headers.get('access-control-allow-origin'),
+        origin,
+    );
+});
+
+test('readJsonBody reports request timeout and abort with stable codes', async () => {
+    const timedOut = new PassThrough();
+    await assert.rejects(
+        () => readJsonBody(timedOut, { timeoutMs: 5 }),
+        (error) => error.code === 'REQUEST_TIMEOUT',
+    );
+
+    const aborted = new PassThrough();
+    const reading = readJsonBody(aborted, { timeoutMs: 100 });
+    aborted.destroy(new Error('client disconnected'));
+    await assert.rejects(
+        () => reading,
+        (error) => error.code === 'REQUEST_ABORTED',
+    );
 });
 
 test('rejects private application files from static GET and HEAD', async (t) => {

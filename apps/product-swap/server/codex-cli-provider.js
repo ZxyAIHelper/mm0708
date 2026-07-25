@@ -5,6 +5,9 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 
+const MAX_RESULT_IMAGE_BYTES = 10 * 1024 * 1024;
+const PNG_MAGIC = Buffer.from('89504e470d0a1a0a', 'hex');
+
 function buildCodexArgs({ taskDir, imagePaths, prompt }) {
     const args = [
         'exec',
@@ -26,13 +29,18 @@ function buildCodexArgs({ taskDir, imagePaths, prompt }) {
     return args;
 }
 
-function buildCodexSpawnOptions(taskDir, baseEnv = process.env) {
+function buildCodexSpawnOptions(
+    taskDir,
+    baseEnv = process.env,
+    platform = process.platform,
+) {
     const currentDepth = Number(
         baseEnv.PRODUCT_SWAP_AGENT_DEPTH || 0,
     );
 
     return {
         cwd: taskDir,
+        detached: platform !== 'win32',
         shell: false,
         windowsHide: true,
         stdio: ['ignore', 'ignore', 'pipe'],
@@ -57,11 +65,94 @@ function createSerialQueue() {
     };
 }
 
+function delay(milliseconds) {
+    return new Promise((resolve) => {
+        setTimeout(resolve, milliseconds);
+    });
+}
+
+function waitForSpawnedProcess(child) {
+    return new Promise((resolve, reject) => {
+        child.once('error', reject);
+        child.once('close', (code) => {
+            if (code === 0) {
+                resolve();
+                return;
+            }
+            reject(new Error(`Process exited with code ${code}`));
+        });
+    });
+}
+
+async function terminateProcessTree({
+    child,
+    waitForClose,
+    isClosed,
+    platform = process.platform,
+    treeKillSpawnImpl = spawn,
+    processKillImpl = process.kill,
+    killGraceMs = 1000,
+}) {
+    if (isClosed()) {
+        return;
+    }
+
+    if (platform === 'win32') {
+        try {
+            if (!Number.isInteger(child.pid) || child.pid <= 0) {
+                throw new Error('Child PID is unavailable');
+            }
+            const killer = treeKillSpawnImpl(
+                'taskkill',
+                ['/PID', String(child.pid), '/T', '/F'],
+                {
+                    shell: false,
+                    windowsHide: true,
+                    stdio: 'ignore',
+                },
+            );
+            await waitForSpawnedProcess(killer);
+        } catch {
+            if (!isClosed()) {
+                child.kill();
+            }
+        }
+        await waitForClose;
+        return;
+    }
+
+    const signalProcessGroup = (signal) => {
+        if (!Number.isInteger(child.pid) || child.pid <= 0) {
+            child.kill(signal);
+            return;
+        }
+        try {
+            processKillImpl(-child.pid, signal);
+        } catch {
+            child.kill(signal);
+        }
+    };
+
+    signalProcessGroup('SIGTERM');
+    const closedDuringGrace = await Promise.race([
+        waitForClose.then(() => true),
+        delay(killGraceMs).then(() => false),
+    ]);
+    if (!closedDuringGrace && !isClosed()) {
+        signalProcessGroup('SIGKILL');
+        await waitForClose;
+    }
+}
+
 async function runCodexProcess({
     taskDir,
     args,
     timeoutMs = 300000,
     spawnImpl = spawn,
+    treeKillSpawnImpl = spawn,
+    platform = process.platform,
+    processKillImpl = process.kill,
+    killGraceMs = 1000,
 }) {
     if (Number(process.env.PRODUCT_SWAP_AGENT_DEPTH || 0) > 0) {
         const error = new Error('Nested product-swap agent call blocked');
@@ -73,10 +164,16 @@ async function runCodexProcess({
         const child = spawnImpl(
             'codex',
             args,
-            buildCodexSpawnOptions(taskDir),
+            buildCodexSpawnOptions(taskDir, process.env, platform),
         );
         let stderr = '';
         let settled = false;
+        let timedOut = false;
+        let closed = false;
+        let resolveClosed;
+        const waitForClose = new Promise((resolve) => {
+            resolveClosed = resolve;
+        });
 
         function finish(callback) {
             if (settled) {
@@ -95,15 +192,32 @@ async function runCodexProcess({
         });
 
         const timer = setTimeout(() => {
-            child.kill();
-            finish(() => {
-                const error = new Error('Codex generation timed out');
-                error.code = 'CODEX_TIMEOUT';
-                reject(error);
+            timedOut = true;
+            void terminateProcessTree({
+                child,
+                waitForClose,
+                isClosed: () => closed,
+                platform,
+                treeKillSpawnImpl,
+                processKillImpl,
+                killGraceMs,
+            }).catch(() => waitForClose).then(() => {
+                finish(() => {
+                    const error = new Error(
+                        'Codex generation timed out',
+                    );
+                    error.code = 'CODEX_TIMEOUT';
+                    reject(error);
+                });
             });
         }, timeoutMs);
 
         child.once('error', (error) => {
+            closed = true;
+            resolveClosed();
+            if (timedOut) {
+                return;
+            }
             finish(() => {
                 error.code = error.code === 'ENOENT'
                     ? 'CODEX_CLI_UNAVAILABLE'
@@ -113,6 +227,11 @@ async function runCodexProcess({
         });
 
         child.once('close', (code) => {
+            closed = true;
+            resolveClosed();
+            if (timedOut) {
+                return;
+            }
             finish(() => {
                 if (code === 0) {
                     resolve();
@@ -129,9 +248,35 @@ async function runCodexProcess({
     });
 
     const resultPath = path.join(taskDir, 'result.png');
+    let resultStat;
+
+    try {
+        resultStat = await fs.stat(resultPath);
+    } catch {
+        const error = new Error('Codex did not create result.png');
+        error.code = 'RESULT_IMAGE_NOT_FOUND';
+        throw error;
+    }
+
+    if (
+        !resultStat.isFile()
+        || resultStat.size < PNG_MAGIC.length
+        || resultStat.size > MAX_RESULT_IMAGE_BYTES
+    ) {
+        const error = new Error('Codex created an invalid result.png');
+        error.code = 'INVALID_RESULT_IMAGE';
+        throw error;
+    }
 
     try {
         const imageBuffer = await fs.readFile(resultPath);
+        if (
+            imageBuffer.length > MAX_RESULT_IMAGE_BYTES
+            || !imageBuffer.subarray(0, PNG_MAGIC.length)
+                .equals(PNG_MAGIC)
+        ) {
+            throw new Error('invalid PNG result');
+        }
         return {
             imageBuffer,
             mimeType: 'image/png',
@@ -139,8 +284,8 @@ async function runCodexProcess({
             assistantMessage: '已完成生成，可以继续提出修改。',
         };
     } catch {
-        const error = new Error('Codex did not create result.png');
-        error.code = 'RESULT_IMAGE_NOT_FOUND';
+        const error = new Error('Codex created an invalid result.png');
+        error.code = 'INVALID_RESULT_IMAGE';
         throw error;
     }
 }
@@ -168,9 +313,11 @@ async function generateWithCodex({
 }
 
 module.exports = {
+    MAX_RESULT_IMAGE_BYTES,
     buildCodexArgs,
     buildCodexSpawnOptions,
     createSerialQueue,
+    terminateProcessTree,
     runCodexProcess,
     generateWithCodex,
 };

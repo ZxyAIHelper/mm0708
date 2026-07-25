@@ -6,9 +6,14 @@ const assert = require('node:assert/strict');
 const {
     validateGenerateRequest,
     decodeImageDataUrl,
+    resolveTaskImagePath,
 } = require('../server/dev-server');
 
-const tinyPng = 'data:image/png;base64,iVBORw0KGgo=';
+const tinyPng = [
+    'data:image/png;base64,',
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwC',
+    'AAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+].join('');
 
 test('requires the default product-swap target image', () => {
     assert.throws(
@@ -120,6 +125,123 @@ test('validates date-time and retains only the last six messages', () => {
     assert.deepEqual(value.messages, messages.slice(-6));
 });
 
+test('requires a plain request object and rejects unknown keys', () => {
+    for (const body of [null, [], Object.create({})]) {
+        assert.throws(
+            () => validateGenerateRequest(body),
+            (error) => error.code === 'INVALID_INPUT',
+        );
+    }
+    assert.throws(
+        () => validateGenerateRequest({
+            targetImage: tinyPng,
+            unexpected: 'value',
+        }),
+        (error) => error.code === 'INVALID_INPUT',
+    );
+    assert.throws(
+        () => validateGenerateRequest(JSON.parse(
+            `{"targetImage":${JSON.stringify(tinyPng)},"constructor":"bad"}`,
+        )),
+        (error) => error.code === 'INVALID_INPUT',
+    );
+});
+
+test('requires exact schema field value types', () => {
+    assert.throws(
+        () => validateGenerateRequest({
+            targetImage: tinyPng,
+            requirements: 123,
+        }),
+        (error) => error.code === 'INVALID_INPUT',
+    );
+    assert.throws(
+        () => validateGenerateRequest({
+            templateId: 'food-copy-layout',
+            targetImage: tinyPng,
+            aspectRatio: 3,
+        }),
+        (error) => error.code === 'INVALID_INPUT',
+    );
+    assert.throws(
+        () => validateGenerateRequest({
+            templateId: 'food-copy-layout',
+            targetImage: tinyPng,
+            showDateTime: null,
+        }),
+        (error) => error.code === 'INVALID_INPUT',
+    );
+});
+
+test('validates and sanitizes bounded conversation metadata', () => {
+    assert.throws(
+        () => validateGenerateRequest({
+            targetImage: tinyPng,
+            messages: 'not-an-array',
+        }),
+        (error) => error.code === 'INVALID_INPUT',
+    );
+    assert.throws(
+        () => validateGenerateRequest({
+            targetImage: tinyPng,
+            messages: [{ role: 'tool', content: 'run' }],
+        }),
+        (error) => error.code === 'INVALID_INPUT',
+    );
+    assert.throws(
+        () => validateGenerateRequest({
+            targetImage: tinyPng,
+            messages: [{
+                role: 'user',
+                content: 'a'.repeat(1001),
+            }],
+        }),
+        (error) => error.code === 'INVALID_INPUT',
+    );
+
+    const value = validateGenerateRequest({
+        targetImage: tinyPng,
+        conversationId: 'conversation_1',
+        messages: [{
+            role: 'user',
+            content: 'move it',
+            ignored: 'strip me',
+        }],
+    });
+    assert.deepEqual(value.messages, [{
+        role: 'user',
+        content: 'move it',
+    }]);
+});
+
+test('requires calendar-valid timezone-qualified RFC3339 dates', () => {
+    for (const generatedAt of [
+        '2026-07-25T16:16:58',
+        '2026-02-30T16:16:58+08:00',
+        1784967418000,
+    ]) {
+        assert.throws(
+            () => validateGenerateRequest({
+                templateId: 'food-copy-layout',
+                targetImage: tinyPng,
+                generatedAt,
+            }),
+            (error) => error.code === 'INVALID_INPUT'
+                && error.message === '日期时间无效',
+        );
+    }
+
+    const value = validateGenerateRequest({
+        templateId: 'food-copy-layout',
+        targetImage: tinyPng,
+        generatedAt: '2026-07-25T16:16:58+08:00',
+    });
+    assert.equal(
+        value.values.generatedAt,
+        '2026-07-25T08:16:58.000Z',
+    );
+});
+
 test('decodes supported Data URLs and rejects unsupported MIME types', () => {
     const decoded = decodeImageDataUrl(tinyPng, 'targetImage');
     assert.equal(decoded.mimeType, 'image/png');
@@ -132,5 +254,69 @@ test('decodes supported Data URLs and rejects unsupported MIME types', () => {
                 'targetImage',
             ),
         (error) => error.code === 'UNSUPPORTED_IMAGE',
+    );
+});
+
+test('rejects non-string, non-canonical, and MIME-mismatched images', () => {
+    assert.throws(
+        () => decodeImageDataUrl({ data: tinyPng }, 'targetImage'),
+        (error) => error.code === 'INVALID_INPUT',
+    );
+    assert.throws(
+        () => decodeImageDataUrl(
+            'data:image/png;base64,AA=A',
+            'targetImage',
+        ),
+        (error) => error.code === 'INVALID_INPUT',
+    );
+    assert.throws(
+        () => decodeImageDataUrl(
+            tinyPng.replace('image/png', 'image/jpeg'),
+            'targetImage',
+        ),
+        (error) => error.code === 'INVALID_IMAGE',
+    );
+});
+
+test('rejects zero and oversized image dimensions', () => {
+    const pngHeader = (width, height) => {
+        const buffer = Buffer.alloc(24);
+        Buffer.from('89504e470d0a1a0a', 'hex').copy(buffer);
+        buffer.writeUInt32BE(13, 8);
+        buffer.write('IHDR', 12, 'ascii');
+        buffer.writeUInt32BE(width, 16);
+        buffer.writeUInt32BE(height, 20);
+        return `data:image/png;base64,${buffer.toString('base64')}`;
+    };
+
+    assert.throws(
+        () => decodeImageDataUrl(
+            pngHeader(0, 1),
+            'targetImage',
+        ),
+        (error) => error.code === 'INVALID_IMAGE',
+    );
+    assert.throws(
+        () => decodeImageDataUrl(
+            pngHeader(50000, 50000),
+            'targetImage',
+        ),
+        (error) => error.code === 'INVALID_IMAGE',
+    );
+});
+
+test('resolves image files directly inside the task directory', () => {
+    const taskDir = 'C:\\temp\\safe-task';
+    assert.equal(
+        resolveTaskImagePath(taskDir, 'targetImage', '.png'),
+        'C:\\temp\\safe-task\\targetImage.png',
+    );
+    assert.throws(
+        () => resolveTaskImagePath(
+            taskDir,
+            '..\\escape',
+            '.png',
+        ),
+        (error) => error.code === 'INVALID_TEMPLATE',
     );
 });
