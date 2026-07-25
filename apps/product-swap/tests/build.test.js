@@ -25,6 +25,8 @@ test('build emits only deployable public assets', async () => {
         'index.html',
         'local-history.js',
         'merchant-store.js',
+        'profile.html',
+        'profile.js',
         'script.js',
         'style.css',
         'templates.js',

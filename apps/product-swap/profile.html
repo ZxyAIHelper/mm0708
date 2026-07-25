@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>我的店铺 · 商家内容助手</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+    <main class="app-shell profile-shell">
+        <header class="profile-header">
+            <p class="eyebrow">资料会自动带入创作</p>
+            <h1>我的店铺</h1>
+        </header>
+
+        <section class="profile-section" aria-labelledby="shopSectionTitle">
+            <h2 id="shopSectionTitle">店铺资料</h2>
+            <form id="shopForm" class="settings-card">
+                <label for="shopName">店铺名称</label>
+                <input id="shopName" name="shopName" maxlength="60" required>
+
+                <label for="shopIndustry">所属行业</label>
+                <input id="shopIndustry" name="shopIndustry" maxlength="40">
+
+                <label for="shopSlogan">店铺标语</label>
+                <textarea id="shopSlogan" name="shopSlogan" maxlength="120"></textarea>
+
+                <button type="submit">保存店铺资料</button>
+            </form>
+        </section>
+
+        <section class="profile-section" aria-labelledby="productSectionTitle">
+            <h2 id="productSectionTitle">产品素材</h2>
+            <form id="productForm" class="settings-card">
+                <label for="productName">产品名称</label>
+                <input id="productName" name="productName" maxlength="80" required>
+
+                <label for="productSellingPoint">产品卖点</label>
+                <textarea
+                    id="productSellingPoint"
+                    name="productSellingPoint"
+                    maxlength="160"
+                ></textarea>
+
+                <label for="productPrice">产品价格</label>
+                <input
+                    id="productPrice"
+                    name="productPrice"
+                    maxlength="40"
+                    inputmode="decimal"
+                >
+
+                <button type="submit">添加产品</button>
+            </form>
+
+            <p id="profileNotice" role="status" hidden></p>
+            <div id="productList" class="product-list" aria-live="polite"></div>
+        </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="主要导航">
+        <a href="/" data-nav="home">
+            <span aria-hidden="true">⌂</span>首页
+        </a>
+        <a href="/create.html" data-nav="create">
+            <span aria-hidden="true">＋</span>创作
+        </a>
+        <a href="/history.html" data-nav="history">
+            <span aria-hidden="true">▣</span>作品
+        </a>
+        <a class="active" href="/profile.html" data-nav="profile" aria-current="page">
+            <span aria-hidden="true">●</span>我的
+        </a>
+    </nav>
+
+    <script src="/merchant-store.js"></script>
+    <script src="/profile.js"></script>
+</body>
+</html>
