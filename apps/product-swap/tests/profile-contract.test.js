@@ -28,4 +28,7 @@ test('profile page exposes the merchant profile contract', () => {
     assert.ok(merchantScript >= 0);
     assert.ok(merchantScript < profileScript);
     assert.match(html, /data-nav=["']profile["']/);
+    assert.match(html, /<label for=["']shopSlogan["']>常用宣传语<\/label>/);
+    assert.match(html, /<label for=["']productSellingPoint["']>核心卖点<\/label>/);
+    assert.match(html, /<label for=["']productPrice["']>价格<\/label>/);
 });
