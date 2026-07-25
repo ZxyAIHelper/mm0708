@@ -145,6 +145,12 @@ ${JSON.stringify({
             validateChatDraftRequest(validRequest),
         )
         expect(prompt[0].role).toBe('system')
+        expect(prompt[0].content).toContain(
+            '{"version":1,"contactName"',
+        )
+        expect(prompt[0].content).toContain(
+            'text 消息只能包含 id、side、type、text',
+        )
         expect(prompt[1].content).toContain(
             '---BEGIN_UNTRUSTED_CHAT_MATERIALS---',
         )

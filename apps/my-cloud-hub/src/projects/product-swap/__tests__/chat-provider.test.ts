@@ -70,9 +70,14 @@ describe('chat draft provider', () => {
 
         expect(result.draft.contactName).toBe('小林')
         expect(fetchMock).toHaveBeenCalledTimes(2)
-        expect(JSON.parse(
+        const repairMessages = JSON.parse(
             String(fetchMock.mock.calls[1][1].body),
-        ).messages.at(-1).content).toContain('修复')
+        ).messages
+        expect(repairMessages.at(-2)).toEqual({
+            role: 'assistant',
+            content: 'not json',
+        })
+        expect(repairMessages.at(-1).content).toContain('修复')
     })
 
     it('returns a stable error after a second invalid response', async () => {

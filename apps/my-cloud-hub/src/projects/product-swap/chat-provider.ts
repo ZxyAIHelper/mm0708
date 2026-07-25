@@ -152,6 +152,9 @@ export async function generateChatDraft(
             env.DOUBAO_CHAT_ENDPOINT,
             env.DOUBAO_API_KEY,
             [...messages, {
+                role: 'assistant',
+                content,
+            }, {
                 role: 'user',
                 content: [
                     `上次输出无效：${error.message}`,

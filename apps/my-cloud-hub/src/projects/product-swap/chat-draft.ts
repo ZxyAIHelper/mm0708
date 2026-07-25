@@ -46,7 +46,7 @@ export type DraftRefs = {
 }
 
 export type ArkMessage = {
-    role: 'system' | 'user'
+    role: 'system' | 'user' | 'assistant'
     content: string
 }
 
@@ -299,8 +299,11 @@ export function buildChatDraftMessages(
         content: [
             '你是中文微信单聊对话编剧。',
             '只输出 JSON，不要 Markdown、解释或额外字段。',
+            '严格结构示例：{"version":1,"contactName":"小林","messages":[{"id":"m1","side":"right","type":"text","text":"刚发现一家店"},{"id":"m2","side":"left","type":"text","text":"怎么样？"}]}。',
             '输出 version=1、contactName 和 6 至 10 条 messages。',
             '消息 side 只能是 left/right，type 只能是 text/image_ref/location_ref。',
+            'text 消息只能包含 id、side、type、text；image_ref 和 location_ref 消息只能包含 id、side、type、refId。',
+            '每条消息 id 使用 m1、m2、m3 这样的唯一值。',
             '每个已提供的图片和地点素材必须且只能引用一次。',
             '文本像真实朋友聊天，不编造价格、优惠、销量、地址或联系方式。',
             '单条文字不超过 80 字，总文字不超过 500 字。',
