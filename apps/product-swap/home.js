@@ -15,6 +15,20 @@
         ];
     }
 
+    function readShopSummary(createStore) {
+        try {
+            const profile = createStore().loadProfile();
+            return profile.shop.name || '完善店铺';
+        } catch {
+            return '完善店铺';
+        }
+    }
+
+    function syncCategoryButton(button, isActive) {
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-pressed', String(isActive));
+    }
+
     function createTemplateCard(template) {
         const model = templateCardModel(template);
         const card = document.createElement(model.href ? 'a' : 'article');
@@ -56,7 +70,7 @@
     function boot() {
         const catalog = globalScope.ContentTemplates;
         const merchant = globalScope.MerchantStore;
-        if (!catalog || !merchant) return;
+        if (!catalog) return;
 
         const shopSummary = document.querySelector('#shopSummary');
         const searchForm = document.querySelector('#templateSearch');
@@ -67,10 +81,11 @@
         const templateGrid = document.querySelector('#templateGrid');
         const emptyState = document.querySelector('#homeEmpty');
         const templates = catalog.listTemplates();
-        const profile = merchant.createMerchantStore().loadProfile();
         let activeCategory = '全部';
 
-        shopSummary.textContent = profile.shop.name || '完善店铺';
+        shopSummary.textContent = readShopSummary(
+            () => merchant.createMerchantStore(),
+        );
 
         function render() {
             const matches = catalog.searchTemplates(searchInput.value);
@@ -84,7 +99,10 @@
         function setCategory(category) {
             activeCategory = category;
             for (const button of categoryList.querySelectorAll('button')) {
-                button.classList.toggle('is-active', button.dataset.category === category);
+                syncCategoryButton(
+                    button,
+                    button.dataset.category === category,
+                );
             }
             render();
         }
@@ -95,7 +113,7 @@
             button.className = 'category-pill';
             button.dataset.category = category;
             button.textContent = category;
-            button.classList.toggle('is-active', category === activeCategory);
+            syncCategoryButton(button, category === activeCategory);
             button.addEventListener('click', () => setCategory(category));
             return button;
         });
@@ -125,6 +143,11 @@
     }
 
     if (typeof module !== 'undefined' && module.exports) {
-        module.exports = { templateCardModel, categoryNames };
+        module.exports = {
+            templateCardModel,
+            categoryNames,
+            readShopSummary,
+            syncCategoryButton,
+        };
     }
 }(globalThis));

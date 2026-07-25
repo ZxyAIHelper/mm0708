@@ -41,7 +41,15 @@ test('homepage exposes the hotspot template discovery contract', () => {
     );
     assert.match(
         bottomNav,
-        /class="is-active"[^>]*data-nav="home"[^>]*aria-current="page"/,
+        /class="active"[^>]*data-nav="home"[^>]*aria-current="page"/,
+    );
+    assert.match(
+        html,
+        /id="templateCategories"[\s\S]*?class="category-strip"[\s\S]*?role="group"[\s\S]*?aria-label="模板分类"/,
+    );
+    assert.match(
+        html,
+        /id="homeEmpty"[^>]*role="status"[^>]*aria-live="polite"/,
     );
 
     const quickTasks = html.match(/<section id="quickTasks"[\s\S]*?<\/section>/)?.[0] || '';
@@ -83,4 +91,57 @@ test('unavailable templates render as disabled articles', () => {
 
     assert.match(source, /createElement\(model\.href \? 'a' : 'article'\)/);
     assert.match(source, /setAttribute\('aria-disabled', 'true'\)/);
+});
+
+test('shop summary falls back when merchant storage is unavailable', () => {
+    const { readShopSummary } = require('../home');
+
+    assert.equal(
+        readShopSummary(() => {
+            throw new DOMException('Blocked', 'SecurityError');
+        }),
+        '完善店铺',
+    );
+    assert.equal(
+        readShopSummary(() => ({
+            loadProfile() {
+                return { shop: { name: '山野面包房' } };
+            },
+        })),
+        '山野面包房',
+    );
+});
+
+test('category buttons synchronize active and aria-pressed state', () => {
+    const { syncCategoryButton } = require('../home');
+    const states = new Set();
+    const attributes = {};
+    const button = {
+        classList: {
+            toggle(name, enabled) {
+                if (enabled) states.add(name);
+                else states.delete(name);
+            },
+        },
+        setAttribute(name, value) {
+            attributes[name] = value;
+        },
+    };
+
+    syncCategoryButton(button, true);
+    assert.equal(states.has('active'), true);
+    assert.equal(attributes['aria-pressed'], 'true');
+
+    syncCategoryButton(button, false);
+    assert.equal(states.has('active'), false);
+    assert.equal(attributes['aria-pressed'], 'false');
+});
+
+test('home styles expose the planned active selectors and local nav colors', () => {
+    const css = fs.readFileSync(path.join(appRoot, 'app.css'), 'utf8');
+
+    assert.match(css, /\.category-strip button\.active\s*\{/);
+    assert.match(css, /\.bottom-nav a\.active\s*\{/);
+    assert.match(css, /\.bottom-nav a\s*\{[\s\S]*?color:\s*#716d68;/);
+    assert.match(css, /\.bottom-nav a\.active\s*\{[\s\S]*?color:\s*#f4515b;/);
 });
