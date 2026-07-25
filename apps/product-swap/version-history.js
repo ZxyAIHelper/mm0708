@@ -8,6 +8,8 @@
     const DEFAULT_MAX_DOWNLOAD_BYTES = 10 * 1024 * 1024;
     const MAX_PNG_DIMENSION = 16384;
     const MAX_PNG_PIXELS = 16_000_000;
+    const MAX_JPEG_DIMENSION = 16384;
+    const MAX_JPEG_PIXELS = 16_000_000;
     const CANONICAL_BASE64 =
         /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
     const BASE64_ALPHABET =
@@ -172,6 +174,69 @@
         throw new Error('INVALID_PNG');
     }
 
+    function validateJpegBytes(input) {
+        const bytes = input instanceof Uint8Array
+            ? input
+            : new Uint8Array(input || 0);
+        if (
+            bytes.length < 14
+            || bytes[0] !== 0xff
+            || bytes[1] !== 0xd8
+            || bytes.at(-2) !== 0xff
+            || bytes.at(-1) !== 0xd9
+        ) {
+            throw new Error('INVALID_JPEG');
+        }
+
+        const frameMarkers = new Set([
+            0xc0, 0xc1, 0xc2, 0xc3,
+            0xc5, 0xc6, 0xc7,
+            0xc9, 0xca, 0xcb,
+            0xcd, 0xce, 0xcf,
+        ]);
+        let offset = 2;
+        let metadata = null;
+        let seenScan = false;
+        while (offset < bytes.length - 2) {
+            if (bytes[offset] !== 0xff) throw new Error('INVALID_JPEG');
+            while (bytes[offset] === 0xff) offset += 1;
+            const marker = bytes[offset];
+            offset += 1;
+            if (marker === 0xd9) break;
+            if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+                continue;
+            }
+            if (offset + 2 > bytes.length) throw new Error('INVALID_JPEG');
+            const length = bytes[offset] * 0x100 + bytes[offset + 1];
+            const segmentEnd = offset + length;
+            if (length < 2 || segmentEnd > bytes.length) {
+                throw new Error('INVALID_JPEG');
+            }
+            if (frameMarkers.has(marker)) {
+                if (length < 7) throw new Error('INVALID_JPEG');
+                const height = bytes[offset + 3] * 0x100 + bytes[offset + 4];
+                const width = bytes[offset + 5] * 0x100 + bytes[offset + 6];
+                if (
+                    !width
+                    || !height
+                    || width > MAX_JPEG_DIMENSION
+                    || height > MAX_JPEG_DIMENSION
+                    || width * height > MAX_JPEG_PIXELS
+                ) {
+                    throw new Error('INVALID_JPEG');
+                }
+                metadata = { width, height };
+            }
+            offset = segmentEnd;
+            if (marker === 0xda) {
+                seenScan = true;
+                break;
+            }
+        }
+        if (!metadata || !seenScan) throw new Error('INVALID_JPEG');
+        return metadata;
+    }
+
     function hasCanonicalPaddingBits(base64) {
         if (base64.endsWith('==')) {
             return BASE64_ALPHABET.indexOf(base64.at(-3)) % 16 === 0;
@@ -191,10 +256,24 @@
         const boundedMax = Number.isFinite(maxBytes) && maxBytes > 0
             ? maxBytes
             : DEFAULT_MAX_DOWNLOAD_BYTES;
-        const dataPrefix = 'data:image/png;base64,';
         if (value.startsWith('data:')) {
-            if (!value.startsWith(dataPrefix)) unsafeDownload();
-            const base64 = value.slice(dataPrefix.length);
+            const format = value.startsWith('data:image/png;base64,')
+                ? {
+                    prefix: 'data:image/png;base64,',
+                    mimeType: 'image/png',
+                    extension: 'png',
+                    validate: validatePngBytes,
+                }
+                : (value.startsWith('data:image/jpeg;base64,')
+                    ? {
+                        prefix: 'data:image/jpeg;base64,',
+                        mimeType: 'image/jpeg',
+                        extension: 'jpg',
+                        validate: validateJpegBytes,
+                    }
+                    : null);
+            if (!format) unsafeDownload();
+            const base64 = value.slice(format.prefix.length);
             if (
                 !base64
                 || !CANONICAL_BASE64.test(base64)
@@ -206,7 +285,7 @@
             let bytes;
             try {
                 bytes = decodeBase64(base64);
-                validatePngBytes(bytes);
+                format.validate(bytes);
             } catch {
                 unsafeDownload();
             }
@@ -216,6 +295,8 @@
                 maxBytes: boundedMax,
                 fetchOptions: undefined,
                 bytes,
+                mimeType: format.mimeType,
+                extension: format.extension,
             };
         }
 
@@ -720,6 +801,7 @@
         hydrateVersion,
         readBoundedResponseBody,
         validateDownloadResponse,
+        validateJpegBytes,
         validatePngBytes,
         versionIdForSourceTask,
     };

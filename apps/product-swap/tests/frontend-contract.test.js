@@ -673,13 +673,14 @@ test('downloads the current version through a checked blob response', () => {
     assert.match(source, /new AbortControllerConstructor\(\)/);
     assert.match(source, /readBoundedResponseBody\(/);
     assert.match(source, /VersionHistory\.validatePngBytes/);
+    assert.match(source, /VersionHistory\.validateJpegBytes/);
     assert.match(source, /VersionHistory\.ensureBrowserDecodablePng/);
     assert.match(source, /request\.kind\s*===\s*'data'/);
     assert.doesNotMatch(source, /response\.blob\(\)/);
     assert.match(source, /URL\.createObjectURL/);
     assert.match(
         source,
-        /`\$\{activeTemplate\.id\}-\$\{Date\.now\(\)\}\.png`/,
+        /`\$\{activeTemplate\.id\}-\$\{Date\.now\(\)\}\.\$\{extension\}`/,
     );
     assert.match(source, /link\.remove\(\)/);
     assert.match(

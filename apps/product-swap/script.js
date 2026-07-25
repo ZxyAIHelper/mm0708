@@ -1326,10 +1326,15 @@ function boot() {
                 window.location.origin,
             );
             let blob;
+            let extension = request.extension || 'png';
             if (request.kind === 'data') {
                 const bytes = request.bytes;
-                VersionHistory.validatePngBytes(bytes);
-                blob = new Blob([bytes], { type: 'image/png' });
+                if (request.mimeType === 'image/jpeg') {
+                    VersionHistory.validateJpegBytes(bytes);
+                } else {
+                    VersionHistory.validatePngBytes(bytes);
+                }
+                blob = new Blob([bytes], { type: request.mimeType });
                 await VersionHistory.ensureBrowserDecodablePng(blob);
             } else {
                 const networkPng = await VersionHistory.fetchValidatedPng(
@@ -1341,7 +1346,8 @@ function boot() {
             objectUrl = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = objectUrl;
-            link.download = `${activeTemplate.id}-${Date.now()}.png`;
+            link.download =
+                `${activeTemplate.id}-${Date.now()}.${extension}`;
             document.body.appendChild(link);
             link.click();
             link.remove();

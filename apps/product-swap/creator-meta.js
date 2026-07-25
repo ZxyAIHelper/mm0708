@@ -149,6 +149,13 @@
             template.name;
         global.document.getElementById('creatorSummary').textContent =
             template.summary;
+        const imageFieldCount = template.fields.filter(
+            (field) => field.type === 'image',
+        ).length;
+        global.document.getElementById('creatorTip').textContent =
+            imageFieldCount > 1
+                ? '提示：请按字段准备清晰图片，尽量保留完整主体内容。'
+                : '提示：上传一张清晰原图，尽量保留完整主体内容。';
         global.document.getElementById('generateButton').textContent =
             `${template.outputLabel}（消耗 ${template.creditCost} 豆额度）`;
         global.document.body.dataset.templateId = template.id;

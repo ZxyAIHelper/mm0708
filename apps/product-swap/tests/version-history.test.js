@@ -11,6 +11,7 @@ const {
     hydrateVersion,
     readBoundedResponseBody,
     validateDownloadResponse,
+    validateJpegBytes,
     validatePngBytes,
     versionIdForSourceTask,
 } = require('../version-history');
@@ -20,6 +21,14 @@ const tinyPngBase64 = [
     'AAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
 ].join('');
 const tinyPngBytes = Buffer.from(tinyPngBase64, 'base64');
+const tinyJpegBytes = Buffer.from([
+    0xff, 0xd8,
+    0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01, 0x01,
+    0x11, 0x00,
+    0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00,
+    0x00,
+    0xff, 0xd9,
+]);
 
 function pngChunk(type, data) {
     const chunk = Buffer.alloc(12 + data.length);
@@ -393,10 +402,28 @@ test('allows canonical PNG data URLs and same-origin network URLs', () => {
     );
 });
 
+test('allows bounded JPEG data URLs with the correct download extension', () => {
+    const dataUrl =
+        `data:image/jpeg;base64,${tinyJpegBytes.toString('base64')}`;
+    const request = createDownloadRequest(
+        dataUrl,
+        'https://product-swap.example',
+        1024,
+    );
+
+    assert.equal(request.kind, 'data');
+    assert.equal(request.mimeType, 'image/jpeg');
+    assert.equal(request.extension, 'jpg');
+    assert.deepEqual(validateJpegBytes(request.bytes), {
+        width: 1,
+        height: 1,
+    });
+});
+
 test('rejects malformed data URLs and non-same-origin download URLs', () => {
     const origin = 'https://product-swap.example';
     for (const unsafeUrl of [
-        'data:image/jpeg;base64,AAAA',
+        'data:image/jpeg;base64,/9j/2Q==',
         'data:image/png;base64,AAA',
         'data:image/png;base64,',
         'data:image/png;base64,AB==',
