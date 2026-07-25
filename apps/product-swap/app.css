@@ -42,6 +42,11 @@ a {
     text-decoration: none;
 }
 
+:focus-visible {
+    outline: 3px solid rgb(244 81 91 / 35%);
+    outline-offset: 2px;
+}
+
 .app-shell {
     width: min(100%, 520px);
     min-height: 100vh;
@@ -329,8 +334,10 @@ h2 {
 
 .bottom-nav a {
     display: flex;
+    min-height: 48px;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 3px;
     color: #716d68;
     font-size: 11px;
@@ -344,6 +351,17 @@ h2 {
 
 .bottom-nav a.active {
     color: #f4515b;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+    }
 }
 
 @media (max-width: 370px) {
