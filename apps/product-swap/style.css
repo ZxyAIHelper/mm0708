@@ -44,6 +44,9 @@ button {
 }
 
 .back-button {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
     border: 0;
     padding: 0;
     color: var(--muted);
@@ -182,7 +185,6 @@ button {
     resize: vertical;
     border: 1px solid var(--line);
     border-radius: 7px;
-    outline: none;
     background: var(--panel-soft);
     color: var(--text);
     font-size: 12px;
@@ -190,7 +192,7 @@ button {
 }
 
 #requirementsInput::placeholder {
-    color: #7f879a;
+    color: var(--muted);
 }
 
 .generate-button {
@@ -200,7 +202,7 @@ button {
     border: 0;
     border-radius: 7px;
     background: var(--accent);
-    color: white;
+    color: var(--text);
     font-weight: 700;
     cursor: pointer;
 }
@@ -240,7 +242,7 @@ button {
 
 .result-actions button {
     flex: 1;
-    min-height: 38px;
+    min-height: 44px;
     border: 1px solid var(--line);
     border-radius: 7px;
     background: var(--panel-soft);
@@ -252,8 +254,8 @@ button {
     margin: 0;
     padding: 10px 14px;
     border-top: 1px solid var(--line);
-    color: #f4c56a;
-    background: rgba(244, 197, 106, 0.08);
+    color: #7a4b00;
+    background: #fff4d8;
     font-size: 13px;
 }
 
@@ -301,8 +303,8 @@ button {
 .chat-message.user {
     margin-left: auto;
     border-bottom-right-radius: 3px;
-    background: #0b8ea7;
-    color: white;
+    background: var(--accent);
+    color: var(--text);
 }
 
 .chat-message.assistant {
@@ -325,7 +327,6 @@ button {
     border: 1px solid var(--line);
     border-radius: 7px;
     padding: 10px;
-    outline: none;
     background: var(--panel-soft);
     color: var(--text);
     font: inherit;
@@ -334,11 +335,12 @@ button {
 
 #refineButton {
     min-width: 112px;
+    min-height: 44px;
     border: 0;
     border-radius: 7px;
     padding: 0 12px;
     background: var(--accent);
-    color: white;
+    color: var(--text);
     font-weight: 700;
     cursor: pointer;
 }
@@ -354,13 +356,13 @@ button {
 #refineInput:focus-visible,
 #refineButton:focus-visible,
 .back-button:focus-visible {
-    outline: 3px solid rgb(244 81 91 / 35%);
+    outline: 3px solid #c63d48;
     outline-offset: 2px;
 }
 
 .upload-box.dragover {
     border-color: var(--accent);
-    background: rgba(21, 185, 212, 0.08);
+    background: rgb(244 81 91 / 8%);
 }
 
 .upload-field.has-preview .upload-box {
@@ -418,7 +420,7 @@ button {
     }
 
     #refineButton {
-        min-height: 40px;
+        min-height: 44px;
     }
 }
 
@@ -437,13 +439,17 @@ button {
 .history-link {
     display: inline-flex;
     align-items: center;
-    min-height: 32px;
+    min-height: 44px;
     padding: 0 12px;
     border: 1px solid var(--line);
     border-radius: 999px;
     color: var(--text);
-    background: rgba(21, 185, 212, 0.06);
+    background: rgb(244 81 91 / 6%);
     font-size: 12px;
+}
+
+#historyLink {
+    min-height: 44px;
 }
 
 .history-shell {
@@ -498,6 +504,7 @@ button {
 
 .task-filters button {
     flex: 0 0 auto;
+    min-height: 44px;
     padding: 8px 14px;
     color: var(--muted);
     font-size: 13px;
@@ -505,7 +512,7 @@ button {
 
 .task-filters button.active {
     border-color: var(--accent);
-    color: #071019;
+    color: var(--text);
     background: var(--accent);
     font-weight: 700;
 }
@@ -539,10 +546,10 @@ button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 38px;
+    min-height: 44px;
     padding: 0 16px;
     border-radius: 8px;
-    color: #041117;
+    color: var(--text);
     background: var(--accent);
     font-weight: 700;
     text-decoration: none;
@@ -570,7 +577,7 @@ button {
     place-items: center;
     overflow: hidden;
     background:
-        linear-gradient(135deg, rgba(21, 185, 212, 0.08), transparent),
+        linear-gradient(135deg, rgb(244 81 91 / 8%), transparent),
         #03050a;
 }
 
@@ -630,6 +637,10 @@ button {
     background: #e8f7ef;
 }
 
+.primary-link {
+    color: var(--text);
+}
+
 .status-failed {
     color: #a92f3c;
     background: #fdecef;
@@ -662,7 +673,7 @@ button {
 
 .task-card-actions button,
 .detail-asset button {
-    min-height: 38px;
+    min-height: 44px;
     padding: 0 13px;
 }
 
@@ -673,13 +684,13 @@ button {
 .load-more {
     display: block;
     width: min(100%, 320px);
-    min-height: 42px;
+    min-height: 44px;
     margin: 24px auto 0;
 }
 
 .history-footnote {
     margin: 40px 0 0;
-    color: #6f7688;
+    color: #5f5a55;
     font-size: 11px;
     text-align: center;
 }
@@ -801,13 +812,18 @@ button {
 
 .detail-asset button {
     width: 100%;
+    min-height: 44px;
     margin-top: 8px;
 }
 
 .detail-delete {
-    min-height: 40px;
+    min-height: 44px;
     margin-top: 30px;
     padding: 0 16px;
+}
+
+.task-card-actions button {
+    min-height: 44px;
 }
 
 .muted-copy {

@@ -143,5 +143,5 @@ test('home styles expose the planned active selectors and local nav colors', () 
     assert.match(css, /\.category-strip button\.active\s*\{/);
     assert.match(css, /\.bottom-nav a\.active\s*\{/);
     assert.match(css, /\.bottom-nav a\s*\{[\s\S]*?color:\s*#716d68;/);
-    assert.match(css, /\.bottom-nav a\.active\s*\{[\s\S]*?color:\s*#f4515b;/);
+    assert.match(css, /\.bottom-nav a\.active\s*\{[\s\S]*?color:\s*#c63d48;/);
 });

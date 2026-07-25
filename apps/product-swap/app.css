@@ -43,7 +43,7 @@ a {
 }
 
 :focus-visible {
-    outline: 3px solid rgb(244 81 91 / 35%);
+    outline: 3px solid #c63d48;
     outline-offset: 2px;
 }
 
@@ -137,7 +137,6 @@ h2 {
     padding: 0 14px;
     border: 1px solid var(--line);
     border-radius: 12px;
-    outline: none;
     color: var(--text);
     background: var(--surface-soft);
 }
@@ -151,14 +150,15 @@ h2 {
     padding: 0 17px;
     border: 0;
     border-radius: 12px;
-    color: #fff;
+    color: var(--text);
     font-weight: 750;
     background: var(--accent);
     cursor: pointer;
 }
 
 .search-row button:hover {
-    background: var(--accent-strong);
+    color: #fff;
+    background: #c63d48;
 }
 
 .quick-task-grid {
@@ -191,13 +191,13 @@ h2 {
 }
 
 .quick-task-primary {
-    color: #fff;
+    color: var(--text);
     border-color: var(--accent);
     background: var(--accent);
 }
 
 .quick-task-primary span {
-    color: #fff;
+    color: var(--text);
 }
 
 .hot-template-list,
@@ -225,7 +225,7 @@ h2 {
 }
 
 .category-strip button.active {
-    color: #fff;
+    color: var(--text);
     border-color: var(--accent);
     background: var(--accent);
 }
@@ -350,7 +350,7 @@ h2 {
 }
 
 .bottom-nav a.active {
-    color: #f4515b;
+    color: #c63d48;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -360,6 +360,11 @@ h2 {
         scroll-behavior: auto !important;
         transition-duration: 0.01ms !important;
         animation-duration: 0.01ms !important;
+    }
+
+    .loading-spinner,
+    .generate-button.is-loading::before {
+        animation: none !important;
     }
 }
 
@@ -436,7 +441,7 @@ h2 {
     margin-top: 5px;
     border: 0;
     border-radius: 12px;
-    color: #fff;
+    color: var(--text);
     font: inherit;
     font-weight: 750;
     background: var(--accent);
