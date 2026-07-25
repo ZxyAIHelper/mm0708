@@ -17,6 +17,10 @@
     box-sizing: border-box;
 }
 
+html {
+    scroll-padding-bottom: calc(112px + env(safe-area-inset-bottom));
+}
+
 body {
     min-width: 320px;
     margin: 0;
@@ -355,6 +359,10 @@ h2 {
     gap: 14px;
 }
 
+.profile-shell {
+    padding-bottom: calc(124px + env(safe-area-inset-bottom));
+}
+
 .profile-section {
     margin-top: 30px;
 }
@@ -407,6 +415,7 @@ h2 {
     font-weight: 750;
     background: var(--accent);
     cursor: pointer;
+    scroll-margin-bottom: calc(104px + env(safe-area-inset-bottom));
 }
 
 .product-list {
@@ -430,6 +439,12 @@ h2 {
 .product-row strong {
     color: var(--accent-strong);
     font-size: 13px;
+}
+
+.product-row h3,
+.product-row p,
+.product-row strong {
+    overflow-wrap: anywhere;
 }
 
 .empty-card {

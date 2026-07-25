@@ -1,7 +1,86 @@
 (function (globalScope) {
+    const STORAGE_ERROR = '浏览器存储不可用，请检查隐私设置后重试';
+    let productIdCounter = 0;
+
+    function emptyProfile() {
+        return {
+            shop: { name: '', industry: '', slogan: '' },
+            products: [],
+        };
+    }
+
+    function loadProfileStore(merchantStore) {
+        try {
+            if (!merchantStore || typeof merchantStore.createMerchantStore !== 'function') {
+                throw new Error('MerchantStore unavailable');
+            }
+            const store = merchantStore.createMerchantStore();
+            const profile = store.loadProfile();
+            return {
+                available: true,
+                store,
+                profile,
+                errorMessage: '',
+            };
+        } catch {
+            return {
+                available: false,
+                store: null,
+                profile: emptyProfile(),
+                errorMessage: STORAGE_ERROR,
+            };
+        }
+    }
+
+    function createProductId(scope = globalScope) {
+        if (typeof scope.crypto?.randomUUID === 'function') {
+            return scope.crypto.randomUUID();
+        }
+        const clock = scope.Date && typeof scope.Date.now === 'function'
+            ? scope.Date
+            : Date;
+        productIdCounter += 1;
+        return `product_${clock.now()}_${productIdCounter}`;
+    }
+
+    function normalizeShopInput(shop = {}) {
+        const normalized = {
+            name: String(shop.name || '').trim(),
+            industry: String(shop.industry || '').trim(),
+            slogan: String(shop.slogan || '').trim(),
+        };
+        return {
+            valid: Boolean(normalized.name),
+            shop: normalized,
+        };
+    }
+
+    function saveShopProfile(store, shop) {
+        const normalized = normalizeShopInput(shop);
+        if (!normalized.valid) {
+            return {
+                ok: false,
+                validationError: true,
+                message: '店铺名称不能为空',
+            };
+        }
+        try {
+            store.saveShop(normalized.shop);
+            return {
+                ok: true,
+                validationError: false,
+                message: '店铺资料已保存',
+            };
+        } catch {
+            return {
+                ok: false,
+                validationError: false,
+                message: STORAGE_ERROR,
+            };
+        }
+    }
+
     function boot() {
-        const store = globalScope.MerchantStore.createMerchantStore();
-        const profile = store.loadProfile();
         const shopForm = document.getElementById('shopForm');
         const productForm = document.getElementById('productForm');
         const shopName = document.getElementById('shopName');
@@ -12,10 +91,16 @@
         const productPrice = document.getElementById('productPrice');
         const productList = document.getElementById('productList');
         const profileNotice = document.getElementById('profileNotice');
+        let merchantStore;
 
-        shopName.value = profile.shop.name;
-        shopIndustry.value = profile.shop.industry;
-        shopSlogan.value = profile.shop.slogan;
+        try {
+            merchantStore = globalScope.MerchantStore;
+        } catch {
+            merchantStore = null;
+        }
+
+        const loaded = loadProfileStore(merchantStore);
+        const { profile, store } = loaded;
 
         function showNotice(message, isError = false) {
             profileNotice.textContent = message;
@@ -23,8 +108,12 @@
             profileNotice.classList.toggle('is-error', isError);
         }
 
-        function renderProducts() {
-            const products = store.listProducts();
+        function disableSaving() {
+            shopForm.querySelector('[type="submit"]').disabled = true;
+            productForm.querySelector('[type="submit"]').disabled = true;
+        }
+
+        function renderProducts(products) {
             productList.replaceChildren();
 
             if (!products.length) {
@@ -52,41 +141,72 @@
             }
         }
 
+        shopName.value = profile.shop.name;
+        shopIndustry.value = profile.shop.industry;
+        shopSlogan.value = profile.shop.slogan;
+        renderProducts(profile.products);
+
+        if (!loaded.available) {
+            disableSaving();
+            showNotice(loaded.errorMessage, true);
+            return;
+        }
+
+        shopName.addEventListener('input', () => {
+            if (shopName.value.trim()) {
+                shopName.removeAttribute('aria-invalid');
+            }
+        });
+
         shopForm.addEventListener('submit', (event) => {
             event.preventDefault();
-            try {
-                store.saveShop({
-                    name: shopName.value,
-                    industry: shopIndustry.value,
-                    slogan: shopSlogan.value,
-                });
-                showNotice('店铺资料已保存');
-            } catch (error) {
-                showNotice(error.message, true);
+            const result = saveShopProfile(store, {
+                name: shopName.value,
+                industry: shopIndustry.value,
+                slogan: shopSlogan.value,
+            });
+
+            if (result.validationError) {
+                shopName.setAttribute('aria-invalid', 'true');
+            } else {
+                shopName.removeAttribute('aria-invalid');
             }
+            showNotice(result.message, !result.ok);
         });
 
         productForm.addEventListener('submit', (event) => {
             event.preventDefault();
             try {
                 store.saveProduct({
-                    id: globalScope.crypto?.randomUUID
-                        ? globalScope.crypto.randomUUID()
-                        : `product_${Date.now()}`,
+                    id: createProductId(globalScope),
                     name: productName.value,
                     sellingPoint: productSellingPoint.value,
                     price: productPrice.value,
                 });
+                const products = store.listProducts();
                 productForm.reset();
                 showNotice('产品已添加');
-                renderProducts();
-            } catch (error) {
-                showNotice(error.message, true);
+                renderProducts(products);
+            } catch {
+                showNotice(STORAGE_ERROR, true);
             }
         });
-
-        renderProducts();
     }
 
-    globalScope.addEventListener('DOMContentLoaded', boot);
+    const ProfilePage = {
+        STORAGE_ERROR,
+        createProductId,
+        loadProfileStore,
+        normalizeShopInput,
+        saveShopProfile,
+    };
+
+    globalScope.ProfilePage = ProfilePage;
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = ProfilePage;
+    }
+
+    if (typeof globalScope.addEventListener === 'function') {
+        globalScope.addEventListener('DOMContentLoaded', boot);
+    }
 }(globalThis));

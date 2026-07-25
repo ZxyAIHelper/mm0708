@@ -32,3 +32,24 @@ test('profile page exposes the merchant profile contract', () => {
     assert.match(html, /<label for=["']productSellingPoint["']>核心卖点<\/label>/);
     assert.match(html, /<label for=["']productPrice["']>价格<\/label>/);
 });
+
+test('profile styles keep form actions clear of the fixed navigation', () => {
+    const css = fs.readFileSync(path.join(appRoot, 'app.css'), 'utf8');
+
+    assert.match(
+        css,
+        /html\s*\{[\s\S]*?scroll-padding-bottom:\s*calc\([^;]*env\(safe-area-inset-bottom\)[^;]*\);/,
+    );
+    assert.match(
+        css,
+        /\.profile-shell\s*\{[\s\S]*?padding-bottom:\s*calc\([^;]*env\(safe-area-inset-bottom\)[^;]*\);/,
+    );
+    assert.match(
+        css,
+        /\.settings-card button\s*\{[\s\S]*?scroll-margin-bottom:\s*calc\([^;]*env\(safe-area-inset-bottom\)[^;]*\);/,
+    );
+    assert.match(
+        css,
+        /\.product-row h3,[\s\S]*?\.product-row p,[\s\S]*?\.product-row strong\s*\{[\s\S]*?overflow-wrap:\s*anywhere;/,
+    );
+});
