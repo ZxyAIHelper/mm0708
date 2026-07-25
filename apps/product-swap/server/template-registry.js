@@ -59,6 +59,8 @@ const RESERVED_FIELD_KEYS = new Set([
     'conversationId',
     'generatedAt',
     'requestId',
+    'hasPreviousImage',
+    'imageRoles',
 ]);
 const IMAGE_MEDIA_TYPES = new Set([
     'image/jpeg',
@@ -68,7 +70,61 @@ const IMAGE_MEDIA_TYPES = new Set([
 
 function firstUnknownKey(value, allowedKeys) {
     const allowed = new Set(allowedKeys);
-    return Object.keys(value).find((key) => !allowed.has(key));
+    return Reflect.ownKeys(value).find((key) => !allowed.has(key));
+}
+
+function propertyName(key) {
+    return typeof key === 'symbol' ? key.toString() : key;
+}
+
+function isPlainObject(value) {
+    if (
+        !value
+        || typeof value !== 'object'
+        || Array.isArray(value)
+    ) {
+        return false;
+    }
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+}
+
+function isDataDescriptor(descriptor) {
+    return Boolean(descriptor && Object.hasOwn(descriptor, 'value'));
+}
+
+function rejectAccessors(value, context) {
+    for (const key of Reflect.ownKeys(value)) {
+        if (!isDataDescriptor(
+            Object.getOwnPropertyDescriptor(value, key),
+        )) {
+            throw new Error(
+                `${context} ${propertyName(key)}`
+                + ' must be an own data property',
+            );
+        }
+    }
+}
+
+function requireOwnDataProperty(value, key, context) {
+    if (!isDataDescriptor(
+        Object.getOwnPropertyDescriptor(value, key),
+    )) {
+        throw new Error(
+            `${context} ${propertyName(key)}`
+            + ' must be an own data property',
+        );
+    }
+}
+
+function assertDenseArray(value, context) {
+    for (let index = 0; index < value.length; index += 1) {
+        if (!isDataDescriptor(
+            Object.getOwnPropertyDescriptor(value, index),
+        )) {
+            throw new Error(`${context} must be a dense array`);
+        }
+    }
 }
 
 function validateField(field, manifestId) {
@@ -76,9 +132,30 @@ function validateField(field, manifestId) {
         !field
         || typeof field !== 'object'
         || Array.isArray(field)
-        || typeof field.key !== 'string'
-        || !field.key.trim()
     ) {
+        throw new Error(
+            `Template ${manifestId} field keys must be non-empty strings`,
+        );
+    }
+    if (!isPlainObject(field)) {
+        throw new Error(
+            `Template ${manifestId} field must be a plain object`,
+        );
+    }
+
+    const keyDescriptor = Object.getOwnPropertyDescriptor(field, 'key');
+    if (!keyDescriptor) {
+        throw new Error(
+            `Template ${manifestId} field keys must be non-empty strings`,
+        );
+    }
+    if (!isDataDescriptor(keyDescriptor)) {
+        throw new Error(
+            `Template ${manifestId} field key`
+            + ' must be an own data property',
+        );
+    }
+    if (typeof field.key !== 'string' || !field.key.trim()) {
         throw new Error(
             `Template ${manifestId} field keys must be non-empty strings`,
         );
@@ -102,25 +179,30 @@ function validateField(field, manifestId) {
         );
     }
 
-    const allowedKeys = FIELD_KEYS[field.type];
-    if (!allowedKeys) {
+    const fieldContext = `Template ${manifestId} field ${field.key}`;
+    rejectAccessors(field, fieldContext);
+    requireOwnDataProperty(field, 'type', fieldContext);
+
+    if (!Object.hasOwn(FIELD_KEYS, field.type)) {
         throw new Error(
-            `Template ${manifestId} field ${field.key}`
+            fieldContext
             + ` has unknown type ${field.type}`,
         );
     }
+    const allowedKeys = FIELD_KEYS[field.type];
 
     const unknownKey = firstUnknownKey(field, allowedKeys);
-    if (unknownKey) {
+    if (unknownKey !== undefined) {
         throw new Error(
-            `Template ${manifestId} field ${field.key}`
-            + ` has unknown property ${unknownKey}`,
+            fieldContext
+            + ` has unknown property ${propertyName(unknownKey)}`,
         );
     }
 
+    requireOwnDataProperty(field, 'label', fieldContext);
     if (typeof field.label !== 'string' || !field.label.trim()) {
         throw new Error(
-            `Template ${manifestId} field ${field.key}`
+            fieldContext
             + ' label must be a non-empty string',
         );
     }
@@ -129,24 +211,26 @@ function validateField(field, manifestId) {
         && typeof field.required !== 'boolean'
     ) {
         throw new Error(
-            `Template ${manifestId} field ${field.key}`
+            fieldContext
             + ' required must be a boolean',
         );
     }
 
     if (field.type === 'image') {
+        requireOwnDataProperty(field, 'role', fieldContext);
+        requireOwnDataProperty(field, 'required', fieldContext);
         if (
             typeof field.role !== 'string'
             || !field.role.trim()
         ) {
             throw new Error(
-                `Template ${manifestId} field ${field.key}`
+                fieldContext
                 + ' role must be a non-empty string',
             );
         }
         if (typeof field.required !== 'boolean') {
             throw new Error(
-                `Template ${manifestId} field ${field.key}`
+                fieldContext
                 + ' required must be a boolean',
             );
         }
@@ -155,8 +239,14 @@ function validateField(field, manifestId) {
             && !Array.isArray(field.accept)
         ) {
             throw new Error(
-                `Template ${manifestId} field ${field.key}`
+                fieldContext
                 + ' accept must be an array',
+            );
+        }
+        if (Array.isArray(field.accept)) {
+            assertDenseArray(
+                field.accept,
+                `${fieldContext} accept`,
             );
         }
         if (
@@ -169,13 +259,49 @@ function validateField(field, manifestId) {
             )
         ) {
             throw new Error(
-                `Template ${manifestId} field ${field.key}`
+                fieldContext
                 + ' accept may only contain image/jpeg, image/png, or image/webp',
             );
         }
     }
 
     if (field.type === 'choice') {
+        requireOwnDataProperty(field, 'options', fieldContext);
+        requireOwnDataProperty(field, 'default', fieldContext);
+        if (Array.isArray(field.options)) {
+            assertDenseArray(
+                field.options,
+                `${fieldContext} options`,
+            );
+            for (const option of field.options) {
+                if (!isPlainObject(option)) {
+                    throw new Error(
+                        `${fieldContext} option must be a plain object`,
+                    );
+                }
+                const unknownOptionKey = firstUnknownKey(
+                    option,
+                    ['value', 'label'],
+                );
+                if (unknownOptionKey !== undefined) {
+                    throw new Error(
+                        `${fieldContext} option has unknown property`
+                        + ` ${propertyName(unknownOptionKey)}`,
+                    );
+                }
+                rejectAccessors(option, `${fieldContext} option`);
+                requireOwnDataProperty(
+                    option,
+                    'value',
+                    `${fieldContext} option`,
+                );
+                requireOwnDataProperty(
+                    option,
+                    'label',
+                    `${fieldContext} option`,
+                );
+            }
+        }
         const invalidOptions = (
             !Array.isArray(field.options)
             || field.options.length === 0
@@ -201,36 +327,29 @@ function validateField(field, manifestId) {
             || new Set(labels).size !== labels.length
         ) {
             throw new Error(
-                `Template ${manifestId} field ${field.key}`
+                fieldContext
                 + ' options must have unique non-empty string values and labels',
             );
         }
         if (!values.includes(field.default)) {
             throw new Error(
-                `Template ${manifestId} field ${field.key}`
+                fieldContext
                 + ' default must match an option value',
             );
-        }
-        for (const option of field.options) {
-            const unknownOptionKey = firstUnknownKey(
-                option,
-                ['value', 'label'],
-            );
-            if (unknownOptionKey) {
-                throw new Error(
-                    `Template ${manifestId} field ${field.key}`
-                    + ` option has unknown property ${unknownOptionKey}`,
-                );
-            }
         }
     }
 
     if (
         field.type === 'boolean'
+    ) {
+        requireOwnDataProperty(field, 'default', fieldContext);
+    }
+    if (
+        field.type === 'boolean'
         && typeof field.default !== 'boolean'
     ) {
         throw new Error(
-            `Template ${manifestId} field ${field.key}`
+            fieldContext
             + ' default must be a boolean',
         );
     }
@@ -244,7 +363,7 @@ function validateField(field, manifestId) {
         )
     ) {
         throw new Error(
-            `Template ${manifestId} field ${field.key}`
+            fieldContext
             + ' maxLength must be a positive integer',
         );
     }
@@ -254,7 +373,7 @@ function validateField(field, manifestId) {
         && typeof field.placeholder !== 'string'
     ) {
         throw new Error(
-            `Template ${manifestId} field ${field.key}`
+            fieldContext
             + ' placeholder must be a string',
         );
     }
@@ -270,16 +389,24 @@ function validateManifest(manifest, directoryName) {
             `Template ${directoryName} manifest must be an object`,
         );
     }
-
-    const unknownKey = firstUnknownKey(manifest, PUBLIC_KEYS);
-    if (unknownKey) {
+    if (!isPlainObject(manifest)) {
         throw new Error(
-            `Template ${directoryName} has unknown property ${unknownKey}`,
+            `Template ${directoryName} manifest must be a plain object`,
         );
     }
 
+    const unknownKey = firstUnknownKey(manifest, PUBLIC_KEYS);
+    if (unknownKey !== undefined) {
+        throw new Error(
+            `Template ${directoryName} has unknown property`
+            + ` ${propertyName(unknownKey)}`,
+        );
+    }
+
+    rejectAccessors(manifest, `Template ${directoryName}`);
+
     for (const key of REQUIRED_KEYS) {
-        if (manifest[key] === undefined) {
+        if (!Object.hasOwn(manifest, key)) {
             throw new Error(`Template ${directoryName} is missing ${key}`);
         }
     }
@@ -324,19 +451,26 @@ function validateManifest(manifest, directoryName) {
                 `Template ${manifest.id} ${key} must be an array`,
             );
         }
-    }
-
-    if (
-        Object.hasOwn(manifest, 'quickPrompts')
-        && !Array.isArray(manifest.quickPrompts)
-    ) {
-        throw new Error(
-            `Template ${manifest.id} quickPrompts must be an array`,
+        assertDenseArray(
+            manifest[key],
+            `Template ${manifest.id} ${key}`,
         );
     }
 
-    for (const key of ['platforms', 'tags', 'quickPrompts']) {
-        if (manifest[key] === undefined) continue;
+    const hasQuickPrompts = Object.hasOwn(manifest, 'quickPrompts');
+    if (hasQuickPrompts) {
+        if (!Array.isArray(manifest.quickPrompts)) {
+            throw new Error(
+                `Template ${manifest.id} quickPrompts must be an array`,
+            );
+        }
+        assertDenseArray(
+            manifest.quickPrompts,
+            `Template ${manifest.id} quickPrompts`,
+        );
+    }
+
+    for (const key of ['platforms', 'tags']) {
         if (manifest[key].some(
             (entry) => (
                 typeof entry !== 'string'
@@ -347,6 +481,20 @@ function validateManifest(manifest, directoryName) {
                 `Template ${manifest.id} ${key} entries must be non-empty strings`,
             );
         }
+    }
+    if (
+        hasQuickPrompts
+        && manifest.quickPrompts.some(
+            (entry) => (
+                typeof entry !== 'string'
+                || !entry.trim()
+            ),
+        )
+    ) {
+        throw new Error(
+            `Template ${manifest.id} quickPrompts entries`
+            + ' must be non-empty strings',
+        );
     }
 
     if (
@@ -428,7 +576,12 @@ function copyAllowedProperties(source, keys) {
     for (const key of keys) {
         if (!Object.hasOwn(source, key)) continue;
         const value = source[key];
-        copy[key] = Array.isArray(value) ? value.slice() : value;
+        Object.defineProperty(copy, key, {
+            value: Array.isArray(value) ? value.slice() : value,
+            enumerable: true,
+            writable: true,
+            configurable: true,
+        });
     }
     return copy;
 }
@@ -452,9 +605,17 @@ function publicManifest(manifest) {
         }
         return publishedField;
     });
-    published.quickPrompts = Array.isArray(manifest.quickPrompts)
-        ? manifest.quickPrompts.slice()
-        : [];
+    Object.defineProperty(published, 'quickPrompts', {
+        value: (
+            Object.hasOwn(manifest, 'quickPrompts')
+            && Array.isArray(manifest.quickPrompts)
+        )
+            ? manifest.quickPrompts.slice()
+            : [],
+        enumerable: true,
+        writable: true,
+        configurable: true,
+    });
     return published;
 }
 

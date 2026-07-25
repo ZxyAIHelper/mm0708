@@ -69,6 +69,12 @@ function validField(type, overrides = {}) {
     return { ...fields[type], ...overrides };
 }
 
+function sparseArray(value) {
+    const values = new Array(2);
+    values[1] = value;
+    return values;
+}
+
 test('discovers all template packages in stable id order', () => {
     assert.deepEqual(
         listTemplatePackages().map((templatePackage) => templatePackage.manifest.id),
@@ -196,6 +202,150 @@ test('rejects a non-object manifest with a clear registry error', () => {
     );
 });
 
+test('accepts only plain manifests, fields, and choice options', () => {
+    assert.throws(
+        () => validateManifest(
+            Object.create(validManifest()),
+            'sample',
+        ),
+        /Template sample manifest must be a plain object/,
+    );
+    assert.throws(
+        () => validateManifest(validManifest({
+            fields: [Object.create(validField('text'))],
+        }), 'sample'),
+        /Template sample field must be a plain object/,
+    );
+    assert.throws(
+        () => validateManifest(validManifest({
+            fields: [validField('choice', {
+                options: [Object.create({
+                    value: 'square',
+                    label: 'Square',
+                })],
+            })],
+        }), 'sample'),
+        /Template sample field ratio option must be a plain object/,
+    );
+
+    const nullPrototypeManifest = Object.assign(
+        Object.create(null),
+        validManifest(),
+    );
+    assert.equal(
+        validateManifest(nullPrototypeManifest, 'sample'),
+        nullPrototypeManifest,
+    );
+});
+
+test('rejects hidden and symbol manifest properties', () => {
+    const hidden = validManifest();
+    Object.defineProperty(hidden, 'internalNotes', {
+        value: 'private',
+        enumerable: false,
+    });
+    assert.throws(
+        () => validateManifest(hidden, 'sample'),
+        /Template sample has unknown property internalNotes/,
+    );
+
+    const privateSymbol = Symbol('private');
+    const symbolManifest = validManifest();
+    symbolManifest[privateSymbol] = true;
+    assert.throws(
+        () => validateManifest(symbolManifest, 'sample'),
+        /Template sample has unknown property Symbol\(private\)/,
+    );
+
+    const hiddenField = validField('text');
+    Object.defineProperty(hiddenField, 'internalNotes', {
+        value: 'private',
+        enumerable: false,
+    });
+    assert.throws(
+        () => validateManifest(
+            validManifest({ fields: [hiddenField] }),
+            'sample',
+        ),
+        /Template sample field requirements has unknown property internalNotes/,
+    );
+
+    const optionSymbol = Symbol('private-option');
+    const option = { value: 'square', label: 'Square' };
+    option[optionSymbol] = true;
+    assert.throws(
+        () => validateManifest(validManifest({
+            fields: [validField('choice', { options: [option] })],
+        }), 'sample'),
+        /Template sample field ratio option has unknown property Symbol\(private-option\)/,
+    );
+});
+
+test('rejects accessors instead of invoking them as manifest data', () => {
+    const manifest = validManifest();
+    Object.defineProperty(manifest, 'name', {
+        get() {
+            return 'Accessor name';
+        },
+        enumerable: true,
+    });
+    assert.throws(
+        () => validateManifest(manifest, 'sample'),
+        /Template sample name must be an own data property/,
+    );
+
+    const field = validField('text');
+    Object.defineProperty(field, 'label', {
+        get() {
+            return 'Accessor label';
+        },
+        enumerable: true,
+    });
+    assert.throws(
+        () => validateManifest(
+            validManifest({ fields: [field] }),
+            'sample',
+        ),
+        /Template sample field requirements label must be an own data property/,
+    );
+
+    const option = { value: 'square' };
+    Object.defineProperty(option, 'label', {
+        get() {
+            return 'Accessor label';
+        },
+        enumerable: true,
+    });
+    assert.throws(
+        () => validateManifest(validManifest({
+            fields: [validField('choice', { options: [option] })],
+        }), 'sample'),
+        /Template sample field ratio option label must be an own data property/,
+    );
+});
+
+test('does not treat inherited optional values as manifest data', () => {
+    Object.defineProperty(Object.prototype, 'quickPrompts', {
+        value: ['Inherited prompt'],
+        configurable: true,
+    });
+    try {
+        const manifest = validManifest();
+
+        validateManifest(manifest, 'sample');
+
+        assert.deepEqual(publicManifest(manifest).quickPrompts, []);
+        assert.deepEqual(
+            publicManifest(
+                validManifest({ quickPrompts: ['Own prompt'] }),
+            ).quickPrompts,
+            ['Own prompt'],
+        );
+    } finally {
+        delete Object.prototype.quickPrompts;
+    }
+});
+
 test('rejects unknown top-level manifest properties', () => {
     for (const key of ['prompt', 'internalNotes']) {
         assert.throws(
@@ -269,6 +419,8 @@ test('rejects reserved request transport field keys', () => {
         'conversationId',
         'generatedAt',
         'requestId',
+        'hasPreviousImage',
+        'imageRoles',
     ]) {
         assert.throws(
             () => validateManifest(
@@ -282,6 +434,45 @@ test('rejects reserved request transport field keys', () => {
     }
 });
 
+test('rejects sparse manifest arrays before validating their entries', () => {
+    for (const [key, value] of [
+        ['platforms', 'Platform'],
+        ['tags', 'Tag'],
+        ['quickPrompts', 'Prompt'],
+        ['fields', validField('text')],
+    ]) {
+        assert.throws(
+            () => validateManifest(
+                validManifest({ [key]: sparseArray(value) }),
+                'sample',
+            ),
+            new RegExp(`Template sample ${key} must be a dense array`),
+        );
+    }
+});
+
+test('rejects sparse image accept and choice options arrays clearly', () => {
+    assert.throws(
+        () => validateManifest(validManifest({
+            fields: [validField('image', {
+                accept: sparseArray('image/png'),
+            })],
+        }), 'sample'),
+        /Template sample field targetImage accept must be a dense array/,
+    );
+    assert.throws(
+        () => validateManifest(validManifest({
+            fields: [validField('choice', {
+                options: sparseArray({
+                    value: 'square',
+                    label: 'Square',
+                }),
+            })],
+        }), 'sample'),
+        /Template sample field ratio options must be a dense array/,
+    );
+});
+
 test('rejects invalid field types and properties outside the type contract', () => {
     assert.throws(
         () => validateManifest({
@@ -293,6 +484,17 @@ test('rejects invalid field types and properties outside the type contract', () 
             }],
         }, 'sample'),
         /Template sample field mystery has unknown type upload/,
+    );
+    assert.throws(
+        () => validateManifest({
+            ...validManifest(),
+            fields: [{
+                key: 'mystery',
+                type: 'toString',
+                label: 'Mystery',
+            }],
+        }, 'sample'),
+        /Template sample field mystery has unknown type toString/,
     );
 
     for (const [type, property] of [
