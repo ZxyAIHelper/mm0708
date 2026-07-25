@@ -1,6 +1,10 @@
 'use strict';
 
+const sharp = require('sharp');
+
 const PNG_MAGIC = Buffer.from('89504e470d0a1a0a', 'hex');
+const MAX_IMAGE_PIXELS = 64 * 1024 * 1024;
+const MAX_DECODED_IMAGE_BYTES = MAX_IMAGE_PIXELS * 4;
 
 function crc32(buffer) {
     let crc = 0xffffffff;
@@ -109,7 +113,63 @@ function validatePng(buffer) {
     return null;
 }
 
+async function decodeImageBuffer(buffer, expectedMimeType) {
+    const expectedFormat = new Map([
+        ['image/png', 'png'],
+        ['image/jpeg', 'jpeg'],
+        ['image/webp', 'webp'],
+    ]).get(expectedMimeType);
+    if (!expectedFormat || !Buffer.isBuffer(buffer)) {
+        throw new Error('Unsupported image decode request');
+    }
+
+    const image = sharp(buffer, {
+        failOn: 'error',
+        limitInputPixels: MAX_IMAGE_PIXELS,
+        sequentialRead: true,
+    });
+    const metadata = await image.metadata();
+    if (
+        metadata.format !== expectedFormat
+        || !Number.isInteger(metadata.width)
+        || !Number.isInteger(metadata.height)
+        || metadata.width <= 0
+        || metadata.height <= 0
+        || metadata.width * metadata.height > MAX_IMAGE_PIXELS
+    ) {
+        throw new Error('Decoded image metadata is invalid');
+    }
+
+    const { data, info } = await image.clone()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+    if (
+        !Number.isInteger(info.width)
+        || !Number.isInteger(info.height)
+        || !Number.isInteger(info.channels)
+        || info.width !== metadata.width
+        || info.height !== metadata.height
+        || info.channels <= 0
+        || info.channels > 4
+        || info.width * info.height > MAX_IMAGE_PIXELS
+        || data.length <= 0
+        || data.length > MAX_DECODED_IMAGE_BYTES
+        || data.length
+            !== info.width * info.height * info.channels
+    ) {
+        throw new Error('Decoded image pixels are invalid');
+    }
+
+    return {
+        format: metadata.format,
+        width: info.width,
+        height: info.height,
+    };
+}
+
 module.exports = {
+    MAX_IMAGE_PIXELS,
     PNG_MAGIC,
+    decodeImageBuffer,
     validatePng,
 };

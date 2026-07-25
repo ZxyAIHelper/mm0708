@@ -6,6 +6,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
+const { createZeroIdatPng } = require('./image-fixtures');
 
 const {
     buildCodexArgs,
@@ -150,6 +151,27 @@ test('generateWithCodex rejects header-only PNG results', async (t) => {
             (error) => error.code === 'INVALID_RESULT_IMAGE',
         );
     }
+});
+
+test('generateWithCodex rejects a structurally valid undecodable result', async (t) => {
+    const taskDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'codex-provider-test-'),
+    );
+    t.after(() => fs.rm(taskDir, { recursive: true, force: true }));
+    await fs.writeFile(
+        path.join(taskDir, 'result.png'),
+        createZeroIdatPng(),
+    );
+
+    await assert.rejects(
+        () => generateWithCodex({
+            taskDir,
+            imagePaths: [],
+            prompt: '生成图片',
+            spawnImpl: createSuccessfulChild,
+        }),
+        (error) => error.code === 'INVALID_RESULT_IMAGE',
+    );
 });
 
 test('generateWithCodex rejects a symlink result', async (t) => {

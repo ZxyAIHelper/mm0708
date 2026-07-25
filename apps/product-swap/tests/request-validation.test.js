@@ -15,16 +15,16 @@ const tinyPng = [
     'AAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
 ].join('');
 
-test('requires the default product-swap target image', () => {
-    assert.throws(
+test('requires the default product-swap target image', async () => {
+    await assert.rejects(
         () => validateGenerateRequest({ requirements: '' }),
         (error) => error.code === 'INVALID_INPUT'
             && error.message === '请上传目标图（样图模板）',
     );
 });
 
-test('keeps product-swap as the default and trims requirements', () => {
-    const value = validateGenerateRequest({
+test('keeps product-swap as the default and trims requirements', async () => {
+    const value = await validateGenerateRequest({
         targetImage: tinyPng,
         productImage: '',
         sceneImage: '',
@@ -35,8 +35,8 @@ test('keeps product-swap as the default and trims requirements', () => {
     assert.equal(value.values.requirements, '保持三个托盘');
 });
 
-test('rejects initial requirements longer than the manifest limit', () => {
-    assert.throws(
+test('rejects initial requirements longer than the manifest limit', async () => {
+    await assert.rejects(
         () =>
             validateGenerateRequest({
                 targetImage: tinyPng,
@@ -46,8 +46,8 @@ test('rejects initial requirements longer than the manifest limit', () => {
     );
 });
 
-test('allows a longer correction when refining a previous result', () => {
-    const value = validateGenerateRequest({
+test('allows a longer correction when refining a previous result', async () => {
+    const value = await validateGenerateRequest({
         targetImage: tinyPng,
         previousImage: tinyPng,
         requirements: '调整'.repeat(200),
@@ -57,8 +57,8 @@ test('allows a longer correction when refining a previous result', () => {
     assert.ok(value.previousImage);
 });
 
-test('validates a live food template from its manifest', () => {
-    const value = validateGenerateRequest({
+test('validates a live food template from its manifest', async () => {
+    const value = await validateGenerateRequest({
         templateId: 'food-copy-layout',
         targetImage: tinyPng,
         aspectRatio: '3:4',
@@ -77,20 +77,20 @@ test('validates a live food template from its manifest', () => {
     );
 });
 
-test('rejects missing, unavailable, and invalid template input', () => {
-    assert.throws(
+test('rejects missing, unavailable, and invalid template input', async () => {
+    await assert.rejects(
         () => validateGenerateRequest({ templateId: 'missing' }),
         (error) => error.code === 'INVALID_TEMPLATE'
             && error.message === '模板不可用',
     );
-    assert.throws(
+    await assert.rejects(
         () => validateGenerateRequest({
             templateId: 'summer-seeding',
         }),
         (error) => error.code === 'INVALID_TEMPLATE'
             && error.message === '模板不可用',
     );
-    assert.throws(
+    await assert.rejects(
         () => validateGenerateRequest({
             templateId: 'food-copy-layout',
             targetImage: tinyPng,
@@ -101,8 +101,8 @@ test('rejects missing, unavailable, and invalid template input', () => {
     );
 });
 
-test('validates date-time and retains only the last six messages', () => {
-    assert.throws(
+test('validates date-time and retains only the last six messages', async () => {
+    await assert.rejects(
         () => validateGenerateRequest({
             templateId: 'food-copy-layout',
             targetImage: tinyPng,
@@ -117,7 +117,7 @@ test('validates date-time and retains only the last six messages', () => {
         role: 'user',
         content: `message ${index}`,
     }));
-    const value = validateGenerateRequest({
+    const value = await validateGenerateRequest({
         targetImage: tinyPng,
         messages,
     });
@@ -125,21 +125,21 @@ test('validates date-time and retains only the last six messages', () => {
     assert.deepEqual(value.messages, messages.slice(-6));
 });
 
-test('requires a plain request object and rejects unknown keys', () => {
+test('requires a plain request object and rejects unknown keys', async () => {
     for (const body of [null, [], Object.create({})]) {
-        assert.throws(
+        await assert.rejects(
             () => validateGenerateRequest(body),
             (error) => error.code === 'INVALID_INPUT',
         );
     }
-    assert.throws(
+    await assert.rejects(
         () => validateGenerateRequest({
             targetImage: tinyPng,
             unexpected: 'value',
         }),
         (error) => error.code === 'INVALID_INPUT',
     );
-    assert.throws(
+    await assert.rejects(
         () => validateGenerateRequest(JSON.parse(
             `{"targetImage":${JSON.stringify(tinyPng)},"constructor":"bad"}`,
         )),
@@ -147,15 +147,15 @@ test('requires a plain request object and rejects unknown keys', () => {
     );
 });
 
-test('requires exact schema field value types', () => {
-    assert.throws(
+test('requires exact schema field value types', async () => {
+    await assert.rejects(
         () => validateGenerateRequest({
             targetImage: tinyPng,
             requirements: 123,
         }),
         (error) => error.code === 'INVALID_INPUT',
     );
-    assert.throws(
+    await assert.rejects(
         () => validateGenerateRequest({
             templateId: 'food-copy-layout',
             targetImage: tinyPng,
@@ -163,7 +163,7 @@ test('requires exact schema field value types', () => {
         }),
         (error) => error.code === 'INVALID_INPUT',
     );
-    assert.throws(
+    await assert.rejects(
         () => validateGenerateRequest({
             templateId: 'food-copy-layout',
             targetImage: tinyPng,
@@ -173,22 +173,22 @@ test('requires exact schema field value types', () => {
     );
 });
 
-test('validates and sanitizes bounded conversation metadata', () => {
-    assert.throws(
+test('validates and sanitizes bounded conversation metadata', async () => {
+    await assert.rejects(
         () => validateGenerateRequest({
             targetImage: tinyPng,
             messages: 'not-an-array',
         }),
         (error) => error.code === 'INVALID_INPUT',
     );
-    assert.throws(
+    await assert.rejects(
         () => validateGenerateRequest({
             targetImage: tinyPng,
             messages: [{ role: 'tool', content: 'run' }],
         }),
         (error) => error.code === 'INVALID_INPUT',
     );
-    assert.throws(
+    await assert.rejects(
         () => validateGenerateRequest({
             targetImage: tinyPng,
             messages: [{
@@ -199,7 +199,7 @@ test('validates and sanitizes bounded conversation metadata', () => {
         (error) => error.code === 'INVALID_INPUT',
     );
 
-    const value = validateGenerateRequest({
+    const value = await validateGenerateRequest({
         targetImage: tinyPng,
         conversationId: 'conversation_1',
         messages: [{
@@ -214,13 +214,13 @@ test('validates and sanitizes bounded conversation metadata', () => {
     }]);
 });
 
-test('requires calendar-valid timezone-qualified RFC3339 dates', () => {
+test('requires calendar-valid timezone-qualified RFC3339 dates', async () => {
     for (const generatedAt of [
         '2026-07-25T16:16:58',
         '2026-02-30T16:16:58+08:00',
         1784967418000,
     ]) {
-        assert.throws(
+        await assert.rejects(
             () => validateGenerateRequest({
                 templateId: 'food-copy-layout',
                 targetImage: tinyPng,
@@ -231,7 +231,7 @@ test('requires calendar-valid timezone-qualified RFC3339 dates', () => {
         );
     }
 
-    const value = validateGenerateRequest({
+    const value = await validateGenerateRequest({
         templateId: 'food-copy-layout',
         targetImage: tinyPng,
         generatedAt: '2026-07-25T16:16:58+08:00',

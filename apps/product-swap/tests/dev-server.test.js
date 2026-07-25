@@ -9,6 +9,7 @@ const {
     readJsonBody,
 } = require('../server/dev-server');
 const { publicCatalog } = require('../server/template-registry');
+const { createZeroIdatPng } = require('./image-fixtures');
 
 const tinyPng = [
     'data:image/png;base64,',
@@ -98,6 +99,37 @@ test('returns stable validation errors', async (t) => {
 
     assert.equal(response.status, 400);
     assert.equal(data.error.code, 'INVALID_INPUT');
+});
+
+test('rejects an undecodable upload before invoking the provider', async (t) => {
+    let providerCalls = 0;
+    const server = createProductSwapServer({
+        provider: async () => {
+            providerCalls += 1;
+        },
+    });
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    t.after(() => server.close());
+    const { port } = server.address();
+    const invalidPng = createZeroIdatPng();
+
+    const response = await fetch(
+        `http://127.0.0.1:${port}/api/product-swap/generate`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                targetImage:
+                    `data:image/png;base64,${invalidPng.toString('base64')}`,
+            }),
+        },
+    );
+    const data = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(data.error.code, 'INVALID_IMAGE');
+    assert.equal(providerCalls, 0);
 });
 
 test('rejects a concurrent generation with SERVER_BUSY', async (t) => {

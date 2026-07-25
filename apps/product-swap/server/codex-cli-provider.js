@@ -6,6 +6,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const {
+    decodeImageBuffer,
     validatePng,
 } = require('./image-validation');
 
@@ -315,6 +316,7 @@ async function readResultImage(
         if (extraBytes || !validatePng(imageBuffer)) {
             throw new Error('invalid PNG result');
         }
+        await decodeImageBuffer(imageBuffer, 'image/png');
         return {
             imageBuffer,
             mimeType: 'image/png',

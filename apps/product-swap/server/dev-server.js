@@ -12,11 +12,14 @@ const {
     getTemplatePackage,
     publicCatalog,
 } = require('./template-registry');
-const { validatePng } = require('./image-validation');
+const {
+    MAX_IMAGE_PIXELS,
+    decodeImageBuffer,
+    validatePng,
+} = require('./image-validation');
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_IMAGE_DIMENSION = 16384;
-const MAX_IMAGE_PIXELS = 64 * 1024 * 1024;
 const MAX_REQUEST_BYTES = 42 * 1024 * 1024;
 const APP_ROOT = path.resolve(__dirname, '..');
 const PUBLIC_ASSETS_ROOT = path.join(APP_ROOT, 'assets');
@@ -367,7 +370,7 @@ function normalizeGeneratedAt(value) {
     return Number.isNaN(date.getTime()) ? '' : date.toISOString();
 }
 
-function validateGenerateRequest(body = {}) {
+async function validateGenerateRequest(body = {}) {
     if (!isPlainObject(body)) {
         throw new ProductSwapError(
             'INVALID_INPUT',
@@ -588,12 +591,37 @@ function validateGenerateRequest(body = {}) {
         },
     );
 
+    const previousImage = body.previousImage
+        ? decodeImageDataUrl(body.previousImage, 'previousImage')
+        : null;
+    const images = [
+        ...template.manifest.fields
+            .filter((field) => field.type === 'image')
+            .map((field) => values[field.key])
+            .filter(Boolean),
+        previousImage,
+    ].filter(Boolean);
+
+    try {
+        for (const image of images) {
+            const decoded = await decodeImageBuffer(
+                image.buffer,
+                image.mimeType,
+            );
+            image.width = decoded.width;
+            image.height = decoded.height;
+        }
+    } catch {
+        throw new ProductSwapError(
+            'INVALID_IMAGE',
+            '图片内容无法解码',
+        );
+    }
+
     return {
         template,
         values,
-        previousImage: body.previousImage
-            ? decodeImageDataUrl(body.previousImage, 'previousImage')
-            : null,
+        previousImage,
         messages,
     };
 }
@@ -789,7 +817,7 @@ async function handleGenerate(
 
     try {
         const body = await readJsonBody(request, bodyOptions);
-        const input = validateGenerateRequest(body);
+        const input = await validateGenerateRequest(body);
         taskDir = await fs.mkdtemp(
             path.join(os.tmpdir(), 'product-swap-'),
         );
