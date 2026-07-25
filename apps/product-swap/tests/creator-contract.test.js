@@ -40,3 +40,13 @@ test('resolves only live creator templates', () => {
     assert.equal(resolveCreatorTemplate('?template=missing'), null);
     assert.equal(resolveCreatorTemplate('?template=summer-seeding'), null);
 });
+
+test('restores the active template generation label after loading', () => {
+    const source = fs.readFileSync(
+        path.join(root, 'script.js'),
+        'utf8',
+    );
+
+    assert.match(source, /activeTemplate\?\.outputLabel/);
+    assert.match(source, /activeTemplate\?\.creditCost/);
+});

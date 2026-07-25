@@ -396,7 +396,9 @@ function boot() {
         );
         generateButton.textContent = value
             ? '生成中…'
-            : '生成（消耗 3 豆额度）';
+            : `${activeTemplate?.outputLabel || '生成 1 张场景图'}（消耗 ${
+                activeTemplate?.creditCost ?? 3
+            } 豆额度）`;
 
         for (const input of Object.values(inputs)) {
             input.disabled = value;
