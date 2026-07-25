@@ -164,8 +164,6 @@ function readImageDimensions(buffer, mimeType) {
         && buffer.length >= 4
         && buffer[0] === 0xff
         && buffer[1] === 0xd8
-        && buffer.at(-2) === 0xff
-        && buffer.at(-1) === 0xd9
     ) {
         let offset = 2;
         let dimensions = null;
@@ -203,8 +201,12 @@ function readImageDimensions(buffer, mimeType) {
                 break;
             }
             if (marker === 0xda) {
-                seenScan = offset + segmentLength
-                    < buffer.length - 2;
+                const scanStart = offset + segmentLength;
+                const endMarker = buffer.indexOf(
+                    Buffer.from([0xff, 0xd9]),
+                    scanStart,
+                );
+                seenScan = endMarker > scanStart;
                 break;
             }
             if (

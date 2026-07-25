@@ -273,6 +273,7 @@ test('image binding invalidates stale uploads and uses field MIME types', () => 
     assert.match(source, /uploadOperations\.complete\(operation\)/);
     assert.match(source, /uploadOperations\.cancel\(field\.key\)/);
     assert.match(source, /validateClientFileMeta\(file, field\.accept/);
+    assert.match(source, /detectImageMime\(header\)/);
     assert.match(source, /input\.value = '';\s*const operation/);
 });
 

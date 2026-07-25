@@ -351,6 +351,30 @@ test('rejects JPEG and WebP files with dimensions but no image data', () => {
     }
 });
 
+test('accepts JPEG metadata appended after the end-of-image marker', () => {
+    const jpegWithTrailingMetadata = Buffer.from([
+        0xff, 0xd8,
+        0xff, 0xc0, 0x00, 0x0b,
+        0x08, 0x00, 0x01, 0x00, 0x01,
+        0x01, 0x01, 0x11, 0x00,
+        0xff, 0xda, 0x00, 0x08,
+        0x01, 0x01, 0x00, 0x00, 0x3f, 0x00,
+        0x00,
+        0xff, 0xd9,
+        0x63, 0x6f, 0x6e, 0x74, 0x65, 0x78, 0x74,
+    ]);
+
+    const decoded = decodeImageDataUrl(
+        `data:image/jpeg;base64,${
+            jpegWithTrailingMetadata.toString('base64')
+        }`,
+        'targetImage',
+    );
+
+    assert.equal(decoded.width, 1);
+    assert.equal(decoded.height, 1);
+});
+
 test('resolves image files directly inside the task directory', () => {
     const taskDir = 'C:\\temp\\safe-task';
     assert.equal(

@@ -7,6 +7,37 @@ const CLIENT_IMAGE_TYPES = new Set([
     'image/webp',
 ]);
 
+function detectImageMime(input) {
+    const bytes = input instanceof Uint8Array
+        ? input
+        : new Uint8Array(input || 0);
+    if (
+        bytes.length >= 3
+        && bytes[0] === 0xff
+        && bytes[1] === 0xd8
+        && bytes[2] === 0xff
+    ) {
+        return 'image/jpeg';
+    }
+    if (
+        bytes.length >= 8
+        && [
+            0x89, 0x50, 0x4e, 0x47,
+            0x0d, 0x0a, 0x1a, 0x0a,
+        ].every((value, index) => bytes[index] === value)
+    ) {
+        return 'image/png';
+    }
+    if (
+        bytes.length >= 12
+        && String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF'
+        && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP'
+    ) {
+        return 'image/webp';
+    }
+    return '';
+}
+
 function resolveApiBase(explicitBase, hostname) {
     if (explicitBase) {
         return String(explicitBase).replace(/\/+$/, '');
@@ -380,13 +411,29 @@ function mapErrorCode(code) {
     return ERROR_MESSAGES[code] || '生成失败，请稍后重试';
 }
 
-function readFileAsDataUrl(file) {
-    return new Promise((resolve, reject) => {
+async function readFileAsDataUrl(file) {
+    let header;
+    try {
+        header = new Uint8Array(
+            await file.slice(0, 12).arrayBuffer(),
+        );
+    } catch {
+        throw new Error('图片读取失败');
+    }
+    const detectedMime = detectImageMime(header);
+    if (!detectedMime) throw new Error('图片格式无效');
+
+    const originalDataUrl = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result || ''));
         reader.onerror = () => reject(new Error('图片读取失败'));
         reader.readAsDataURL(file);
     });
+    const commaIndex = originalDataUrl.indexOf(',');
+    if (commaIndex < 0) throw new Error('图片读取失败');
+    return `data:${detectedMime};base64,${
+        originalDataUrl.slice(commaIndex + 1)
+    }`;
 }
 
 function readImageDimensions(source) {
@@ -1392,6 +1439,7 @@ if (typeof module !== 'undefined') {
         resolveApiBase,
         activeTaskStorageKey,
         taskMatchesTemplate,
+        detectImageMime,
         validateClientFileMeta,
         buildGeneratePayload,
         buildRefinePayload,

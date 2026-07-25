@@ -15,6 +15,7 @@ const {
     resolveApiBase,
     activeTaskStorageKey,
     taskMatchesTemplate,
+    detectImageMime,
     validateClientFileMeta,
     buildGeneratePayload,
     buildRefinePayload,
@@ -24,6 +25,22 @@ const {
     pollLocalTask,
     mapErrorCode,
 } = require('../script');
+
+test('detects supported image MIME types from file signatures', () => {
+    assert.equal(
+        detectImageMime(Buffer.from('ffd8ffe00010', 'hex')),
+        'image/jpeg',
+    );
+    assert.equal(
+        detectImageMime(Buffer.from('89504e470d0a1a0a', 'hex')),
+        'image/png',
+    );
+    assert.equal(
+        detectImageMime(Buffer.from('524946460000000057454250', 'hex')),
+        'image/webp',
+    );
+    assert.equal(detectImageMime(Buffer.from('not-an-image')), '');
+});
 
 test('page exposes the screenshot-matching controls', () => {
     const html = fs.readFileSync(
