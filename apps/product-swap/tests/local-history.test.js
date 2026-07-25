@@ -83,6 +83,7 @@ test('exports local polling helpers', () => {
     assert.equal(typeof history.completeTaskMetadata, 'function');
     assert.equal(typeof history.storeGenerationReceipt, 'function');
     assert.equal(typeof history.getGenerationReceipt, 'function');
+    assert.equal(typeof history.getAsset, 'function');
 });
 
 test('does not overwrite terminal success with an interruption failure', () => {

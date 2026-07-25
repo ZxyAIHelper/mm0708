@@ -81,20 +81,31 @@
 
     async function loadProtectedImage(
         container,
-        _taskId,
+        taskId,
         asset,
         urlGroup,
     ) {
-        if (assetExpired(asset)) {
-            showExpired(container);
-            return null;
-        }
         const image = container.querySelector('img');
         const placeholder = container.querySelector('.asset-placeholder');
         try {
-            let imageUrl = asset.sourceUrl || '';
-            if (asset.blob) {
-                const blobUrl = URL.createObjectURL(asset.blob);
+            let resolvedAsset = asset;
+            if (
+                resolvedAsset?.id
+                && !resolvedAsset.blob
+                && !resolvedAsset.sourceUrl
+            ) {
+                resolvedAsset = await history.getAsset(resolvedAsset.id);
+            }
+            if (
+                assetExpired(resolvedAsset)
+                || resolvedAsset.taskId !== taskId
+            ) {
+                showExpired(container);
+                return null;
+            }
+            let imageUrl = resolvedAsset.sourceUrl || '';
+            if (resolvedAsset.blob) {
+                const blobUrl = URL.createObjectURL(resolvedAsset.blob);
                 urlGroup.add(blobUrl);
                 imageUrl = blobUrl;
             }

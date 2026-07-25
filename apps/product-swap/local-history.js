@@ -354,6 +354,30 @@ async function assetsForTask(database, taskId) {
     );
 }
 
+async function getAsset(assetId) {
+    if (!assetId) {
+        return null;
+    }
+    const database = await openDatabase();
+    const transaction = database.transaction(
+        ['assets', 'tasks'],
+        'readonly',
+    );
+    const asset = await requestValue(
+        transaction.objectStore('assets').get(assetId),
+    );
+    if (!asset) {
+        return null;
+    }
+    const task = await requestValue(
+        transaction.objectStore('tasks').get(asset.taskId),
+    );
+    if (!task || task.userId !== ensureUserId()) {
+        return null;
+    }
+    return asset;
+}
+
 async function getTask(taskId) {
     const database = await openDatabase();
     const transaction = database.transaction('tasks', 'readonly');
@@ -596,6 +620,7 @@ const localHistory = {
     latestProcessingTask,
     touchTask,
     markTaskDispatched,
+    getAsset,
     getTask,
     deleteTask,
     cleanupExpiredAssets,

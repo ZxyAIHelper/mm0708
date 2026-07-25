@@ -1023,7 +1023,7 @@ function attachPageErrorListeners(page, errors, label) {
             || foodState.refineSubmitCount !== 1
             || historyState.title !== '作品'
             || historyState.cards !== 2
-            || historyState.expired !== 2
+            || historyState.expired !== 0
             || historyState.expiredAfterCleanup !== 2
             || historyState.detailAssets !== 4
             || historyState.outputUrlAfterCleanup !== ''

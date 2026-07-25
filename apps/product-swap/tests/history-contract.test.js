@@ -73,6 +73,7 @@ test('task center reads local blobs, urls, expiry and deletion', () => {
     assert.match(script, /LocalTaskHistory/);
     assert.match(script, /history\.listTasks/);
     assert.match(script, /history\.getTask/);
+    assert.match(script, /history\.getAsset/);
     assert.match(script, /history\.deleteTask/);
     assert.match(script, /URL\.createObjectURL/);
     assert.match(script, /URL\.revokeObjectURL/);

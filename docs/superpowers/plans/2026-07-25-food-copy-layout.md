@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 在现有内容生成应用中加入单图餐饮文案排版模板，并让模板目录、表单、服务端生成策略都能扩展到上百个独立模板包。
+**Goal:** 在现有内容生成应用中加入一套独立的单图餐饮文案排版功能，并复用火山 API Provider 与现有任务中心。
 
-**Architecture:** 每个模板由独立 `template-packs/<id>/manifest.js` 与 `prompt.js` 组成；服务端自动发现并校验模板包，构建阶段生成浏览器目录数据。创建页由 manifest 字段 schema 驱动，通用生成链路只处理上传、任务、版本和对话，模板专属图片理解与提示词留在各自模板包中。
+**Architecture:** 商品换图和文案配图分别维护自己的字段校验、图片顺序、提示词和结果行为。两套功能只共享火山 API 的调用封装与任务中心的创建、完成、失败记录；首期不建设通用百模板运行时。
 
-**Tech Stack:** 原生 HTML/CSS/JavaScript、Node.js CommonJS、Node Test Runner、现有 Codex CLI 图片生成 provider、IndexedDB 本地任务历史。
+**Tech Stack:** 原生 HTML/CSS/JavaScript、Node.js CommonJS、Node Test Runner、Cloudflare Worker、火山方舟图片生成 API、IndexedDB 本地任务历史。
 
 ---
 
