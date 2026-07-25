@@ -739,14 +739,31 @@ function boot() {
             state.values,
             task.input?.generatedAt || new Date().toISOString(),
         );
-        state.conversationId = task.input?.conversationId || '';
-        state.messages = Array.isArray(task.input?.messages)
+        const inputConversationId = task.input?.conversationId || '';
+        const inputMessages = Array.isArray(task.input?.messages)
             ? task.input.messages.map((message) => ({ ...message }))
             : [];
 
         const previous = task.assets?.find((item) => item.role === 'previous');
+        const previousSource = previous
+            ? await sourceForAsset(previous)
+            : '';
+        const baseVersionId = String(task.input?.baseVersionId || '');
+        let parentVersion = null;
+        if (baseVersionId || previousSource) {
+            parentVersion = VersionHistory.hydrateVersion(versions, {
+                ...(baseVersionId ? { id: baseVersionId } : {}),
+                imageUrl: previousSource,
+                instruction: '恢复的基础版本',
+                conversationId: inputConversationId,
+                messages: inputMessages,
+            });
+        }
+
+        state.conversationId = inputConversationId;
+        state.messages = inputMessages;
         if (previous) {
-            state.result = await sourceForAsset(previous);
+            state.result = previousSource;
         }
         if (task.status === 'completed' && task.result?.imageUrl) {
             state.result = task.result.imageUrl;
@@ -766,33 +783,25 @@ function boot() {
                 content: task.result.assistantMessage || '已完成本次生成。',
             });
             state.messages = state.messages.slice(-6);
-        }
-        if (state.result) {
-            const hydratedVersion = {
+            const childVersion = VersionHistory.hydrateVersion(versions, {
                 imageUrl: state.result,
                 instruction: task.input?.isRefinement
                     ? String(task.input.requirements || '继续修改')
                     : '首次生成',
                 conversationId: state.conversationId,
                 messages: state.messages,
-                baseVersionId: task.input?.baseVersionId || null,
-                sourceTaskId: (
-                    task.status === 'completed'
-                    && task.result?.imageUrl
-                ) ? task.id : null,
-            };
-            const existingIndex =
-                VersionHistory.findVersionIndexByIdentity(
-                    versions.list(),
-                    hydratedVersion,
-                );
-            if (existingIndex >= 0) {
-                const selected = versions.select(existingIndex);
-                selectedVersionIndex = existingIndex;
-                showVersion(selected);
-            } else {
-                addVersion(hydratedVersion);
-            }
+                baseVersionId: parentVersion?.id || null,
+                sourceTaskId: task.id,
+            });
+            selectedVersionIndex = versions.list().findIndex(
+                (version) => version.id === childVersion.id,
+            );
+            showVersion(childVersion);
+        } else if (parentVersion && previousSource) {
+            selectedVersionIndex = versions.list().findIndex(
+                (version) => version.id === parentVersion.id,
+            );
+            showVersion(parentVersion);
         }
         renderMessages();
     }
@@ -1215,25 +1224,30 @@ function boot() {
                 current.imageUrl,
                 window.location.origin,
             );
-            const response = await fetch(
-                request.url,
-                request.fetchOptions,
-            );
-            const responseDetails = {
-                url: response.url,
-                ok: response.ok,
-                contentType: response.headers.get('content-type'),
-                contentLength: response.headers.get('content-length'),
-            };
-            VersionHistory.validateDownloadResponse(
-                request,
-                responseDetails,
-            );
-            const blob = await response.blob();
-            VersionHistory.validateDownloadResponse(request, {
-                ...responseDetails,
-                blobSize: blob.size,
-            });
+            let bytes;
+            if (request.kind === 'data') {
+                bytes = request.bytes;
+            } else {
+                const abortController = new AbortController();
+                const response = await fetch(request.url, {
+                    ...request.fetchOptions,
+                    signal: abortController.signal,
+                });
+                VersionHistory.validateDownloadResponse(request, {
+                    url: response.url,
+                    ok: response.ok,
+                    contentType: response.headers.get('content-type'),
+                    contentLength: response.headers.get('content-length'),
+                });
+                bytes = await VersionHistory.readBoundedResponseBody(
+                    response,
+                    request.maxBytes,
+                    { abortController },
+                );
+            }
+            VersionHistory.validatePngBytes(bytes);
+            const blob = new Blob([bytes], { type: 'image/png' });
+            await VersionHistory.ensureBrowserDecodablePng(blob);
             objectUrl = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = objectUrl;

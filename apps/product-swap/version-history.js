@@ -10,6 +10,24 @@
         /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
     const BASE64_ALPHABET =
         'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    let fallbackIdSequence = 0;
+
+    function fallbackVersionId() {
+        const randomUuid = global.crypto?.randomUUID?.();
+        if (randomUuid) return `version:${randomUuid}`;
+        fallbackIdSequence += 1;
+        const randomPart = Math.random().toString(36).slice(2);
+        return [
+            'version',
+            Date.now().toString(36),
+            fallbackIdSequence.toString(36),
+            randomPart,
+        ].join(':');
+    }
+
+    function versionIdForSourceTask(sourceTaskId) {
+        return `task:${encodeURIComponent(String(sourceTaskId || ''))}`;
+    }
 
     function unsafeDownload() {
         throw new Error('UNSAFE_DOWNLOAD');
@@ -20,6 +38,104 @@
             ? 2
             : (base64.endsWith('=') ? 1 : 0);
         return (base64.length / 4) * 3 - padding;
+    }
+
+    function decodeBase64(base64) {
+        let binary;
+        try {
+            binary = global.atob(base64);
+        } catch {
+            throw new Error('INVALID_PNG');
+        }
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) {
+            bytes[index] = binary.charCodeAt(index);
+        }
+        return bytes;
+    }
+
+    function uint32(bytes, offset) {
+        return (
+            bytes[offset] * 0x1000000
+            + bytes[offset + 1] * 0x10000
+            + bytes[offset + 2] * 0x100
+            + bytes[offset + 3]
+        );
+    }
+
+    function chunkType(bytes, offset) {
+        return String.fromCharCode(
+            bytes[offset],
+            bytes[offset + 1],
+            bytes[offset + 2],
+            bytes[offset + 3],
+        );
+    }
+
+    function validatePngBytes(input) {
+        const bytes = input instanceof Uint8Array
+            ? input
+            : new Uint8Array(input || 0);
+        const signature = [
+            0x89, 0x50, 0x4e, 0x47,
+            0x0d, 0x0a, 0x1a, 0x0a,
+        ];
+        if (
+            bytes.length < 8
+            || signature.some((value, index) => bytes[index] !== value)
+        ) {
+            throw new Error('INVALID_PNG');
+        }
+
+        let offset = 8;
+        let chunkIndex = 0;
+        let seenHeader = false;
+        let seenImageData = false;
+        while (offset < bytes.length) {
+            if (offset + 12 > bytes.length) {
+                throw new Error('INVALID_PNG');
+            }
+            const length = uint32(bytes, offset);
+            const type = chunkType(bytes, offset + 4);
+            const nextOffset = offset + 12 + length;
+            if (
+                !Number.isSafeInteger(nextOffset)
+                || nextOffset > bytes.length
+            ) {
+                throw new Error('INVALID_PNG');
+            }
+            if (chunkIndex === 0) {
+                if (type !== 'IHDR' || length !== 13) {
+                    throw new Error('INVALID_PNG');
+                }
+                const width = uint32(bytes, offset + 8);
+                const height = uint32(bytes, offset + 12);
+                if (!width || !height) throw new Error('INVALID_PNG');
+                seenHeader = true;
+            } else if (type === 'IHDR') {
+                throw new Error('INVALID_PNG');
+            }
+            if (type === 'IDAT') {
+                if (!seenHeader || length === 0) {
+                    throw new Error('INVALID_PNG');
+                }
+                seenImageData = true;
+            }
+            if (type === 'IEND') {
+                if (
+                    length !== 0
+                    || !seenHeader
+                    || !seenImageData
+                    || nextOffset !== bytes.length
+                ) {
+                    throw new Error('INVALID_PNG');
+                }
+                return true;
+            }
+            offset = nextOffset;
+            chunkIndex += 1;
+        }
+        throw new Error('INVALID_PNG');
     }
 
     function hasCanonicalPaddingBits(base64) {
@@ -53,11 +169,19 @@
             ) {
                 unsafeDownload();
             }
+            let bytes;
+            try {
+                bytes = decodeBase64(base64);
+                validatePngBytes(bytes);
+            } catch {
+                unsafeDownload();
+            }
             return {
                 kind: 'data',
                 url: value,
                 maxBytes: boundedMax,
                 fetchOptions: undefined,
+                bytes,
             };
         }
 
@@ -146,6 +270,113 @@
         return true;
     }
 
+    async function readBoundedResponseBody(
+        response,
+        maxBytes,
+        { abortController } = {},
+    ) {
+        const boundedMax = Number(maxBytes);
+        if (!Number.isFinite(boundedMax) || boundedMax <= 0) {
+            throw new Error('DOWNLOAD_TOO_LARGE');
+        }
+        const contentLength = response.headers?.get?.('content-length');
+        if (contentLength !== null && contentLength !== undefined) {
+            if (!/^\d+$/.test(String(contentLength))) {
+                throw new Error('DOWNLOAD_LENGTH_INVALID');
+            }
+            if (Number(contentLength) > boundedMax) {
+                abortController?.abort?.();
+                throw new Error('DOWNLOAD_TOO_LARGE');
+            }
+        }
+
+        const reader = response.body?.getReader?.();
+        if (!reader) {
+            if (
+                contentLength === null
+                || contentLength === undefined
+                || !response.arrayBuffer
+            ) {
+                throw new Error('DOWNLOAD_LENGTH_REQUIRED');
+            }
+            const buffer = await response.arrayBuffer();
+            const bytes = new Uint8Array(buffer);
+            if (bytes.byteLength > boundedMax) {
+                abortController?.abort?.();
+                throw new Error('DOWNLOAD_TOO_LARGE');
+            }
+            return bytes;
+        }
+
+        const chunks = [];
+        let total = 0;
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = value instanceof Uint8Array
+                    ? value
+                    : new Uint8Array(value);
+                if (total + chunk.byteLength > boundedMax) {
+                    abortController?.abort?.();
+                    try {
+                        await reader.cancel('DOWNLOAD_TOO_LARGE');
+                    } catch {
+                        // The hard ceiling still applies if cancel reports failure.
+                    }
+                    throw new Error('DOWNLOAD_TOO_LARGE');
+                }
+                chunks.push(chunk);
+                total += chunk.byteLength;
+            }
+        } finally {
+            reader.releaseLock?.();
+        }
+        const bytes = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) {
+            bytes.set(chunk, offset);
+            offset += chunk.byteLength;
+        }
+        return bytes;
+    }
+
+    async function ensureBrowserDecodablePng(blob, environment = global) {
+        if (typeof environment.createImageBitmap === 'function') {
+            let bitmap;
+            try {
+                bitmap = await environment.createImageBitmap(blob);
+                if (!bitmap.width || !bitmap.height) {
+                    throw new Error('INVALID_PNG');
+                }
+            } finally {
+                bitmap?.close?.();
+            }
+            return true;
+        }
+
+        const Url = environment.URL;
+        const ImageConstructor = environment.Image;
+        if (!Url?.createObjectURL || !ImageConstructor) {
+            throw new Error('IMAGE_DECODE_UNAVAILABLE');
+        }
+        const objectUrl = Url.createObjectURL(blob);
+        try {
+            await new Promise((resolve, reject) => {
+                const image = new ImageConstructor();
+                image.onload = () => {
+                    if (image.naturalWidth && image.naturalHeight) resolve();
+                    else reject(new Error('INVALID_PNG'));
+                };
+                image.onerror = () => reject(new Error('INVALID_PNG'));
+                image.src = objectUrl;
+            });
+        } finally {
+            Url.revokeObjectURL(objectUrl);
+        }
+        return true;
+    }
+
     function utf8Length(value) {
         let bytes = 0;
         for (const character of String(value)) {
@@ -203,10 +434,28 @@
         return -1;
     }
 
+    function hydrateVersion(history, input) {
+        const candidate = {
+            ...input,
+            id: input.id || (
+                input.sourceTaskId
+                    ? versionIdForSourceTask(input.sourceTaskId)
+                    : null
+            ),
+        };
+        const existingIndex = findVersionIndexByIdentity(
+            history.list(),
+            candidate,
+        );
+        if (existingIndex >= 0) {
+            return history.select(existingIndex);
+        }
+        return history.add(candidate);
+    }
+
     function createVersionHistory(options = {}) {
         const versions = [];
         let selectedIndex = -1;
-        let nextId = 1;
         const maxEntries = Number.isInteger(options.maxEntries)
             && options.maxEntries > 0
             ? options.maxEntries
@@ -230,14 +479,33 @@
                     ) > maxEstimatedBytes
                 )
             ) {
-                versions.shift();
+                const removed = versions.shift();
+                for (const version of versions) {
+                    if (version.baseVersionId === removed.id) {
+                        version.baseVersionId = null;
+                    }
+                }
                 selectedIndex -= 1;
             }
         }
 
         function add(input) {
+            const requestedId = input.id
+                ? String(input.id)
+                : (
+                    input.sourceTaskId
+                        ? versionIdForSourceTask(input.sourceTaskId)
+                        : null
+                );
+            let id = requestedId;
+            while (
+                !id
+                || versions.some((version) => version.id === id)
+            ) {
+                id = fallbackVersionId();
+            }
             const version = {
-                id: `version-${nextId++}`,
+                id,
                 imageUrl: String(input.imageUrl || ''),
                 instruction: String(input.instruction || ''),
                 createdAt: Date.now(),
@@ -305,8 +573,13 @@
     const versionHistory = {
         createVersionHistory,
         createDownloadRequest,
+        ensureBrowserDecodablePng,
         findVersionIndexByIdentity,
+        hydrateVersion,
+        readBoundedResponseBody,
         validateDownloadResponse,
+        validatePngBytes,
+        versionIdForSourceTask,
     };
     global.VersionHistory = versionHistory;
     if (typeof module !== 'undefined' && module.exports) {

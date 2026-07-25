@@ -5,9 +5,20 @@ const assert = require('node:assert/strict');
 const {
     createVersionHistory,
     createDownloadRequest,
+    ensureBrowserDecodablePng,
     findVersionIndexByIdentity,
+    hydrateVersion,
+    readBoundedResponseBody,
     validateDownloadResponse,
+    validatePngBytes,
+    versionIdForSourceTask,
 } = require('../version-history');
+
+const tinyPngBase64 = [
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwC',
+    'AAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+].join('');
+const tinyPngBytes = Buffer.from(tinyPngBase64, 'base64');
 
 test('adds versions and selects the newest version', () => {
     const history = createVersionHistory();
@@ -255,19 +266,18 @@ test('retains the newest current version when it alone exceeds the budget', () =
 });
 
 test('allows canonical PNG data URLs and same-origin network URLs', () => {
-    const dataUrl = 'data:image/png;base64,AAAA';
+    const dataUrl = `data:image/png;base64,${tinyPngBase64}`;
+    const dataRequest = createDownloadRequest(
+        dataUrl,
+        'https://product-swap.example',
+        1024,
+    );
+    assert.equal(dataRequest.kind, 'data');
+    assert.equal(dataRequest.url, dataUrl);
+    assert.equal(dataRequest.maxBytes, 1024);
     assert.deepEqual(
-        createDownloadRequest(
-            dataUrl,
-            'https://product-swap.example',
-            1024,
-        ),
-        {
-            kind: 'data',
-            url: dataUrl,
-            maxBytes: 1024,
-            fetchOptions: undefined,
-        },
+        Buffer.from(dataRequest.bytes),
+        tinyPngBytes,
     );
 
     assert.deepEqual(
@@ -297,6 +307,7 @@ test('rejects malformed data URLs and non-same-origin download URLs', () => {
         'data:image/png;base64,',
         'data:image/png;base64,AB==',
         'data:image/png;base64,AAB=',
+        'data:image/png;base64,AAAA',
         'javascript:alert(1)',
         'https://other.example/result.png',
         'https://user:password@product-swap.example/result.png',
@@ -341,4 +352,310 @@ test('validates the final PNG response and bounded blob size', () => {
             /UNSAFE_DOWNLOAD/,
         );
     }
+});
+
+test('fallback version IDs do not reset across history sessions', () => {
+    const firstSession = createVersionHistory();
+    const secondSession = createVersionHistory();
+
+    const first = firstSession.add({
+        imageUrl: 'first',
+        instruction: 'first',
+    });
+    const second = secondSession.add({
+        imageUrl: 'second',
+        instruction: 'second',
+    });
+
+    assert.notEqual(first.id, second.id);
+    assert.doesNotMatch(first.id, /^version-\d+$/);
+    assert.doesNotMatch(second.id, /^version-\d+$/);
+});
+
+test('completed task versions use a stable source-derived ID', () => {
+    const expectedId = versionIdForSourceTask('task/refine 1');
+    const firstSession = createVersionHistory();
+    const secondSession = createVersionHistory();
+
+    const first = firstSession.add({
+        imageUrl: 'same',
+        instruction: 'first',
+        sourceTaskId: 'task/refine 1',
+    });
+    const second = secondSession.add({
+        imageUrl: 'same',
+        instruction: 'rehydrated',
+        sourceTaskId: 'task/refine 1',
+    });
+
+    assert.match(expectedId, /^task:/);
+    assert.equal(first.id, expectedId);
+    assert.equal(second.id, expectedId);
+});
+
+test('preserves a trusted explicit ID when it is unique', () => {
+    const history = createVersionHistory();
+    const explicit = history.add({
+        id: 'persisted-base-version',
+        imageUrl: 'base',
+        instruction: 'base',
+    });
+    const later = history.add({
+        imageUrl: 'later',
+        instruction: 'later',
+    });
+
+    assert.equal(explicit.id, 'persisted-base-version');
+    assert.notEqual(later.id, explicit.id);
+});
+
+test('rehydrates an exact parent before its stable task child', () => {
+    const originalSession = createVersionHistory();
+    const originalBase = originalSession.add({
+        imageUrl: 'base-image',
+        instruction: 'base',
+        conversationId: 'conversation-1',
+        messages: [{ role: 'assistant', content: 'base result' }],
+    });
+
+    const refreshedSession = createVersionHistory();
+    const parent = hydrateVersion(refreshedSession, {
+        id: originalBase.id,
+        imageUrl: 'base-image',
+        instruction: '恢复的基础版本',
+        conversationId: 'conversation-1',
+        messages: originalBase.messages,
+    });
+    const child = hydrateVersion(refreshedSession, {
+        imageUrl: 'child-image',
+        instruction: 'make it brighter',
+        baseVersionId: originalBase.id,
+        conversationId: 'conversation-1',
+        sourceTaskId: 'task-refine-1',
+        messages: [
+            ...originalBase.messages,
+            { role: 'user', content: 'make it brighter' },
+        ],
+    });
+    const duplicate = hydrateVersion(refreshedSession, {
+        imageUrl: 'child-image',
+        instruction: 'make it brighter',
+        baseVersionId: originalBase.id,
+        sourceTaskId: 'task-refine-1',
+    });
+    const later = refreshedSession.add({
+        imageUrl: 'later-image',
+        instruction: 'later',
+    });
+
+    assert.equal(parent.id, originalBase.id);
+    assert.equal(child.id, versionIdForSourceTask('task-refine-1'));
+    assert.equal(child.baseVersionId, parent.id);
+    assert.equal(duplicate.id, child.id);
+    assert.equal(refreshedSession.list().length, 3);
+    assert.notEqual(later.id, parent.id);
+    assert.notEqual(later.id, child.id);
+});
+
+test('never leaves a dangling parent ID after deterministic eviction', () => {
+    const history = createVersionHistory({ maxEntries: 2 });
+    const parent = history.add({
+        imageUrl: 'parent',
+        instruction: 'parent',
+    });
+    history.add({
+        imageUrl: 'child',
+        instruction: 'child',
+        baseVersionId: parent.id,
+    });
+    history.add({
+        imageUrl: 'latest',
+        instruction: 'latest',
+    });
+
+    const listed = history.list();
+    const retainedIds = new Set(listed.map((version) => version.id));
+    assert.equal(listed.length, 2);
+    assert.equal(
+        listed.every((version) => (
+            !version.baseVersionId
+            || retainedIds.has(version.baseVersionId)
+        )),
+        true,
+    );
+});
+
+test('rejects truncated or structurally incomplete PNG bytes', () => {
+    assert.equal(validatePngBytes(tinyPngBytes), true);
+
+    for (const invalid of [
+        tinyPngBytes.subarray(0, 8),
+        tinyPngBytes.subarray(0, 24),
+        tinyPngBytes.subarray(0, -1),
+        Buffer.from('not a png'),
+    ]) {
+        assert.throws(
+            () => validatePngBytes(invalid),
+            /INVALID_PNG/,
+        );
+    }
+});
+
+test('streams a valid PNG within the hard byte ceiling', async () => {
+    const chunks = [
+        tinyPngBytes.subarray(0, 20),
+        tinyPngBytes.subarray(20, 50),
+        tinyPngBytes.subarray(50),
+    ];
+    let reads = 0;
+    const response = {
+        body: {
+            getReader() {
+                return {
+                    async read() {
+                        const value = chunks[reads++];
+                        return value
+                            ? { done: false, value }
+                            : { done: true };
+                    },
+                    async cancel() {},
+                };
+            },
+        },
+    };
+
+    const bytes = await readBoundedResponseBody(
+        response,
+        tinyPngBytes.length,
+    );
+
+    assert.deepEqual(Buffer.from(bytes), tinyPngBytes);
+    assert.equal(validatePngBytes(bytes), true);
+});
+
+test('cancels and aborts an oversized stream before reading it fully', async () => {
+    const chunks = [
+        Buffer.alloc(4, 1),
+        Buffer.alloc(4, 2),
+        Buffer.alloc(4, 3),
+        Buffer.alloc(4, 4),
+    ];
+    let reads = 0;
+    let cancelled = false;
+    let aborted = false;
+    const response = {
+        body: {
+            getReader() {
+                return {
+                    async read() {
+                        const value = chunks[reads++];
+                        return value
+                            ? { done: false, value }
+                            : { done: true };
+                    },
+                    async cancel() {
+                        cancelled = true;
+                    },
+                };
+            },
+        },
+    };
+
+    await assert.rejects(
+        readBoundedResponseBody(response, 8, {
+            abortController: {
+                abort() {
+                    aborted = true;
+                },
+            },
+        }),
+        /DOWNLOAD_TOO_LARGE/,
+    );
+
+    assert.equal(reads, 3);
+    assert.equal(cancelled, true);
+    assert.equal(aborted, true);
+});
+
+test('uses a known-length bounded fallback when response streams are absent', async () => {
+    let buffered = false;
+    const response = {
+        body: null,
+        headers: {
+            get(name) {
+                return name === 'content-length'
+                    ? String(tinyPngBytes.length)
+                    : null;
+            },
+        },
+        async arrayBuffer() {
+            buffered = true;
+            return tinyPngBytes.buffer.slice(
+                tinyPngBytes.byteOffset,
+                tinyPngBytes.byteOffset + tinyPngBytes.byteLength,
+            );
+        },
+    };
+
+    const bytes = await readBoundedResponseBody(
+        response,
+        tinyPngBytes.length,
+    );
+    assert.equal(buffered, true);
+    assert.deepEqual(Buffer.from(bytes), tinyPngBytes);
+
+    await assert.rejects(
+        readBoundedResponseBody({
+            ...response,
+            headers: { get: () => null },
+        }, tinyPngBytes.length),
+        /DOWNLOAD_LENGTH_REQUIRED/,
+    );
+});
+
+test('forces browser PNG decoding and closes the decoded bitmap', async () => {
+    let closed = false;
+    const blob = new Blob([tinyPngBytes], { type: 'image/png' });
+
+    await ensureBrowserDecodablePng(blob, {
+        async createImageBitmap() {
+            return {
+                width: 1,
+                height: 1,
+                close() {
+                    closed = true;
+                },
+            };
+        },
+    });
+
+    assert.equal(closed, true);
+});
+
+test('falls back to Image decoding and releases its temporary URL', async () => {
+    let revoked = '';
+    class FakeImage {
+        constructor() {
+            this.naturalWidth = 1;
+            this.naturalHeight = 1;
+        }
+
+        set src(value) {
+            this.value = value;
+            queueMicrotask(() => this.onload());
+        }
+    }
+    const blob = new Blob([tinyPngBytes], { type: 'image/png' });
+
+    await ensureBrowserDecodablePng(blob, {
+        Image: FakeImage,
+        URL: {
+            createObjectURL: () => 'blob:temporary-decode',
+            revokeObjectURL: (value) => {
+                revoked = value;
+            },
+        },
+    });
+
+    assert.equal(revoked, 'blob:temporary-decode');
 });

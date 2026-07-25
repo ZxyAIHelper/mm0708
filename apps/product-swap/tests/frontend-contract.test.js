@@ -483,13 +483,18 @@ test('downloads the current version through a checked blob response', () => {
     assert.match(source, /VersionHistory\.createDownloadRequest/);
     assert.match(
         source,
-        /fetch\(\s*request\.url,\s*request\.fetchOptions/,
+        /fetch\(\s*request\.url,\s*\{[\s\S]*?\.\.\.request\.fetchOptions[\s\S]*?signal:/,
     );
     assert.match(source, /credentials:\s*'omit'/);
     assert.match(source, /redirect:\s*'error'/);
     assert.match(source, /referrerPolicy:\s*'no-referrer'/);
     assert.match(source, /VersionHistory\.validateDownloadResponse/);
-    assert.match(source, /await response\.blob\(\)/);
+    assert.match(source, /new AbortController\(\)/);
+    assert.match(source, /VersionHistory\.readBoundedResponseBody/);
+    assert.match(source, /VersionHistory\.validatePngBytes/);
+    assert.match(source, /VersionHistory\.ensureBrowserDecodablePng/);
+    assert.match(source, /request\.kind\s*===\s*'data'/);
+    assert.doesNotMatch(source, /response\.blob\(\)/);
     assert.match(source, /URL\.createObjectURL/);
     assert.match(
         source,
@@ -515,21 +520,34 @@ test('generation versions retain context and hydrate by task identity', () => {
     );
     assert.match(
         source,
-        /baseVersionId:\s*task\.input\?\.baseVersionId/,
+        /const baseVersionId\s*=\s*String\(task\.input\?\.baseVersionId/,
     );
     assert.match(source, /conversationId:\s*state\.conversationId/);
     assert.match(source, /messages:\s*state\.messages/);
     assert.match(
         source,
-        /VersionHistory\.findVersionIndexByIdentity/,
+        /VersionHistory\.hydrateVersion/,
     );
     assert.match(
         source,
-        /sourceTaskId:[\s\S]{0,120}\?\s*task\.id\s*:\s*null/,
+        /sourceTaskId:\s*task\.id/,
     );
     assert.doesNotMatch(
         source,
         /current\.imageUrl\s*!==\s*state\.result/,
+    );
+});
+
+test('hydration reconstructs the persisted parent before its task child', () => {
+    const source = fs.readFileSync(path.join(root, 'script.js'), 'utf8');
+    const parentMarker = 'id: baseVersionId';
+    const childMarker = 'sourceTaskId: task.id';
+
+    assert.match(source, /VersionHistory\.hydrateVersion/);
+    assert.ok(source.includes(parentMarker));
+    assert.ok(source.includes(childMarker));
+    assert.ok(
+        source.indexOf(parentMarker) < source.indexOf(childMarker),
     );
 });
 
