@@ -14,6 +14,14 @@ const {
     decodeImageBuffer,
     validatePng,
 } = require('./image-validation');
+const {
+    parseDishAssetQuery,
+    queryDishAssets,
+    validateCatalog,
+} = require('../dish-assets/library');
+const dishAssetCatalog = validateCatalog(
+    require('../dish-assets/catalog.json'),
+);
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_IMAGE_DIMENSION = 16384;
@@ -1110,6 +1118,51 @@ function createProductSwapServer({
                 request.method,
                 catalogProvider,
             );
+            return;
+        }
+
+        if (pathname.replace(/\/+$/, '') === '/api/dish-assets') {
+            if (request.method !== 'GET' && request.method !== 'HEAD') {
+                sendJson(response, 405, {
+                    success: false,
+                    error: {
+                        code: 'METHOD_NOT_ALLOWED',
+                        message: '请求方法不受支持',
+                    },
+                });
+                return;
+            }
+            try {
+                const options = parseDishAssetQuery(new URL(
+                    request.url || '/',
+                    'http://local',
+                ));
+                const items = queryDishAssets(dishAssetCatalog, options);
+                response.setHeader(
+                    'Cache-Control',
+                    'public, max-age=300',
+                );
+                if (request.method === 'HEAD') {
+                    response.writeHead(200, {
+                        'Content-Type': 'application/json; charset=utf-8',
+                    });
+                    response.end();
+                    return;
+                }
+                sendJson(response, 200, {
+                    success: true,
+                    items,
+                    total: items.length,
+                });
+            } catch (error) {
+                sendJson(response, 400, {
+                    success: false,
+                    error: {
+                        code: 'INVALID_INPUT',
+                        message: error.message,
+                    },
+                });
+            }
             return;
         }
 

@@ -40,6 +40,18 @@ test('build emits only deployable public assets', async () => {
         ).then((stat) => stat.isFile()),
         true,
     );
+    assert.equal(
+        await fs.stat(
+            path.join(
+                appRoot,
+                'dist',
+                'assets',
+                'dish-library',
+                'catalog.json',
+            ),
+        ).then((stat) => stat.isFile()),
+        true,
+    );
 });
 
 test('build emits a browser-safe generated template catalog', async () => {
