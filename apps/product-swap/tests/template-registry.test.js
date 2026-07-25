@@ -80,6 +80,7 @@ test('discovers all template packages in stable id order', () => {
         listTemplatePackages().map((templatePackage) => templatePackage.manifest.id),
         [
             'before-after',
+            'dish-ranking-guide',
             'food-copy-layout',
             'product-swap',
             'store-promotion',

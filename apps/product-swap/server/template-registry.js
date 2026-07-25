@@ -31,6 +31,17 @@ const STRING_KEYS = [
 ];
 const FIELD_KEYS = {
     image: ['key', 'type', 'role', 'label', 'required', 'accept'],
+    'dish-list': [
+        'key',
+        'type',
+        'role',
+        'label',
+        'required',
+        'minItems',
+        'maxItems',
+        'minOwned',
+        'accept',
+    ],
     choice: [
         'key',
         'type',
@@ -275,7 +286,7 @@ function validateField(field, manifestId) {
         );
     }
 
-    if (values.type === 'image') {
+    if (values.type === 'image' || values.type === 'dish-list') {
         requireOwnDataProperty(field, 'role', fieldContext);
         requireOwnDataProperty(field, 'required', fieldContext);
         if (
@@ -327,6 +338,24 @@ function validateField(field, manifestId) {
                 }
             }
             values.accept = acceptValues;
+        }
+    }
+
+    if (values.type === 'dish-list') {
+        for (const key of ['minItems', 'maxItems', 'minOwned']) {
+            requireOwnDataProperty(field, key, fieldContext);
+        }
+        if (
+            !Number.isInteger(values.minItems)
+            || !Number.isInteger(values.maxItems)
+            || !Number.isInteger(values.minOwned)
+            || values.minItems < 1
+            || values.maxItems > 12
+            || values.minItems > values.maxItems
+            || values.minOwned < 1
+            || values.minOwned > values.maxItems
+        ) {
+            throw new Error(`${fieldContext} has invalid dish-list bounds`);
         }
     }
 
@@ -724,7 +753,8 @@ function publicManifest(manifest) {
                 : [],
         );
         if (
-            fieldValues.type === 'image'
+            (fieldValues.type === 'image'
+                || fieldValues.type === 'dish-list')
             && Array.isArray(fieldValues.accept)
         ) {
             publishedField.accept = denseArrayValues(fieldValues.accept);

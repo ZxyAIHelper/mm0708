@@ -30,10 +30,10 @@ test('lists, filters, and searches the catalog', () => {
     const templates = listTemplates();
     const imageRemakes = listTemplates({ category: '改造图片' });
 
-    assert.equal(templates.length, 5);
+    assert.equal(templates.length, 6);
     assert.equal(
         templates.filter((template) => template.status === 'live').length,
-        2,
+        3,
     );
     assert.ok(templates.some((template) => template.status === 'coming_soon'));
     assert.ok(imageRemakes.length > 0);
@@ -44,7 +44,7 @@ test('lists, filters, and searches the catalog', () => {
     );
     assert.deepEqual(
         searchTemplates('美食').map((template) => template.id),
-        ['food-copy-layout'],
+        ['dish-ranking-guide', 'food-copy-layout'],
     );
     assert.equal(getTemplate('unknown-template'), null);
 });
@@ -111,6 +111,17 @@ test('public catalog exposes only the manifest DTO contract', () => {
     ];
     const allowedFieldKeys = {
         image: ['accept', 'key', 'label', 'required', 'role', 'type'],
+        'dish-list': [
+            'accept',
+            'key',
+            'label',
+            'maxItems',
+            'minItems',
+            'minOwned',
+            'required',
+            'role',
+            'type',
+        ],
         choice: [
             'default',
             'key',
