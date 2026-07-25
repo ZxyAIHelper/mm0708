@@ -51,6 +51,12 @@ test('Works exposes list, status filters, states, pagination and detail', () => 
         'utf8',
     );
     assert.match(script, /setAttribute\('aria-pressed'/);
+
+    const style = fs.readFileSync(path.join(root, 'style.css'), 'utf8');
+    assert.match(
+        style,
+        /\.load-more\[hidden\]\s*\{[^}]*display:\s*none\s*;/,
+    );
 });
 
 test('task center reads local blobs, urls, expiry and deletion', () => {

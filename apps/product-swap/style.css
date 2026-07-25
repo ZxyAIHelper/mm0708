@@ -688,6 +688,10 @@ button {
     margin: 24px auto 0;
 }
 
+.load-more[hidden] {
+    display: none;
+}
+
 .history-footnote {
     margin: 40px 0 0;
     color: #5f5a55;
