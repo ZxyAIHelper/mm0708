@@ -40,6 +40,42 @@ test('separates per-field upload completion from global feedback ownership', () 
     assert.equal(uploads.isLatestFeedback(targetC), true);
 });
 
+test('tracks only the latest pending operation for each image field', () => {
+    const uploads = createUploadOperations();
+    const targetA = uploads.begin('targetImage');
+    const targetB = uploads.begin('targetImage');
+
+    assert.equal(uploads.hasPending(), true);
+    uploads.complete(targetA);
+    assert.equal(uploads.hasPending(), true);
+    uploads.complete(targetB);
+    assert.equal(uploads.hasPending(), false);
+});
+
+test('cancel clears one field without clearing other pending uploads', () => {
+    const uploads = createUploadOperations();
+    const target = uploads.begin('targetImage');
+    const product = uploads.begin('productImage');
+
+    uploads.cancel('targetImage');
+    uploads.complete(target);
+    assert.equal(uploads.hasPending(), true);
+    uploads.complete(product);
+    assert.equal(uploads.hasPending(), false);
+});
+
+test('claiming feedback does not cancel a pending image operation', () => {
+    const uploads = createUploadOperations();
+    const target = uploads.begin('targetImage');
+    const validation = uploads.claimFeedback('form-validation');
+
+    assert.equal(uploads.hasPending(), true);
+    assert.equal(uploads.isLatestFeedback(target), false);
+    assert.equal(uploads.isLatestFeedback(validation), true);
+    uploads.complete(target);
+    assert.equal(uploads.hasPending(), false);
+});
+
 test('keeps exactly one choice reachable without a selected default', () => {
     assert.deepEqual(
         ['a', 'b', 'c'].map((value, index) => (

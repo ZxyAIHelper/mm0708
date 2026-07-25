@@ -743,6 +743,7 @@ function boot() {
         input.value = '';
         const operation = uploadOperations.begin(field.key);
         if (!file || state.isGenerating) {
+            uploadOperations.complete(operation);
             return;
         }
 
@@ -750,6 +751,7 @@ function boot() {
             ...CLIENT_IMAGE_TYPES,
         ]);
         if (validation) {
+            uploadOperations.complete(operation);
             if (uploadOperations.isLatestFeedback(operation)) {
                 showError(validation.message);
             }
@@ -786,6 +788,8 @@ function boot() {
             if (uploadOperations.isLatestFeedback(operation)) {
                 showError(error.message || '图片读取失败');
             }
+        } finally {
+            uploadOperations.complete(operation);
         }
     }
 
@@ -823,7 +827,7 @@ function boot() {
             });
             section.querySelector('.remove-image')
                 .addEventListener('click', () => {
-                    uploadOperations.begin(field.key);
+                    uploadOperations.cancel(field.key);
                     state.values[field.key] = '';
                     input.value = '';
                     renderImageField(field);
@@ -876,7 +880,11 @@ function boot() {
         if (state.isGenerating) {
             return;
         }
-        uploadOperations.begin('form-validation');
+        uploadOperations.claimFeedback('form-validation');
+        if (uploadOperations.hasPending()) {
+            showError('图片处理中，请稍候');
+            return;
+        }
 
         const validation = CreatorForm.validateValues(
             activeTemplate,
@@ -955,7 +963,11 @@ function boot() {
         if (state.isRefining || state.isGenerating) {
             return;
         }
-        uploadOperations.begin('refine-validation');
+        uploadOperations.claimFeedback('refine-validation');
+        if (uploadOperations.hasPending()) {
+            showError('图片处理中，请稍候');
+            return;
+        }
 
         const correction = refineInput.value.trim();
         if (!correction) {

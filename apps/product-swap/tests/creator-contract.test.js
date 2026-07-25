@@ -151,12 +151,46 @@ test('image binding invalidates stale uploads and uses field MIME types', () => 
     );
     assert.match(
         source,
-        /uploadOperations\.begin\('form-validation'\)/,
+        /uploadOperations\.claimFeedback\('form-validation'\)/,
     );
     assert.match(
         source,
-        /uploadOperations\.begin\('refine-validation'\)/,
+        /uploadOperations\.claimFeedback\('refine-validation'\)/,
     );
+    assert.match(source, /uploadOperations\.complete\(operation\)/);
+    assert.match(source, /uploadOperations\.cancel\(field\.key\)/);
     assert.match(source, /validateClientFileMeta\(file, field\.accept/);
     assert.match(source, /input\.value = '';\s*const operation/);
+});
+
+test('pending uploads gate both submit paths before payload creation', () => {
+    const source = fs.readFileSync(
+        path.join(root, 'script.js'),
+        'utf8',
+    );
+    const initial = source.slice(source.indexOf(
+        'async function submitGeneration()',
+    ));
+    const refine = source.slice(source.indexOf(
+        "refineForm.addEventListener('submit'",
+    ));
+
+    for (const pathSource of [initial, refine]) {
+        const pending = pathSource.indexOf(
+            'uploadOperations.hasPending()',
+        );
+        assert.ok(pending >= 0);
+        assert.ok(
+            pathSource.indexOf("showError('图片处理中，请稍候')", pending)
+            > pending,
+        );
+    }
+    assert.ok(
+        initial.indexOf('uploadOperations.hasPending()')
+        < initial.indexOf('CreatorForm.validateValues'),
+    );
+    assert.ok(
+        refine.indexOf('uploadOperations.hasPending()')
+        < refine.indexOf('buildRefinePayload'),
+    );
 });

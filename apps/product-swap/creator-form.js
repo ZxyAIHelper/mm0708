@@ -21,15 +21,45 @@
 
     function createUploadOperations() {
         const fieldVersions = createOperationVersions();
+        const pending = new Map();
         let feedbackVersion = 0;
+
+        function nextFeedback(fieldKey) {
+            feedbackVersion += 1;
+            return { fieldKey, feedbackVersion };
+        }
+
         return {
             begin(fieldKey) {
-                feedbackVersion += 1;
-                return {
+                const operation = {
+                    ...nextFeedback(fieldKey),
                     fieldKey,
                     fieldVersion: fieldVersions.next(fieldKey),
-                    feedbackVersion,
                 };
+                pending.set(fieldKey, operation);
+                return operation;
+            },
+            complete(operation) {
+                const current = pending.get(operation?.fieldKey);
+                if (
+                    current?.fieldVersion === operation?.fieldVersion
+                ) {
+                    pending.delete(operation.fieldKey);
+                }
+            },
+            cancel(fieldKey) {
+                const operation = {
+                    ...nextFeedback(fieldKey),
+                    fieldVersion: fieldVersions.next(fieldKey),
+                };
+                pending.delete(fieldKey);
+                return operation;
+            },
+            claimFeedback(owner) {
+                return nextFeedback(owner);
+            },
+            hasPending() {
+                return pending.size > 0;
             },
             isFieldCurrent(fieldKey, operation) {
                 return (
