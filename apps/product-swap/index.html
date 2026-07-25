@@ -3,220 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>一键换产品</title>
+    <title>商家内容助手</title>
     <meta
         name="description"
-        content="上传样图和产品图，使用 AI 自动替换样图中的菜品或商品。"
+        content="使用热点模板生成小红书和抖音图文内容。"
     >
     <link rel="icon" href="data:,">
-    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/app.css">
 </head>
 <body>
-    <main class="product-swap-shell">
-        <nav class="top-nav" aria-label="页面导航">
-            <button
-                class="back-button"
-                id="backButton"
-                type="button"
-            >← 返回</button>
-            <a
-                class="history-link"
-                id="historyLink"
-                href="/history.html"
-            >任务记录</a>
-        </nav>
+    <main class="app-shell home-shell">
+        <header class="home-header">
+            <div class="heading-row">
+                <div>
+                    <p class="eyebrow">商家内容助手</p>
+                    <h1>今天想发什么？</h1>
+                </div>
+                <a id="shopSummary" class="shop-summary" href="/profile.html">完善店铺</a>
+            </div>
 
-        <header class="intro">
-            <h1>一键换产品</h1>
-            <p>
-                上传一张满意的样图（目标图），再传你的产品图或场景图，自动换成你的产品。
-            </p>
-            <p class="tip">
-                提示：样图尽量避免含文字、品牌或水印，可能被 AI 安全系统拒绝。
-            </p>
+            <form id="templateSearch" class="template-search" role="search">
+                <label for="templateSearchInput">输入产品、活动或推广需求</label>
+                <div class="search-row">
+                    <input
+                        id="templateSearchInput"
+                        type="search"
+                        placeholder="例如：周末新品蛋糕"
+                    >
+                    <button type="submit">找模板</button>
+                </div>
+            </form>
         </header>
 
-        <section
-            class="example-card"
-            aria-labelledby="exampleTitle"
-        >
-            <p id="exampleTitle">
-                效果示例 · 样图换成你的产品
-            </p>
-            <div class="example-equation">
-                <figure>
-                    <img
-                        src="/assets/example-template.jpg"
-                        alt="样图模板"
-                    >
-                    <figcaption>① 样图模板</figcaption>
-                </figure>
-                <span aria-hidden="true">+</span>
-                <figure>
-                    <img
-                        src="/assets/example-product.jpg"
-                        alt="你的产品"
-                    >
-                    <figcaption>② 你的产品</figcaption>
-                </figure>
-                <span aria-hidden="true">=</span>
-                <figure>
-                    <img
-                        src="/assets/example-result.jpg"
-                        alt="换好的效果"
-                    >
-                    <figcaption>③ 换好的效果</figcaption>
-                </figure>
+        <section id="quickTasks" class="home-section" aria-labelledby="quickTasksTitle">
+            <div class="section-heading">
+                <h2 id="quickTasksTitle">快捷创作</h2>
+            </div>
+            <div class="quick-task-grid">
+                <a class="quick-task quick-task-primary" href="/create.html?template=product-swap">
+                    <span aria-hidden="true">↗</span>
+                    推广产品
+                </a>
+                <button class="quick-task" type="button" data-query="门店">
+                    <span aria-hidden="true">⌂</span>
+                    宣传门店
+                </button>
+                <button class="quick-task" type="button" data-query="活动">
+                    <span aria-hidden="true">％</span>
+                    做活动图
+                </button>
+                <button class="quick-task" type="button" data-query="背景">
+                    <span aria-hidden="true">▧</span>
+                    改造已有图片
+                </button>
             </div>
         </section>
 
-        <form id="swapForm" novalidate>
-            <section class="upload-field" data-slot="target">
-                <label for="targetInput">
-                    目标图（样图模板）
-                    <span aria-hidden="true">*</span>
-                </label>
-                <input
-                    id="targetInput"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    hidden
-                >
-                <button
-                    class="upload-box"
-                    data-input="targetInput"
-                    type="button"
-                >
-                    <span>点击上传</span>
-                </button>
-                <button
-                    class="remove-image"
-                    data-remove="target"
-                    type="button"
-                    hidden
-                >删除</button>
-            </section>
-
-            <section class="upload-field" data-slot="product">
-                <label for="productInput">
-                    产品图
-                    <small>（选填）</small>
-                </label>
-                <input
-                    id="productInput"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    hidden
-                >
-                <button
-                    class="upload-box"
-                    data-input="productInput"
-                    type="button"
-                >
-                    <span>点击上传</span>
-                </button>
-                <button
-                    class="remove-image"
-                    data-remove="product"
-                    type="button"
-                    hidden
-                >删除</button>
-            </section>
-
-            <section class="upload-field" data-slot="scene">
-                <label for="sceneInput">
-                    场景图
-                    <small>（选填）</small>
-                </label>
-                <input
-                    id="sceneInput"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    hidden
-                >
-                <button
-                    class="upload-box dashed"
-                    data-input="sceneInput"
-                    type="button"
-                >
-                    <span>点击上传</span>
-                </button>
-                <button
-                    class="remove-image"
-                    data-remove="scene"
-                    type="button"
-                    hidden
-                >删除</button>
-            </section>
-
-            <textarea
-                id="requirementsInput"
-                maxlength="200"
-                placeholder="额外要求（选填，仅微调风格/细节，最多200字）"
-            ></textarea>
-
-            <p
-                id="formError"
-                class="form-error"
-                role="alert"
-                hidden
-            ></p>
-
-            <button
-                id="generateButton"
-                class="generate-button"
-                type="submit"
-            >生成（消耗 3 豆额度）</button>
-        </form>
-
-        <section
-            id="resultSection"
-            class="result-card"
-            hidden
-        >
-            <img id="resultImage" alt="换品结果">
-            <div class="result-actions">
-                <button
-                    id="regenerateButton"
-                    type="button"
-                >再次生成</button>
-                <button
-                    id="downloadButton"
-                    type="button"
-                >下载图片</button>
+        <section class="home-section" aria-labelledby="hotTemplatesTitle">
+            <div class="section-heading">
+                <h2 id="hotTemplatesTitle">今日热点</h2>
             </div>
-            <p
-                id="archiveNotice"
-                class="archive-notice"
-                role="status"
-                hidden
-            ></p>
-            <div class="refinement-panel">
-                <div class="refinement-heading">
-                    <h2>继续对话修改</h2>
-                    <span>AI 会基于上一版继续调整</span>
-                </div>
-                <div
-                    id="chatTimeline"
-                    class="chat-timeline"
-                    aria-live="polite"
-                ></div>
-                <form id="refineForm" class="refine-form">
-                    <textarea
-                        id="refineInput"
-                        maxlength="500"
-                        placeholder="例如：盘子改成白色，菜品和构图都不要变"
-                    ></textarea>
-                    <button
-                        id="refineButton"
-                        type="submit"
-                    >发送并生成新版本</button>
-                </form>
+            <div id="hotTemplates" class="hot-template-list"></div>
+        </section>
+
+        <section class="home-section templates-section" aria-labelledby="allTemplatesTitle">
+            <div class="section-heading">
+                <h2 id="allTemplatesTitle">全部模板</h2>
+            </div>
+            <div
+                id="templateCategories"
+                class="template-categories"
+                aria-label="模板分类"
+            ></div>
+            <div id="templateGrid" class="template-grid"></div>
+            <div id="homeEmpty" class="home-empty" hidden>
+                <h3>暂时没有完全匹配的模板</h3>
+                <p>试试“产品”“门店”“活动”或“背景”</p>
             </div>
         </section>
     </main>
-    <script src="/api-client.js"></script>
-    <script src="/local-history.js"></script>
-    <script src="/script.js"></script>
+
+    <nav class="bottom-nav" aria-label="主要导航">
+        <a class="is-active" href="/" data-nav="home" aria-current="page">
+            <span aria-hidden="true">⌂</span>首页
+        </a>
+        <a href="/create.html" data-nav="create">
+            <span aria-hidden="true">＋</span>创作
+        </a>
+        <a href="/history.html" data-nav="history">
+            <span aria-hidden="true">▤</span>作品
+        </a>
+        <a href="/profile.html" data-nav="profile">
+            <span aria-hidden="true">○</span>我的
+        </a>
+    </nav>
+
+    <script src="/templates.js"></script>
+    <script src="/merchant-store.js"></script>
+    <script src="/home.js"></script>
 </body>
 </html>

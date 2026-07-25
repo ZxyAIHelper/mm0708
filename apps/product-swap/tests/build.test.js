@@ -14,12 +14,14 @@ test('build emits only deployable public assets', async () => {
     );
     assert.deepEqual(entries.sort(), [
         'api-client.js',
+        'app.css',
         'assets',
         'create.html',
         'creator-meta.js',
         'generation-worker.js',
         'history.html',
         'history.js',
+        'home.js',
         'index.html',
         'local-history.js',
         'merchant-store.js',
