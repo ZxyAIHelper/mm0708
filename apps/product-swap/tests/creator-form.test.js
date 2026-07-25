@@ -7,9 +7,32 @@ const manifest = require(
 const {
     initialValues,
     buildTemplatePayload,
+    createOperationVersions,
+    nextChoiceIndex,
     validateImageDimensions,
     validateValues,
 } = require('../creator-form');
+
+test('only the latest operation version remains current per field', () => {
+    const versions = createOperationVersions();
+    const firstTarget = versions.next('targetImage');
+    const product = versions.next('productImage');
+    const secondTarget = versions.next('targetImage');
+
+    assert.equal(versions.isCurrent('targetImage', firstTarget), false);
+    assert.equal(versions.isCurrent('targetImage', secondTarget), true);
+    assert.equal(versions.isCurrent('productImage', product), true);
+    assert.equal(versions.next('targetImage'), secondTarget + 1);
+});
+
+test('maps choice navigation keys with wrapping and endpoints', () => {
+    assert.equal(nextChoiceIndex(1, 3, 'ArrowRight'), 2);
+    assert.equal(nextChoiceIndex(2, 3, 'ArrowDown'), 0);
+    assert.equal(nextChoiceIndex(0, 3, 'ArrowLeft'), 2);
+    assert.equal(nextChoiceIndex(1, 3, 'Home'), 0);
+    assert.equal(nextChoiceIndex(1, 3, 'End'), 2);
+    assert.equal(nextChoiceIndex(1, 3, 'Enter'), 1);
+});
 
 test('initializes values from the food template schema', () => {
     assert.deepEqual(initialValues(manifest), {

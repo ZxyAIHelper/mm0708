@@ -5,6 +5,33 @@
         return Array.isArray(manifest?.fields) ? manifest.fields : [];
     }
 
+    function createOperationVersions() {
+        const versions = new Map();
+        return {
+            next(key) {
+                const version = (versions.get(key) || 0) + 1;
+                versions.set(key, version);
+                return version;
+            },
+            isCurrent(key, version) {
+                return versions.get(key) === version;
+            },
+        };
+    }
+
+    function nextChoiceIndex(current, length, key) {
+        if (length < 1) return -1;
+        if (key === 'Home') return 0;
+        if (key === 'End') return length - 1;
+        if (key === 'ArrowRight' || key === 'ArrowDown') {
+            return (current + 1) % length;
+        }
+        if (key === 'ArrowLeft' || key === 'ArrowUp') {
+            return (current - 1 + length) % length;
+        }
+        return current;
+    }
+
     function initialValues(manifest) {
         return Object.fromEntries(fieldsFor(manifest).map((field) => [
             field.key,
@@ -71,6 +98,8 @@
     const creatorForm = {
         initialValues,
         buildTemplatePayload,
+        createOperationVersions,
+        nextChoiceIndex,
         validateImageDimensions,
         validateValues,
     };

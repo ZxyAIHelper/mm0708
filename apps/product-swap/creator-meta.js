@@ -13,6 +13,7 @@
 
     function appendLabel(section, field, controlId) {
         const label = global.document.createElement('label');
+        label.id = `${controlId}-label`;
         label.htmlFor = controlId;
         label.textContent = field.label;
         if (field.required) {
@@ -22,6 +23,7 @@
             label.appendChild(required);
         }
         section.appendChild(label);
+        return label;
     }
 
     function renderImageField(section, field, controlId) {
@@ -58,11 +60,16 @@
     }
 
     function renderChoiceField(section, field, controlId) {
-        appendLabel(section, field, controlId);
+        const label = appendLabel(section, field, controlId);
         const group = global.document.createElement('div');
         group.id = controlId;
         group.className = 'choice-group';
         group.setAttribute('role', 'radiogroup');
+        group.setAttribute('aria-labelledby', label.id);
+        group.setAttribute(
+            'aria-required',
+            String(Boolean(field.required)),
+        );
         for (const option of field.options || []) {
             const button = global.document.createElement('button');
             const selected = option.value === field.default;
@@ -71,6 +78,7 @@
             button.setAttribute('role', 'radio');
             button.setAttribute('aria-checked', String(selected));
             button.setAttribute('aria-pressed', String(selected));
+            button.tabIndex = selected ? 0 : -1;
             button.textContent = option.label;
             group.appendChild(button);
         }

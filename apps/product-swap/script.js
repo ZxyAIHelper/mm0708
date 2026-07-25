@@ -22,8 +22,11 @@ function resolveApiBase(explicitBase, hostname) {
     return 'https://api.mm0708.top';
 }
 
-function validateClientFileMeta(file) {
-    if (!CLIENT_IMAGE_TYPES.has(file.type)) {
+function validateClientFileMeta(file, acceptedTypes = CLIENT_IMAGE_TYPES) {
+    const allowedTypes = acceptedTypes instanceof Set
+        ? acceptedTypes
+        : new Set(acceptedTypes);
+    if (!allowedTypes.has(file.type)) {
         return {
             code: 'UNSUPPORTED_IMAGE',
             message: '仅支持 JPG、PNG、WebP',
@@ -77,33 +80,78 @@ function buildRefinePayload(
     };
 }
 
-function historyInputFromPayload(payload, isRefinement = false) {
-    return {
-        ...(payload?.templateId
-            ? { templateId: String(payload.templateId) }
-            : {}),
-        ...(payload?.aspectRatio
-            ? { aspectRatio: String(payload.aspectRatio) }
-            : {}),
-        ...(typeof payload?.showDateTime === 'boolean'
-            ? { showDateTime: payload.showDateTime }
-            : {}),
-        ...(payload?.generatedAt
-            ? { generatedAt: String(payload.generatedAt) }
-            : {}),
-        requirements: String(payload?.requirements || '').trim(),
-        isRefinement: Boolean(isRefinement),
-        conversationId: String(payload?.conversationId || ''),
-        messages: Array.isArray(payload?.messages)
-            ? payload.messages.slice(-6).map((message) => ({
-                role: String(message?.role || ''),
-                content: String(message?.content || ''),
-            }))
-            : [],
-    };
+const ACTIVE_TASK_KEY = 'product_swap_active_task_id';
+
+function activeTaskStorageKey(template) {
+    const identity = [
+        template?.id || 'product-swap',
+        template?.taskType || 'product_swap',
+    ].join(':');
+    return `${ACTIVE_TASK_KEY}:${identity}`;
 }
 
-const ACTIVE_TASK_KEY = 'product_swap_active_task_id';
+function safeHistoryPrimitive(value) {
+    if (typeof value === 'string') {
+        return !value.trimStart().toLowerCase().startsWith('data:');
+    }
+    return (
+        typeof value === 'boolean'
+        || (typeof value === 'number' && Number.isFinite(value))
+        || value === null
+    );
+}
+
+function historyInputFromPayload(
+    manifestOrPayload,
+    payloadOrIsRefinement,
+    isRefinement = false,
+) {
+    const hasManifest = Array.isArray(manifestOrPayload?.fields);
+    const manifest = hasManifest ? manifestOrPayload : null;
+    const payload = hasManifest ? payloadOrIsRefinement : manifestOrPayload;
+    const refinement = hasManifest
+        ? isRefinement
+        : Boolean(payloadOrIsRefinement);
+    const input = {};
+
+    if (manifest) {
+        input.templateId = String(payload?.templateId || manifest.id || '');
+        for (const field of manifest.fields) {
+            if (field.type === 'image') continue;
+            const value = payload?.[field.key];
+            if (!safeHistoryPrimitive(value)) continue;
+            input[field.key] = typeof value === 'string'
+                ? value.trim()
+                : value;
+        }
+    } else {
+        for (const key of [
+            'templateId',
+            'aspectRatio',
+            'showDateTime',
+            'requirements',
+        ]) {
+            const value = payload?.[key];
+            if (!safeHistoryPrimitive(value)) continue;
+            input[key] = typeof value === 'string'
+                ? value.trim()
+                : value;
+        }
+        if (!('requirements' in input)) input.requirements = '';
+    }
+    if (safeHistoryPrimitive(payload?.generatedAt)) {
+        input.generatedAt = String(payload.generatedAt);
+    }
+    input.isRefinement = refinement;
+    input.conversationId = String(payload?.conversationId || '');
+    input.messages = Array.isArray(payload?.messages)
+        ? payload.messages.slice(-6).map((message) => ({
+            role: String(message?.role || ''),
+            content: String(message?.content || ''),
+        }))
+        : [];
+    return input;
+}
 
 function createGenerationMessage(taskId, payload, apiBase, origin) {
     const base = apiBase || origin;
@@ -238,7 +286,10 @@ function readImageDimensions(source) {
 
 function boot() {
     const activeTemplate = window.CreatorMeta?.resolveCreatorTemplate(window.location.search);
+    if (!activeTemplate) return;
     const CreatorForm = window.CreatorForm;
+    const activeTaskKey = activeTaskStorageKey(activeTemplate);
+    const uploadVersions = CreatorForm.createOperationVersions();
     const state = {
         values: CreatorForm.initialValues(activeTemplate),
         result: '',
@@ -279,12 +330,12 @@ function boot() {
     const fields = Array.isArray(activeTemplate?.fields)
         ? activeTemplate.fields
         : [];
-    const fieldSections = Object.fromEntries(fields.map((field) => [
-        field.key,
-        templateFields.querySelector(
-            `[data-field-key="${field.key}"]`,
-        ),
-    ]));
+    const fieldSections = Object.fromEntries(
+        Array.from(templateFields.children).map((section) => [
+            section.dataset.fieldKey,
+            section,
+        ]),
+    );
 
     function showError(message) {
         formError.textContent = message;
@@ -307,7 +358,11 @@ function boot() {
                 taskType: activeTemplate?.taskType || 'product_swap',
                 title: activeTemplate?.name || '爆款场景同款图',
                 input: {
-                    ...historyInputFromPayload(payload, isRefinement),
+                    ...historyInputFromPayload(
+                        activeTemplate,
+                        payload,
+                        isRefinement,
+                    ),
                     templateId: activeTemplate?.id || 'product-swap',
                 },
                 images: [
@@ -333,7 +388,7 @@ function boot() {
 
     function rememberActiveTask(taskId) {
         try {
-            window.sessionStorage.setItem(ACTIVE_TASK_KEY, taskId);
+            window.sessionStorage.setItem(activeTaskKey, taskId);
         } catch {
             // IndexedDB polling still works in the current page.
         }
@@ -341,8 +396,8 @@ function boot() {
 
     function clearActiveTask(taskId) {
         try {
-            if (window.sessionStorage.getItem(ACTIVE_TASK_KEY) === taskId) {
-                window.sessionStorage.removeItem(ACTIVE_TASK_KEY);
+            if (window.sessionStorage.getItem(activeTaskKey) === taskId) {
+                window.sessionStorage.removeItem(activeTaskKey);
             }
         } catch {
             // Storage can be unavailable in strict privacy modes.
@@ -511,6 +566,7 @@ function boot() {
                     button.dataset.value === state.values[field.key];
                 button.setAttribute('aria-checked', String(selected));
                 button.setAttribute('aria-pressed', String(selected));
+                button.tabIndex = selected ? 0 : -1;
             }
         } else if (field.type === 'boolean') {
             const button = section.querySelector('[role="switch"]');
@@ -583,9 +639,16 @@ function boot() {
         setRefining(true);
         let rememberedTask = null;
         try {
-            const rememberedId = window.sessionStorage.getItem(ACTIVE_TASK_KEY);
+            const rememberedId = window.sessionStorage.getItem(activeTaskKey);
             if (rememberedId) {
                 rememberedTask = await localHistory.getTask(rememberedId);
+            }
+            if (
+                rememberedTask
+                && rememberedTask.taskType !== activeTemplate.taskType
+            ) {
+                window.sessionStorage.removeItem(activeTaskKey);
+                rememberedTask = null;
             }
         } catch {
             rememberedTask = null;
@@ -655,35 +718,46 @@ function boot() {
     }
 
     async function acceptFile(field, file) {
+        const input = fieldSections[field.key]
+            .querySelector('input[type="file"]');
+        input.value = '';
+        const version = uploadVersions.next(field.key);
         if (!file || state.isGenerating) {
             return;
         }
 
-        const validation = validateClientFileMeta(file);
+        const validation = validateClientFileMeta(file, field.accept || [
+            ...CLIENT_IMAGE_TYPES,
+        ]);
         if (validation) {
-            showError(validation.message);
+            if (uploadVersions.isCurrent(field.key, version)) {
+                showError(validation.message);
+            }
             return;
         }
 
         try {
             const source = await readFileAsDataUrl(file);
+            if (!uploadVersions.isCurrent(field.key, version)) return;
             const dimensions = await readImageDimensions(source);
+            if (!uploadVersions.isCurrent(field.key, version)) return;
             const dimensionError = CreatorForm.validateImageDimensions(
                 dimensions.width,
                 dimensions.height,
             );
             if (dimensionError) {
-                showError(dimensionError.message);
+                if (uploadVersions.isCurrent(field.key, version)) {
+                    showError(dimensionError.message);
+                }
                 return;
             }
             state.values[field.key] = source;
-            const input = fieldSections[field.key]
-                .querySelector('input[type="file"]');
-            input.value = '';
             renderImageField(field);
             showError('');
         } catch (error) {
-            showError(error.message || '图片读取失败');
+            if (uploadVersions.isCurrent(field.key, version)) {
+                showError(error.message || '图片读取失败');
+            }
         }
     }
 
@@ -721,16 +795,34 @@ function boot() {
             });
             section.querySelector('.remove-image')
                 .addEventListener('click', () => {
+                    uploadVersions.next(field.key);
                     state.values[field.key] = '';
                     input.value = '';
                     renderImageField(field);
                 });
             renderImageField(field);
         } else if (field.type === 'choice') {
-            for (const button of section.querySelectorAll('[data-value]')) {
+            const buttons = Array.from(
+                section.querySelectorAll('[data-value]'),
+            );
+            for (const button of buttons) {
                 button.addEventListener('click', () => {
                     state.values[field.key] = button.dataset.value;
                     renderNonImageField(field);
+                });
+                button.addEventListener('keydown', (event) => {
+                    const current = buttons.indexOf(button);
+                    const next = CreatorForm.nextChoiceIndex(
+                        current,
+                        buttons.length,
+                        event.key,
+                    );
+                    if (next === current) return;
+                    event.preventDefault();
+                    state.values[field.key] =
+                        buttons[next].dataset.value;
+                    renderNonImageField(field);
+                    buttons[next].focus();
                 });
             }
             renderNonImageField(field);
@@ -931,6 +1023,7 @@ if (typeof document !== 'undefined') {
 if (typeof module !== 'undefined') {
     module.exports = {
         resolveApiBase,
+        activeTaskStorageKey,
         validateClientFileMeta,
         buildGeneratePayload,
         buildRefinePayload,

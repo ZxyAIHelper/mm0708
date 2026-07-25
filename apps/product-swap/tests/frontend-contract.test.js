@@ -2,10 +2,17 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const foodManifest = require(
+    '../template-packs/food-copy-layout/manifest',
+);
+const productSwapManifest = require(
+    '../template-packs/product-swap/manifest',
+);
 
 const root = path.resolve(__dirname, '..');
 const {
     resolveApiBase,
+    activeTaskStorageKey,
     validateClientFileMeta,
     buildGeneratePayload,
     buildRefinePayload,
@@ -112,6 +119,29 @@ test('validates upload metadata', () => {
         }).code,
         'UNSUPPORTED_IMAGE',
     );
+    assert.equal(
+        validateClientFileMeta({
+            type: 'image/gif',
+            size: 1024,
+        }, ['image/gif']),
+        null,
+    );
+    assert.equal(
+        validateClientFileMeta({
+            type: 'image/png',
+            size: 1024,
+        }, ['image/jpeg']).code,
+        'UNSUPPORTED_IMAGE',
+    );
+});
+
+test('scopes active task storage by creator template identity', () => {
+    const foodKey = activeTaskStorageKey(foodManifest);
+    const productKey = activeTaskStorageKey(productSwapManifest);
+
+    assert.notEqual(foodKey, productKey);
+    assert.match(foodKey, /food-copy-layout/);
+    assert.match(foodKey, /food_copy_layout/);
 });
 
 test('builds the stable request and maps provider errors', () => {
@@ -169,7 +199,7 @@ test('preserves the complete non-image refinement input in history', () => {
         conversationId: 'conversation_1',
         messages: [{ role: 'user', content: 'first request' }],
     };
-    const input = historyInputFromPayload(payload, true);
+    const input = historyInputFromPayload(foodManifest, payload, true);
 
     assert.deepEqual(input, {
         templateId: 'food-copy-layout',
@@ -183,6 +213,50 @@ test('preserves the complete non-image refinement input in history', () => {
     });
     assert.equal('targetImage' in input, false);
     assert.equal('previousImage' in input, false);
+});
+
+test('history copies only safe manifest non-image primitives', () => {
+    const messages = Array.from({ length: 8 }, (_, index) => ({
+        role: index % 2 ? 'assistant' : 'user',
+        content: `message ${index}`,
+    }));
+    const input = historyInputFromPayload(foodManifest, {
+        templateId: foodManifest.id,
+        targetImage: 'data:image/png;base64,food',
+        aspectRatio: '9:16',
+        showDateTime: false,
+        generatedAt: '2026-07-25T10:00:00.000Z',
+        requirements: 'more contrast',
+        previousImage: 'https://example.com/previous.png',
+        conversationId: 'conversation_2',
+        messages,
+        unknown: { unsafe: true },
+    });
+
+    assert.deepEqual(input, {
+        templateId: 'food-copy-layout',
+        aspectRatio: '9:16',
+        showDateTime: false,
+        requirements: 'more contrast',
+        generatedAt: '2026-07-25T10:00:00.000Z',
+        isRefinement: false,
+        conversationId: 'conversation_2',
+        messages: messages.slice(-6),
+    });
+    assert.equal('targetImage' in input, false);
+    assert.equal('previousImage' in input, false);
+    assert.equal('unknown' in input, false);
+});
+
+test('history excludes Data URLs even from non-image fields', () => {
+    const input = historyInputFromPayload(foodManifest, {
+        templateId: foodManifest.id,
+        targetImage: 'data:image/png;base64,food',
+        requirements: 'data:text/plain;base64,dGV4dA==',
+    });
+
+    assert.equal('targetImage' in input, false);
+    assert.equal('requirements' in input, false);
 });
 
 test('generation binds schema fields and builds a template payload', () => {

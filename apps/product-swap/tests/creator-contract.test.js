@@ -75,6 +75,12 @@ test('creator metadata renders all supported schema field types', () => {
     assert.match(source, /hint\.textContent = '点击或拖拽上传'/);
     assert.match(source, /group\.className = 'choice-group'/);
     assert.match(source, /role', 'radiogroup'/);
+    assert.match(source, /label\.id = `\$\{controlId\}-label`/);
+    assert.match(source, /aria-labelledby', label\.id/);
+    assert.match(
+        source,
+        /aria-required'[\s\S]{0,80}String\(Boolean\(field\.required\)\)/,
+    );
     assert.match(source, /button\.className = 'switch-control'/);
     assert.match(source, /role', 'switch'/);
     assert.match(source, /button\.appendChild\(text\)/);
@@ -89,4 +95,48 @@ test('schema field rerenders preserve creator metadata structure', () => {
 
     assert.match(source, /hint\.textContent = '点击或拖拽上传'/);
     assert.match(source, /button\.firstElementChild\.textContent/);
+    assert.match(source, /button\.tabIndex = selected \? 0 : -1/);
+    assert.match(source, /CreatorForm\.nextChoiceIndex/);
+    assert.match(source, /addEventListener\('keydown'/);
+});
+
+test('creator boot isolates tasks and avoids interpolated selectors', () => {
+    const source = fs.readFileSync(
+        path.join(root, 'script.js'),
+        'utf8',
+    );
+
+    assert.match(source, /if \(!activeTemplate\) return;/);
+    assert.match(
+        source,
+        /const activeTaskKey = activeTaskStorageKey\(activeTemplate\)/,
+    );
+    assert.match(
+        source,
+        /rememberedTask\.taskType !== activeTemplate\.taskType/,
+    );
+    assert.match(
+        source,
+        /historyInputFromPayload\(\s*activeTemplate,\s*payload,/,
+    );
+    assert.doesNotMatch(
+        source,
+        /querySelector\(\s*`\[data-field-key=/,
+    );
+});
+
+test('image binding invalidates stale uploads and uses field MIME types', () => {
+    const source = fs.readFileSync(
+        path.join(root, 'script.js'),
+        'utf8',
+    );
+
+    assert.match(
+        source,
+        /CreatorForm\.createOperationVersions\(\)/,
+    );
+    assert.match(source, /uploadVersions\.next\(field\.key\)/);
+    assert.match(source, /uploadVersions\.isCurrent\(field\.key, version\)/);
+    assert.match(source, /validateClientFileMeta\(file, field\.accept/);
+    assert.match(source, /input\.value = '';\s*const version/);
 });
