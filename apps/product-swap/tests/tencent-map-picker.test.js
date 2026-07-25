@@ -73,6 +73,7 @@ test('builds encoded picker and preview urls', () => {
     );
     assert.equal(preview.searchParams.get('lat'), '39.998766');
     assert.equal(preview.searchParams.get('lng'), '116.273938');
+    assert.equal(preview.searchParams.get('v'), '2');
 });
 
 test('loads picker configuration through the shared api client', async () => {

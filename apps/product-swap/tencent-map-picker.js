@@ -85,6 +85,7 @@
         );
         url.searchParams.set('lat', String(lat));
         url.searchParams.set('lng', String(lng));
+        url.searchParams.set('v', '2');
         return url.toString();
     }
 
