@@ -132,6 +132,66 @@ describe('template generation strategies', () => {
         )
     })
 
+    it.each([
+        [
+            'tier',
+            [
+                '纯白或浅米白背景',
+                '档位栏约占画布宽度 18%',
+                '每个档位独占一行',
+            ],
+        ],
+        [
+            'grid',
+            [
+                '固定三列',
+                '6 张时使用 3×2',
+                '半透明黑色文字带',
+            ],
+        ],
+        [
+            'quad',
+            [
+                '2×2 四个矩形区域',
+                '输入超过四张时',
+                '区域高度的 20%',
+            ],
+        ],
+        [
+            'collage',
+            [
+                '三列隐形网格',
+                '大、中、小三级卡片尺寸',
+                '不旋转、不相互覆盖',
+            ],
+        ],
+    ] as const)(
+        'builds the detailed %s layout contract',
+        (layout, phrases) => {
+            const generation = buildTemplateGeneration(
+                validateTemplateRequest({
+                    templateId: 'dish-ranking-guide',
+                    dishes: [{
+                        image: ownedDishImage,
+                        owned: true,
+                        source: 'user',
+                    }],
+                    layout,
+                    aspectRatio: '3:4',
+                }),
+            )
+            for (const phrase of phrases) {
+                expect(generation.prompt).toContain(phrase)
+            }
+            expect(generation.prompt).toContain(
+                '所有输入菜品必须各出现一次',
+            )
+            expect(generation.prompt).toContain(
+                '短视频平台头像、点赞栏、评论栏',
+            )
+        },
+    )
+
     it('bounds requirements differently for initial and refinement', () => {
         expect(() => validateTemplateRequest({
             templateId: 'food-copy-layout',
