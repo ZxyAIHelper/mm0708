@@ -62,6 +62,36 @@
         section.appendChild(remove);
     }
 
+    function renderDishListField(section, field, controlId) {
+        section.classList.add('dish-list-field');
+        appendLabel(section, field, controlId);
+
+        const input = global.document.createElement('input');
+        input.id = controlId;
+        input.type = 'file';
+        input.multiple = true;
+        input.accept = (field.accept || [
+            'image/jpeg',
+            'image/png',
+            'image/webp',
+        ]).join(',');
+        input.hidden = true;
+
+        const upload = global.document.createElement('button');
+        upload.type = 'button';
+        upload.className = 'dish-upload-box';
+        upload.textContent = '批量上传或拖拽图片';
+
+        const status = global.document.createElement('p');
+        status.className = 'dish-list-status';
+        status.setAttribute('aria-live', 'polite');
+
+        const cards = global.document.createElement('div');
+        cards.className = 'dish-card-list';
+
+        section.append(input, upload, status, cards);
+    }
+
     function renderChoiceField(section, field, controlId) {
         const label = appendLabel(section, field, controlId);
         const group = global.document.createElement('div');
@@ -126,6 +156,8 @@
             const controlId = `template-field-${field.key}`;
             if (field.type === 'image') {
                 renderImageField(section, field, controlId);
+            } else if (field.type === 'dish-list') {
+                renderDishListField(section, field, controlId);
             } else if (field.type === 'choice') {
                 renderChoiceField(section, field, controlId);
             } else if (field.type === 'boolean') {
@@ -150,7 +182,10 @@
         global.document.getElementById('creatorSummary').textContent =
             template.summary;
         const imageFieldCount = template.fields.filter(
-            (field) => field.type === 'image',
+            (field) => (
+                field.type === 'image'
+                || field.type === 'dish-list'
+            ),
         ).length;
         global.document.getElementById('creatorTip').textContent =
             imageFieldCount > 1

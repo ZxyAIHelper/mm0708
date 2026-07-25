@@ -99,13 +99,55 @@
     function initialValues(manifest) {
         return Object.fromEntries(fieldsFor(manifest).map((field) => [
             field.key,
-            field.default ?? (field.type === 'boolean' ? false : ''),
+            field.type === 'dish-list'
+                ? []
+                : (
+                    field.default
+                    ?? (field.type === 'boolean' ? false : '')
+                ),
         ]));
+    }
+
+    function normalizeDishItems(value) {
+        if (!Array.isArray(value)) return [];
+        return value.map((item) => ({
+            image: String(item?.image || '').trim(),
+            owned: Boolean(item?.owned),
+            source: item?.source === 'library' ? 'library' : 'user',
+        }));
     }
 
     function validateValues(manifest, values) {
         for (const field of fieldsFor(manifest)) {
             const value = values?.[field.key];
+            if (field.type === 'dish-list') {
+                const dishes = normalizeDishItems(value).filter(
+                    (dish) => dish.image,
+                );
+                if (dishes.length < (field.minItems || 1)) {
+                    return {
+                        field: field.key,
+                        message: `请上传${field.label}`,
+                    };
+                }
+                if (dishes.length > (field.maxItems || 12)) {
+                    return {
+                        field: field.key,
+                        message: `${field.label}不能超过 ${field.maxItems} 张`,
+                    };
+                }
+                if (
+                    dishes.filter((dish) => (
+                        dish.owned && dish.source === 'user'
+                    )).length < (field.minOwned || 1)
+                ) {
+                    return {
+                        field: field.key,
+                        message: '请至少标记一道自家菜品',
+                    };
+                }
+                continue;
+            }
             if (
                 field.required
                 && (
@@ -139,9 +181,13 @@
         const payload = { templateId: manifest.id };
         for (const field of fieldsFor(manifest)) {
             const value = values?.[field.key];
-            payload[field.key] = typeof value === 'string'
-                ? value.trim()
-                : value;
+            payload[field.key] = field.type === 'dish-list'
+                ? normalizeDishItems(value)
+                : (
+                    typeof value === 'string'
+                        ? value.trim()
+                        : value
+                );
             if (field.key === 'showDateTime' && value) {
                 payload.generatedAt = generatedAt;
             }
@@ -161,6 +207,7 @@
 
     const creatorForm = {
         initialValues,
+        normalizeDishItems,
         buildTemplatePayload,
         createOperationVersions,
         createUploadOperations,
