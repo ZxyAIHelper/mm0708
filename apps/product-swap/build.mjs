@@ -27,6 +27,8 @@ const publicEntries = [
     'creator-form.js',
     'creator-meta.js',
     'chat-materials.js',
+    'tencent-map-picker.js',
+    'chat-draft-client.js',
     'dish-library-client.js',
     'assets',
 ];

@@ -16,6 +16,7 @@ test('build emits only deployable public assets', async () => {
         'api-client.js',
         'app.css',
         'assets',
+        'chat-draft-client.js',
         'chat-materials.js',
         'create.html',
         'creator-form.js',
@@ -34,6 +35,7 @@ test('build emits only deployable public assets', async () => {
         'style.css',
         'template-catalog.js',
         'templates.js',
+        'tencent-map-picker.js',
         'version-history.js',
     ]);
     assert.equal(

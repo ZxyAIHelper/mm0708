@@ -48,6 +48,8 @@ const PUBLIC_STATIC_PATHS = new Set([
     'creator-form.js',
     'creator-meta.js',
     'chat-materials.js',
+    'tencent-map-picker.js',
+    'chat-draft-client.js',
     'dish-library-client.js',
 ].map((entry) => path.join(APP_ROOT, entry)));
 const SUPPORTED_MIME_TYPES = new Map([
