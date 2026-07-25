@@ -199,6 +199,7 @@ function readFileAsDataUrl(file) {
 }
 
 function boot() {
+    const activeTemplate = window.CreatorMeta.resolveCreatorTemplate(window.location.search);
     const state = {
         target: '',
         product: '',
@@ -273,9 +274,12 @@ function boot() {
     async function startLocalTask(payload, isRefinement = false) {
         try {
             return await localHistory.startTask({
-                taskType: 'product_swap',
-                title: '一键换产品',
-                input: historyInputFromPayload(payload, isRefinement),
+                taskType: activeTemplate?.taskType || 'product_swap',
+                title: activeTemplate?.name || '爆款场景同款图',
+                input: {
+                    ...historyInputFromPayload(payload, isRefinement),
+                    templateId: activeTemplate?.id || 'product-swap',
+                },
                 images: [
                     { role: 'target', source: payload.targetImage },
                     { role: 'product', source: payload.productImage },

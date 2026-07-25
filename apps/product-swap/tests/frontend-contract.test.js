@@ -17,7 +17,7 @@ const {
 
 test('page exposes the screenshot-matching controls', () => {
     const html = fs.readFileSync(
-        path.join(root, 'index.html'),
+        path.join(root, 'create.html'),
         'utf8',
     );
 
@@ -233,7 +233,7 @@ test('generation page registers the background worker and restores active tasks'
 
 test('generation records task lifecycle in local history', () => {
     const html = fs.readFileSync(
-        path.join(root, 'index.html'),
+        path.join(root, 'create.html'),
         'utf8',
     );
     const source = fs.readFileSync(

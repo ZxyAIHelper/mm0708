@@ -15,6 +15,8 @@ test('build emits only deployable public assets', async () => {
     assert.deepEqual(entries.sort(), [
         'api-client.js',
         'assets',
+        'create.html',
+        'creator-meta.js',
         'generation-worker.js',
         'history.html',
         'history.js',

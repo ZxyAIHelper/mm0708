@@ -5,8 +5,8 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 
-test('generation page links to the task center', () => {
-    const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+test('creator links to Works', () => {
+    const html = fs.readFileSync(path.join(root, 'create.html'), 'utf8');
     assert.match(html, /id="historyLink"/);
     assert.match(html, /href="\/history\.html"/);
 });
