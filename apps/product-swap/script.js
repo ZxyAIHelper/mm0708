@@ -166,6 +166,18 @@ function historyInputFromPayload(
         input.templateId = String(payload?.templateId || manifest.id || '');
         for (const field of manifest.fields) {
             if (field.type === 'image') continue;
+            if (field.type === 'dish-list') {
+                input[field.key] = Array.isArray(payload?.[field.key])
+                    ? payload[field.key].map((dish, index) => ({
+                        role: `dish-${index}`,
+                        owned: Boolean(dish?.owned),
+                        source: dish?.source === 'library'
+                            ? 'library'
+                            : 'user',
+                    }))
+                    : [];
+                continue;
+            }
             const value = payload?.[field.key];
             if (!safeHistoryPrimitive(value)) continue;
             input[field.key] = typeof value === 'string'
@@ -205,7 +217,7 @@ function createGenerationMessage(taskId, payload, apiBase, origin) {
     const base = apiBase || origin;
     return {
         type: 'product-swap:start',
-        version: 2,
+        version: payload?.templateId === 'dish-ranking-guide' ? 3 : 2,
         taskId,
         apiUrl: new URL(
             `${String(base).replace(/\/$/, '')}/api/product-swap/generate`,
@@ -285,7 +297,11 @@ async function dispatchGenerationMessage(
         return false;
     }
     const capabilities = capabilityExchange.response;
-    if (!capabilities?.supportedGenerationVersions.includes(2)) {
+    const requestedVersion = message.version || 2;
+    if (!capabilities?.supportedGenerationVersions.includes(
+        requestedVersion,
+    )) {
+        if (requestedVersion !== 2) return false;
         try {
             worker.postMessage({
                 ...message,
@@ -303,7 +319,7 @@ async function dispatchGenerationMessage(
         (value) => (
             value?.type === 'product-swap:start:ack'
             && value.taskId === message.taskId
-            && value.version === 2
+            && value.version === requestedVersion
         ),
         boundedTimeout,
     );
@@ -443,6 +459,7 @@ function boot() {
     const activeTemplate = window.CreatorMeta?.resolveCreatorTemplate(window.location.search);
     if (!activeTemplate) return;
     const CreatorForm = window.CreatorForm;
+    const DishLibraryClient = window.DishLibraryClient;
     const versions = VersionHistory.createVersionHistory();
     let selectedVersionIndex = -1;
     const activeTaskKey = activeTaskStorageKey(activeTemplate);
@@ -636,6 +653,16 @@ function boot() {
                             role: field.role || field.key,
                             source: payload[field.key],
                         })),
+                    ...fields
+                        .filter((field) => field.type === 'dish-list')
+                        .flatMap((field) => (
+                            Array.isArray(payload[field.key])
+                                ? payload[field.key].map((dish, index) => ({
+                                    role: `dish-${index}`,
+                                    source: dish.image,
+                                }))
+                                : []
+                        )),
                     ...(payload.previousImage
                         ? [{
                             role: 'previous',
@@ -820,6 +847,53 @@ function boot() {
         }
     }
 
+    function renderDishListField(field) {
+        const section = fieldSections[field.key];
+        const dishes = Array.isArray(state.values[field.key])
+            ? state.values[field.key]
+            : [];
+        const status = section.querySelector('.dish-list-status');
+        const cards = section.querySelector('.dish-card-list');
+        const ownedCount = dishes.filter((dish) => dish.owned).length;
+        const fillers = DishLibraryClient?.fillerCount(dishes.length) || 0;
+        status.textContent = `已上传 ${dishes.length}/${field.maxItems || 12}，自家菜 ${ownedCount} 张${
+            fillers ? `；生成时将从资源库补充 ${fillers} 张` : ''
+        }`;
+        cards.replaceChildren();
+        dishes.forEach((dish, index) => {
+            const card = document.createElement('article');
+            card.className = 'dish-card';
+            if (dish.owned) card.classList.add('is-owned');
+            const image = document.createElement('img');
+            image.src = dish.image;
+            image.alt = `菜品 ${index + 1}`;
+            const actions = document.createElement('div');
+            actions.className = 'dish-card-actions';
+            const owned = document.createElement('button');
+            owned.type = 'button';
+            owned.className = 'dish-owned-toggle';
+            owned.setAttribute('aria-pressed', String(Boolean(dish.owned)));
+            owned.textContent = dish.owned ? '自家菜品 ✓' : '设为自家';
+            owned.addEventListener('click', () => {
+                dish.owned = !dish.owned;
+                renderDishListField(field);
+                showError('');
+            });
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'dish-remove';
+            remove.textContent = '删除';
+            remove.addEventListener('click', () => {
+                state.values[field.key].splice(index, 1);
+                renderDishListField(field);
+                showError('');
+            });
+            actions.append(owned, remove);
+            card.append(image, actions);
+            cards.appendChild(card);
+        });
+    }
+
     async function sourceForAsset(asset) {
         if (asset?.blob) {
             return readFileAsDataUrl(asset.blob);
@@ -865,6 +939,25 @@ function boot() {
                 );
                 state.values[field.key] = await sourceForAsset(asset);
                 renderImageField(field);
+            } else if (field.type === 'dish-list') {
+                const metadata = Array.isArray(task.input?.[field.key])
+                    ? task.input[field.key]
+                    : [];
+                state.values[field.key] = await Promise.all(
+                    metadata.map(async (dish, index) => {
+                        const asset = task.assets?.find(
+                            (item) => item.role === (dish.role || `dish-${index}`),
+                        );
+                        return {
+                            image: await sourceForAsset(asset),
+                            owned: Boolean(dish.owned),
+                            source: dish.source === 'library'
+                                ? 'library'
+                                : 'user',
+                        };
+                    }),
+                );
+                renderDishListField(field);
             } else if (task.input?.[field.key] !== undefined) {
                 state.values[field.key] = task.input[field.key];
                 renderNonImageField(field);
@@ -1088,6 +1181,55 @@ function boot() {
         }
     }
 
+    async function acceptDishFiles(field, fileList) {
+        const input = fieldSections[field.key]
+            .querySelector('input[type="file"]');
+        input.value = '';
+        const files = Array.from(fileList || []);
+        if (!files.length || state.isGenerating) return;
+        const current = state.values[field.key];
+        const available = Math.max(
+            0,
+            (field.maxItems || 12) - current.length,
+        );
+        if (files.length > available) {
+            showError(`最多上传 ${field.maxItems || 12} 张菜品图片`);
+        }
+        const operation = uploadOperations.begin(field.key);
+        try {
+            for (const file of files.slice(0, available)) {
+                const validation = validateClientFileMeta(
+                    file,
+                    field.accept || [...CLIENT_IMAGE_TYPES],
+                );
+                if (validation) {
+                    showError(validation.message);
+                    continue;
+                }
+                const source = await readFileAsDataUrl(file);
+                const dimensions = await readImageDimensions(source);
+                const dimensionError = CreatorForm.validateImageDimensions(
+                    dimensions.width,
+                    dimensions.height,
+                );
+                if (dimensionError) {
+                    showError(dimensionError.message);
+                    continue;
+                }
+                current.push({
+                    image: source,
+                    owned: false,
+                    source: 'user',
+                });
+            }
+            renderDishListField(field);
+        } catch (error) {
+            showError(error.message || '图片读取失败');
+        } finally {
+            uploadOperations.complete(operation);
+        }
+    }
+
     function focusField(fieldKey) {
         const section = fieldSections[fieldKey];
         section?.scrollIntoView({
@@ -1129,6 +1271,26 @@ function boot() {
                     showError('');
                 });
             renderImageField(field);
+        } else if (field.type === 'dish-list') {
+            const input = section.querySelector('input[type="file"]');
+            const box = section.querySelector('.dish-upload-box');
+            input.addEventListener('change', () => {
+                acceptDishFiles(field, input.files);
+            });
+            box.addEventListener('click', () => input.click());
+            box.addEventListener('dragover', (event) => {
+                event.preventDefault();
+                box.classList.add('dragover');
+            });
+            box.addEventListener('dragleave', () => {
+                box.classList.remove('dragover');
+            });
+            box.addEventListener('drop', (event) => {
+                event.preventDefault();
+                box.classList.remove('dragover');
+                acceptDishFiles(field, event.dataTransfer.files);
+            });
+            renderDishListField(field);
         } else if (field.type === 'choice') {
             const buttons = Array.from(
                 section.querySelectorAll('[data-value]'),
@@ -1202,6 +1364,16 @@ function boot() {
                 state.values,
                 new Date().toISOString(),
             );
+            const dishField = fields.find(
+                (field) => field.type === 'dish-list',
+            );
+            if (dishField && DishLibraryClient) {
+                const filled = await DishLibraryClient.fillDishList(
+                    payload[dishField.key],
+                );
+                payload[dishField.key] = filled.dishes;
+                if (filled.warning) showArchiveNotice(filled.warning);
+            }
             lastInitialPayload = payload;
             localTask = await startLocalTask(payload);
             const data = await runGeneration(localTask, payload);

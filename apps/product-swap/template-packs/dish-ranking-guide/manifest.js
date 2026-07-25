@@ -10,7 +10,7 @@ module.exports = {
     tags: ['美食', '测评', '攻略', '排行'],
     status: 'live',
     href: '/create.html?template=dish-ranking-guide',
-    cover: '/assets/example-result.jpg',
+    cover: '/assets/dish-ranking-guide-cover.webp',
     outputLabel: '生成 1 张测评攻略图',
     creditCost: 3,
     fields: [

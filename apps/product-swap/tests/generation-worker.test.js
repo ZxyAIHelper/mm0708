@@ -30,6 +30,22 @@ test('accepts a version 2 food-copy generation message', () => {
     assert.equal(isGenerationMessage(message()), true);
 });
 
+test('accepts a version 3 multi-dish generation message', () => {
+    assert.equal(isGenerationMessage(message({
+        version: 3,
+        payload: {
+            templateId: 'dish-ranking-guide',
+            dishes: [{
+                image: 'data:image/png;base64,aW1hZ2U=',
+                owned: true,
+                source: 'user',
+            }],
+            layout: 'tier',
+            aspectRatio: '3:4',
+        },
+    })), true);
+});
+
 test('rejects a version 2 generation message without a template id', () => {
     assert.equal(isGenerationMessage(message({
         payload: {
@@ -131,7 +147,7 @@ test('accepts a null-prototype v2 payload with own nonempty fields', () => {
     assert.equal(isGenerationMessage(message({ payload })), true);
 });
 
-test('replies to correlated capability requests with v1 and v2 support', () => {
+test('replies to correlated capability requests with v1, v2 and v3 support', () => {
     const replies = [];
     const accepted = handleCapabilityMessage({
         data: {
@@ -147,7 +163,7 @@ test('replies to correlated capability requests with v1 and v2 support', () => {
     assert.deepEqual(replies, [{
         type: 'product-swap:capabilities:response',
         requestId: 'cap_request_1',
-        supportedGenerationVersions: [1, 2],
+        supportedGenerationVersions: [1, 2, 3],
     }]);
 });
 

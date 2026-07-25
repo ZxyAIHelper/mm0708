@@ -77,6 +77,40 @@ test('validates a live food template from its manifest', async () => {
     );
 });
 
+test('accepts a valid owned multi-dish request', async () => {
+    const value = await validateGenerateRequest({
+        templateId: 'dish-ranking-guide',
+        dishes: [
+            { image: tinyPng, owned: true, source: 'user' },
+            { image: tinyPng, owned: false, source: 'library' },
+        ],
+        layout: 'tier',
+        aspectRatio: '3:4',
+        requirements: '',
+    });
+
+    assert.equal(value.values.dishes.length, 2);
+    assert.equal(value.values.dishes[0].owned, true);
+    assert.equal(value.values.dishes[1].source, 'library');
+});
+
+test('rejects invalid ownership in multi-dish requests', async () => {
+    await assert.rejects(
+        () => validateGenerateRequest({
+            templateId: 'dish-ranking-guide',
+            dishes: [{
+                image: tinyPng,
+                owned: true,
+                source: 'library',
+            }],
+            layout: 'tier',
+            aspectRatio: '3:4',
+        }),
+        (error) => error.code === 'INVALID_INPUT'
+            && error.message === '资源库菜品不能标记为自家菜品',
+    );
+});
+
 test('rejects missing, unavailable, and invalid template input', async () => {
     await assert.rejects(
         () => validateGenerateRequest({ templateId: 'missing' }),

@@ -45,6 +45,16 @@ async function extract(sourcePath) {
             .webp({ quality: 68 })
             .toFile(path.join(outputRoot, `${item.id}.webp`));
     }
+    await sharp(path.resolve(sourcePath))
+        .extract({ left: 610, top: 38, width: 281, height: 282 })
+        .resize(600, 600, { fit: 'cover' })
+        .webp({ quality: 72 })
+        .toFile(path.resolve(
+            __dirname,
+            '..',
+            'assets',
+            'dish-ranking-guide-cover.webp',
+        ));
     await fs.copyFile(
         path.resolve(__dirname, '..', 'dish-assets', 'catalog.json'),
         path.join(outputRoot, 'catalog.json'),

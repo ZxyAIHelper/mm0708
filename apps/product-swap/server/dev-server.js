@@ -47,6 +47,7 @@ const PUBLIC_STATIC_PATHS = new Set([
     'templates.js',
     'creator-form.js',
     'creator-meta.js',
+    'dish-library-client.js',
 ].map((entry) => path.join(APP_ROOT, entry)));
 const SUPPORTED_MIME_TYPES = new Map([
     ['image/jpeg', '.jpg'],
@@ -452,6 +453,79 @@ async function validateGenerateRequest(body = {}) {
             field.key,
         );
 
+        if (field.type === 'dish-list') {
+            if (
+                !hasRawValue
+                || !Array.isArray(rawValue)
+                || Object.getPrototypeOf(rawValue) !== Array.prototype
+                || rawValue.length < field.minItems
+                || rawValue.length > field.maxItems
+                || Reflect.ownKeys(rawValue).some((key) => (
+                    key !== 'length'
+                    && (
+                        typeof key !== 'string'
+                        || !/^(0|[1-9]\d*)$/.test(key)
+                        || Number(key) >= rawValue.length
+                    )
+                ))
+            ) {
+                throw new ProductSwapError(
+                    'INVALID_INPUT',
+                    `${field.label}无效`,
+                );
+            }
+            const dishes = [];
+            for (let index = 0; index < rawValue.length; index += 1) {
+                if (!Object.hasOwn(rawValue, index)) {
+                    throw new ProductSwapError(
+                        'INVALID_INPUT',
+                        `${field.label}无效`,
+                    );
+                }
+                const dish = rawValue[index];
+                if (
+                    !isPlainObject(dish)
+                    || Reflect.ownKeys(dish).some((key) => (
+                        !['image', 'owned', 'source'].includes(key)
+                    ))
+                    || typeof dish.image !== 'string'
+                    || typeof dish.owned !== 'boolean'
+                    || !['user', 'library'].includes(dish.source)
+                ) {
+                    throw new ProductSwapError(
+                        'INVALID_INPUT',
+                        `第 ${index + 1} 张菜品无效`,
+                    );
+                }
+                if (dish.source === 'library' && dish.owned) {
+                    throw new ProductSwapError(
+                        'INVALID_INPUT',
+                        '资源库菜品不能标记为自家菜品',
+                    );
+                }
+                dishes.push({
+                    image: decodeImageDataUrl(
+                        dish.image,
+                        `${field.key}-${index}`,
+                    ),
+                    owned: dish.owned,
+                    source: dish.source,
+                });
+            }
+            if (
+                dishes.filter((dish) => (
+                    dish.owned && dish.source === 'user'
+                )).length < field.minOwned
+            ) {
+                throw new ProductSwapError(
+                    'INVALID_INPUT',
+                    '请至少标记一道自家菜品',
+                );
+            }
+            values[field.key] = dishes;
+            continue;
+        }
+
         if (field.type === 'image') {
             if (!hasRawValue || rawValue === '') {
                 if (field.required) {
@@ -615,6 +689,11 @@ async function validateGenerateRequest(body = {}) {
             .filter((field) => field.type === 'image')
             .map((field) => values[field.key])
             .filter(Boolean),
+        ...template.manifest.fields
+            .filter((field) => field.type === 'dish-list')
+            .flatMap((field) => (
+                (values[field.key] || []).map((dish) => dish.image)
+            )),
         previousImage,
     ].filter(Boolean);
 
@@ -837,8 +916,30 @@ async function handleGenerate(
                 input.values[field.key],
             ));
         }
+        const dishFields = input.template.manifest.fields.filter(
+            (field) => field.type === 'dish-list',
+        );
+        for (const field of dishFields) {
+            const dishes = input.values[field.key] || [];
+            for (let index = 0; index < dishes.length; index += 1) {
+                imagePaths.push(await writeInputImage(
+                    taskDir,
+                    `${field.key}-${index}`,
+                    dishes[index].image,
+                ));
+            }
+        }
+        const promptValues = { ...input.values };
+        for (const field of dishFields) {
+            promptValues[field.key] = input.values[field.key].map(
+                (dish) => ({
+                    owned: dish.owned,
+                    source: dish.source,
+                }),
+            );
+        }
         const prompt = input.template.buildPrompt({
-            ...input.values,
+            ...promptValues,
             hasPreviousImage: Boolean(previousPath),
             imageRoles: imageEntries.map((field) => field.role),
             messages: input.messages,

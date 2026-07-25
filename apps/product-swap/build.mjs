@@ -26,6 +26,7 @@ const publicEntries = [
     'templates.js',
     'creator-form.js',
     'creator-meta.js',
+    'dish-library-client.js',
     'assets',
 ];
 

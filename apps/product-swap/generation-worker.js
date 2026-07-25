@@ -6,7 +6,7 @@ if (typeof importScripts === 'function') {
 
 const runningTaskIds = new Set();
 const PRODUCTION_API_ORIGIN = 'https://api.mm0708.top';
-const SUPPORTED_GENERATION_VERSIONS = [1, 2];
+const SUPPORTED_GENERATION_VERSIONS = [1, 2, 3];
 
 function isPlainRecord(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -14,6 +14,29 @@ function isPlainRecord(value) {
     }
     const prototype = Object.getPrototypeOf(value);
     return prototype === Object.prototype || prototype === null;
+}
+
+function isPlainDenseArray(value) {
+    if (
+        !Array.isArray(value)
+        || Object.getPrototypeOf(value) !== Array.prototype
+    ) {
+        return false;
+    }
+    const keys = Reflect.ownKeys(value);
+    if (keys.some((key) => (
+        key !== 'length'
+        && (
+            typeof key !== 'string'
+            || !/^(0|[1-9]\d*)$/.test(key)
+            || Number(key) >= value.length
+        )
+    ))) {
+        return false;
+    }
+    return Array.from({ length: value.length }, (_, index) => (
+        Object.hasOwn(value, index)
+    )).every(Boolean);
 }
 
 function isAllowedApiUrl(apiUrl, workerOrigin = globalThis.location?.origin) {
@@ -64,6 +87,52 @@ function normalizeGenerationMessage(value, workerOrigin) {
             payload: {
                 ...payload,
                 templateId,
+            },
+        };
+    }
+    if (value.version === 3) {
+        if (
+            !Object.hasOwn(payload, 'templateId')
+            || typeof payload.templateId !== 'string'
+            || !payload.templateId.trim()
+            || !Object.hasOwn(payload, 'dishes')
+            || !isPlainDenseArray(payload.dishes)
+            || payload.dishes.length < 1
+            || payload.dishes.length > 12
+        ) {
+            return null;
+        }
+        const dishes = [];
+        for (const dish of payload.dishes) {
+            if (
+                !isPlainRecord(dish)
+                || Reflect.ownKeys(dish).some((key) => (
+                    !['image', 'owned', 'source'].includes(key)
+                ))
+                || !Object.hasOwn(dish, 'image')
+                || typeof dish.image !== 'string'
+                || !dish.image.trim()
+                || !Object.hasOwn(dish, 'owned')
+                || typeof dish.owned !== 'boolean'
+                || !Object.hasOwn(dish, 'source')
+                || !['user', 'library'].includes(dish.source)
+                || (dish.source === 'library' && dish.owned)
+            ) {
+                return null;
+            }
+            dishes.push({
+                image: dish.image,
+                owned: dish.owned,
+                source: dish.source,
+            });
+        }
+        if (!dishes.some((dish) => dish.owned)) return null;
+        return {
+            ...value,
+            payload: {
+                ...payload,
+                templateId: payload.templateId.trim(),
+                dishes,
             },
         };
     }

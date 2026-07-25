@@ -19,6 +19,7 @@ test('build emits only deployable public assets', async () => {
         'create.html',
         'creator-form.js',
         'creator-meta.js',
+        'dish-library-client.js',
         'generation-worker.js',
         'history.html',
         'history.js',
