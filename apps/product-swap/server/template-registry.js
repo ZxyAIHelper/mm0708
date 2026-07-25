@@ -70,7 +70,11 @@ const IMAGE_MEDIA_TYPES = new Set([
 
 function firstUnknownKey(value, allowedKeys) {
     const allowed = new Set(allowedKeys);
-    return Reflect.ownKeys(value).find((key) => !allowed.has(key));
+    const keys = Reflect.ownKeys(value);
+    for (let index = 0; index < keys.length; index += 1) {
+        if (!allowed.has(keys[index])) return keys[index];
+    }
+    return undefined;
 }
 
 function propertyName(key) {
@@ -117,14 +121,69 @@ function requireOwnDataProperty(value, key, context) {
     }
 }
 
-function assertDenseArray(value, context) {
-    for (let index = 0; index < value.length; index += 1) {
+function ownDataValues(value) {
+    const values = Object.create(null);
+    const keys = Reflect.ownKeys(value);
+    for (let index = 0; index < keys.length; index += 1) {
+        const key = keys[index];
+        const descriptor = Object.getOwnPropertyDescriptor(value, key);
+        if (isDataDescriptor(descriptor)) {
+            values[key] = descriptor.value;
+        }
+    }
+    return values;
+}
+
+function assertPlainDenseArray(value, context) {
+    if (Object.getPrototypeOf(value) !== Array.prototype) {
+        throw new Error(`${context} must use Array.prototype`);
+    }
+
+    const length = Object.getOwnPropertyDescriptor(
+        value,
+        'length',
+    ).value;
+    const keys = Reflect.ownKeys(value);
+    for (let keyIndex = 0; keyIndex < keys.length; keyIndex += 1) {
+        const key = keys[keyIndex];
+        if (key === 'length') continue;
+        const numericIndex = typeof key === 'string'
+            ? Number(key)
+            : Number.NaN;
+        if (
+            !Number.isInteger(numericIndex)
+            || numericIndex < 0
+            || numericIndex >= length
+            || String(numericIndex) !== key
+        ) {
+            throw new Error(
+                `${context} has unknown array property`
+                + ` ${propertyName(key)}`,
+            );
+        }
+    }
+    for (let index = 0; index < length; index += 1) {
         if (!isDataDescriptor(
             Object.getOwnPropertyDescriptor(value, index),
         )) {
             throw new Error(`${context} must be a dense array`);
         }
     }
+}
+
+function denseArrayValues(value) {
+    const length = Object.getOwnPropertyDescriptor(
+        value,
+        'length',
+    ).value;
+    const values = new Array(length);
+    for (let index = 0; index < length; index += 1) {
+        values[index] = Object.getOwnPropertyDescriptor(
+            value,
+            index,
+        ).value;
+    }
+    return values;
 }
 
 function validateField(field, manifestId) {
@@ -155,41 +214,41 @@ function validateField(field, manifestId) {
             + ' must be an own data property',
         );
     }
-    if (typeof field.key !== 'string' || !field.key.trim()) {
+    const fieldKey = keyDescriptor.value;
+    if (typeof fieldKey !== 'string' || !fieldKey.trim()) {
         throw new Error(
             `Template ${manifestId} field keys must be non-empty strings`,
         );
     }
 
     if (
-        !/^[A-Za-z][A-Za-z0-9_]*$/.test(field.key)
-        || [
-            '__proto__',
-            'constructor',
-            'prototype',
-        ].includes(field.key)
+        !/^[A-Za-z][A-Za-z0-9_]*$/.test(fieldKey)
+        || fieldKey === '__proto__'
+        || fieldKey === 'constructor'
+        || fieldKey === 'prototype'
     ) {
         throw new Error(
-            `Template ${manifestId} field key ${field.key} is unsafe`,
+            `Template ${manifestId} field key ${fieldKey} is unsafe`,
         );
     }
-    if (RESERVED_FIELD_KEYS.has(field.key)) {
+    if (RESERVED_FIELD_KEYS.has(fieldKey)) {
         throw new Error(
-            `Template ${manifestId} field key ${field.key} is reserved`,
+            `Template ${manifestId} field key ${fieldKey} is reserved`,
         );
     }
 
-    const fieldContext = `Template ${manifestId} field ${field.key}`;
+    const fieldContext = `Template ${manifestId} field ${fieldKey}`;
     rejectAccessors(field, fieldContext);
     requireOwnDataProperty(field, 'type', fieldContext);
+    const values = ownDataValues(field);
 
-    if (!Object.hasOwn(FIELD_KEYS, field.type)) {
+    if (!Object.hasOwn(FIELD_KEYS, values.type)) {
         throw new Error(
             fieldContext
-            + ` has unknown type ${field.type}`,
+            + ` has unknown type ${values.type}`,
         );
     }
-    const allowedKeys = FIELD_KEYS[field.type];
+    const allowedKeys = FIELD_KEYS[values.type];
 
     const unknownKey = firstUnknownKey(field, allowedKeys);
     if (unknownKey !== undefined) {
@@ -200,15 +259,15 @@ function validateField(field, manifestId) {
     }
 
     requireOwnDataProperty(field, 'label', fieldContext);
-    if (typeof field.label !== 'string' || !field.label.trim()) {
+    if (typeof values.label !== 'string' || !values.label.trim()) {
         throw new Error(
             fieldContext
             + ' label must be a non-empty string',
         );
     }
     if (
-        Object.hasOwn(field, 'required')
-        && typeof field.required !== 'boolean'
+        Object.hasOwn(values, 'required')
+        && typeof values.required !== 'boolean'
     ) {
         throw new Error(
             fieldContext
@@ -216,64 +275,79 @@ function validateField(field, manifestId) {
         );
     }
 
-    if (field.type === 'image') {
+    if (values.type === 'image') {
         requireOwnDataProperty(field, 'role', fieldContext);
         requireOwnDataProperty(field, 'required', fieldContext);
         if (
-            typeof field.role !== 'string'
-            || !field.role.trim()
+            typeof values.role !== 'string'
+            || !values.role.trim()
         ) {
             throw new Error(
                 fieldContext
                 + ' role must be a non-empty string',
             );
         }
-        if (typeof field.required !== 'boolean') {
+        if (typeof values.required !== 'boolean') {
             throw new Error(
                 fieldContext
                 + ' required must be a boolean',
             );
         }
         if (
-            Object.hasOwn(field, 'accept')
-            && !Array.isArray(field.accept)
+            Object.hasOwn(values, 'accept')
+            && !Array.isArray(values.accept)
         ) {
             throw new Error(
                 fieldContext
                 + ' accept must be an array',
             );
         }
-        if (Array.isArray(field.accept)) {
-            assertDenseArray(
-                field.accept,
+        if (Array.isArray(values.accept)) {
+            assertPlainDenseArray(
+                values.accept,
                 `${fieldContext} accept`,
             );
-        }
-        if (
-            Array.isArray(field.accept)
-            && (
-                field.accept.length === 0
-                || field.accept.some(
-                    (mediaType) => !IMAGE_MEDIA_TYPES.has(mediaType),
-                )
-            )
-        ) {
-            throw new Error(
-                fieldContext
-                + ' accept may only contain image/jpeg, image/png, or image/webp',
-            );
+            const acceptValues = denseArrayValues(values.accept);
+            if (acceptValues.length === 0) {
+                throw new Error(
+                    fieldContext
+                    + ' accept may only contain image/jpeg, image/png, or image/webp',
+                );
+            }
+            for (
+                let index = 0;
+                index < acceptValues.length;
+                index += 1
+            ) {
+                if (!IMAGE_MEDIA_TYPES.has(acceptValues[index])) {
+                    throw new Error(
+                        fieldContext
+                        + ' accept may only contain image/jpeg, image/png, or image/webp',
+                    );
+                }
+            }
+            values.accept = acceptValues;
         }
     }
 
-    if (field.type === 'choice') {
+    if (values.type === 'choice') {
         requireOwnDataProperty(field, 'options', fieldContext);
         requireOwnDataProperty(field, 'default', fieldContext);
-        if (Array.isArray(field.options)) {
-            assertDenseArray(
-                field.options,
+        if (Array.isArray(values.options)) {
+            assertPlainDenseArray(
+                values.options,
                 `${fieldContext} options`,
             );
-            for (const option of field.options) {
+            const optionInputs = denseArrayValues(values.options);
+            const canonicalOptions = new Array(optionInputs.length);
+            const optionValues = new Array(optionInputs.length);
+            const optionLabels = new Array(optionInputs.length);
+            for (
+                let index = 0;
+                index < optionInputs.length;
+                index += 1
+            ) {
+                const option = optionInputs[index];
                 if (!isPlainObject(option)) {
                     throw new Error(
                         `${fieldContext} option must be a plain object`,
@@ -300,53 +374,60 @@ function validateField(field, manifestId) {
                     'label',
                     `${fieldContext} option`,
                 );
+                const optionData = ownDataValues(option);
+                optionValues[index] = optionData.value;
+                optionLabels[index] = optionData.label;
+                const canonicalOption = Object.create(null);
+                canonicalOption.value = optionData.value;
+                canonicalOption.label = optionData.label;
+                canonicalOptions[index] = canonicalOption;
             }
-        }
-        const invalidOptions = (
-            !Array.isArray(field.options)
-            || field.options.length === 0
-            || field.options.some((option) => (
-                !option
-                || typeof option !== 'object'
-                || Array.isArray(option)
-                || typeof option.value !== 'string'
-                || !option.value.trim()
-                || typeof option.label !== 'string'
-                || !option.label.trim()
-            ))
-        );
-        const values = invalidOptions
-            ? []
-            : field.options.map(({ value }) => value);
-        const labels = invalidOptions
-            ? []
-            : field.options.map(({ label }) => label);
-        if (
-            invalidOptions
-            || new Set(values).size !== values.length
-            || new Set(labels).size !== labels.length
-        ) {
+            let invalidOptions = optionInputs.length === 0;
+            for (
+                let index = 0;
+                index < optionInputs.length;
+                index += 1
+            ) {
+                if (
+                    typeof optionValues[index] !== 'string'
+                    || !optionValues[index].trim()
+                    || typeof optionLabels[index] !== 'string'
+                    || !optionLabels[index].trim()
+                ) {
+                    invalidOptions = true;
+                }
+            }
+            if (
+                invalidOptions
+                || new Set(optionValues).size !== optionValues.length
+                || new Set(optionLabels).size !== optionLabels.length
+            ) {
+                throw new Error(
+                    fieldContext
+                    + ' options must have unique non-empty string values and labels',
+                );
+            }
+            if (!new Set(optionValues).has(values.default)) {
+                throw new Error(
+                    fieldContext
+                    + ' default must match an option value',
+                );
+            }
+            values.options = canonicalOptions;
+        } else {
             throw new Error(
                 fieldContext
                 + ' options must have unique non-empty string values and labels',
             );
         }
-        if (!values.includes(field.default)) {
-            throw new Error(
-                fieldContext
-                + ' default must match an option value',
-            );
-        }
     }
 
-    if (
-        field.type === 'boolean'
-    ) {
+    if (values.type === 'boolean') {
         requireOwnDataProperty(field, 'default', fieldContext);
     }
     if (
-        field.type === 'boolean'
-        && typeof field.default !== 'boolean'
+        values.type === 'boolean'
+        && typeof values.default !== 'boolean'
     ) {
         throw new Error(
             fieldContext
@@ -355,11 +436,11 @@ function validateField(field, manifestId) {
     }
 
     if (
-        field.type === 'text'
-        && Object.hasOwn(field, 'maxLength')
+        values.type === 'text'
+        && Object.hasOwn(values, 'maxLength')
         && (
-            !Number.isInteger(field.maxLength)
-            || field.maxLength <= 0
+            !Number.isInteger(values.maxLength)
+            || values.maxLength <= 0
         )
     ) {
         throw new Error(
@@ -368,15 +449,24 @@ function validateField(field, manifestId) {
         );
     }
     if (
-        field.type === 'text'
-        && Object.hasOwn(field, 'placeholder')
-        && typeof field.placeholder !== 'string'
+        values.type === 'text'
+        && Object.hasOwn(values, 'placeholder')
+        && typeof values.placeholder !== 'string'
     ) {
         throw new Error(
             fieldContext
             + ' placeholder must be a string',
         );
     }
+
+    const canonical = Object.create(null);
+    for (let index = 0; index < allowedKeys.length; index += 1) {
+        const key = allowedKeys[index];
+        if (Object.hasOwn(values, key)) {
+            canonical[key] = values[key];
+        }
+    }
+    return canonical;
 }
 
 function validateManifest(manifest, directoryName) {
@@ -410,112 +500,140 @@ function validateManifest(manifest, directoryName) {
             throw new Error(`Template ${directoryName} is missing ${key}`);
         }
     }
+    const values = ownDataValues(manifest);
 
     for (const key of STRING_KEYS) {
-        if (typeof manifest[key] !== 'string') {
+        if (typeof values[key] !== 'string') {
             throw new Error(
                 `Template ${directoryName} ${key} must be a string`,
             );
         }
     }
 
-    if (manifest.id !== directoryName) {
+    if (values.id !== directoryName) {
         throw new Error(
-            `Template directory ${directoryName} must match manifest id ${manifest.id}`,
+            `Template directory ${directoryName}`
+            + ` must match manifest id ${values.id}`,
         );
     }
 
-    if (!['live', 'coming_soon'].includes(manifest.status)) {
+    if (
+        values.status !== 'live'
+        && values.status !== 'coming_soon'
+    ) {
         throw new Error(
-            `Template ${manifest.id} status must be live or coming_soon`,
+            `Template ${values.id} status must be live or coming_soon`,
         );
     }
-    if (manifest.status === 'live' && !manifest.href.trim()) {
+    if (values.status === 'live' && !values.href.trim()) {
         throw new Error(
-            `Live template ${manifest.id} href must be a non-empty string`,
+            `Live template ${values.id} href must be a non-empty string`,
         );
     }
     if (
-        typeof manifest.creditCost !== 'number'
-        || !Number.isFinite(manifest.creditCost)
-        || manifest.creditCost < 0
+        typeof values.creditCost !== 'number'
+        || !Number.isFinite(values.creditCost)
+        || values.creditCost < 0
     ) {
         throw new Error(
-            `Template ${manifest.id} creditCost must be a non-negative number`,
+            `Template ${values.id}`
+            + ' creditCost must be a non-negative number',
         );
     }
 
     for (const key of ['platforms', 'tags', 'fields']) {
-        if (!Array.isArray(manifest[key])) {
+        if (!Array.isArray(values[key])) {
             throw new Error(
-                `Template ${manifest.id} ${key} must be an array`,
+                `Template ${values.id} ${key} must be an array`,
             );
         }
-        assertDenseArray(
-            manifest[key],
-            `Template ${manifest.id} ${key}`,
+        assertPlainDenseArray(
+            values[key],
+            `Template ${values.id} ${key}`,
         );
     }
 
-    const hasQuickPrompts = Object.hasOwn(manifest, 'quickPrompts');
+    const hasQuickPrompts = Object.hasOwn(values, 'quickPrompts');
     if (hasQuickPrompts) {
-        if (!Array.isArray(manifest.quickPrompts)) {
+        if (!Array.isArray(values.quickPrompts)) {
             throw new Error(
-                `Template ${manifest.id} quickPrompts must be an array`,
+                `Template ${values.id} quickPrompts must be an array`,
             );
         }
-        assertDenseArray(
-            manifest.quickPrompts,
-            `Template ${manifest.id} quickPrompts`,
+        assertPlainDenseArray(
+            values.quickPrompts,
+            `Template ${values.id} quickPrompts`,
         );
     }
 
+    const canonicalArrays = Object.create(null);
     for (const key of ['platforms', 'tags']) {
-        if (manifest[key].some(
-            (entry) => (
-                typeof entry !== 'string'
-                || !entry.trim()
-            ),
-        )) {
+        const entries = denseArrayValues(values[key]);
+        for (let index = 0; index < entries.length; index += 1) {
+            if (
+                typeof entries[index] !== 'string'
+                || !entries[index].trim()
+            ) {
+                throw new Error(
+                    `Template ${values.id} ${key} entries`
+                    + ' must be non-empty strings',
+                );
+            }
+        }
+        canonicalArrays[key] = entries;
+    }
+    const quickPrompts = hasQuickPrompts
+        ? denseArrayValues(values.quickPrompts)
+        : [];
+    for (let index = 0; index < quickPrompts.length; index += 1) {
+        if (
+            typeof quickPrompts[index] !== 'string'
+            || !quickPrompts[index].trim()
+        ) {
             throw new Error(
-                `Template ${manifest.id} ${key} entries must be non-empty strings`,
+                `Template ${values.id} quickPrompts entries`
+                + ' must be non-empty strings',
             );
         }
     }
+
     if (
-        hasQuickPrompts
-        && manifest.quickPrompts.some(
-            (entry) => (
-                typeof entry !== 'string'
-                || !entry.trim()
-            ),
-        )
+        typeof values.cover !== 'string'
+        || !values.cover.trim()
     ) {
         throw new Error(
-            `Template ${manifest.id} quickPrompts entries`
-            + ' must be non-empty strings',
+            `Template ${values.id} cover must be a non-empty string`,
         );
     }
 
-    if (
-        typeof manifest.cover !== 'string'
-        || !manifest.cover.trim()
-    ) {
-        throw new Error(
-            `Template ${manifest.id} cover must be a non-empty string`,
+    const fieldInputs = denseArrayValues(values.fields);
+    const canonicalFields = new Array(fieldInputs.length);
+    const fieldKeys = new Array(fieldInputs.length);
+    for (let index = 0; index < fieldInputs.length; index += 1) {
+        const canonicalField = validateField(
+            fieldInputs[index],
+            values.id,
         );
+        canonicalFields[index] = canonicalField;
+        fieldKeys[index] = Object.getOwnPropertyDescriptor(
+            canonicalField,
+            'key',
+        ).value;
     }
-
-    manifest.fields.forEach((field) => (
-        validateField(field, manifest.id)
-    ));
-
-    const fieldKeys = manifest.fields.map((field) => field.key);
     if (new Set(fieldKeys).size !== fieldKeys.length) {
-        throw new Error(`Template ${manifest.id} has duplicate field keys`);
+        throw new Error(`Template ${values.id} has duplicate field keys`);
     }
 
-    return manifest;
+    const canonical = Object.create(null);
+    for (let index = 0; index < REQUIRED_KEYS.length; index += 1) {
+        const key = REQUIRED_KEYS[index];
+        canonical[key] = values[key];
+    }
+    canonical.platforms = canonicalArrays.platforms;
+    canonical.tags = canonicalArrays.tags;
+    canonical.fields = canonicalFields;
+    canonical.quickPrompts = quickPrompts;
+    return canonical;
 }
 
 function deepFreeze(value) {
@@ -574,10 +692,13 @@ function getTemplatePackage(id) {
 function copyAllowedProperties(source, keys) {
     const copy = {};
     for (const key of keys) {
-        if (!Object.hasOwn(source, key)) continue;
-        const value = source[key];
+        const descriptor = Object.getOwnPropertyDescriptor(source, key);
+        if (!isDataDescriptor(descriptor)) continue;
+        const value = descriptor.value;
         Object.defineProperty(copy, key, {
-            value: Array.isArray(value) ? value.slice() : value,
+            value: Array.isArray(value)
+                ? denseArrayValues(value)
+                : value,
             enumerable: true,
             writable: true,
             configurable: true,
@@ -587,31 +708,54 @@ function copyAllowedProperties(source, keys) {
 }
 
 function publicManifest(manifest) {
+    const manifestValues = ownDataValues(manifest);
     const published = copyAllowedProperties(manifest, PUBLIC_KEYS);
-    published.platforms = manifest.platforms.slice();
-    published.tags = manifest.tags.slice();
-    published.fields = manifest.fields.map((field) => {
+    published.platforms = denseArrayValues(manifestValues.platforms);
+    published.tags = denseArrayValues(manifestValues.tags);
+    const fieldInputs = denseArrayValues(manifestValues.fields);
+    published.fields = new Array(fieldInputs.length);
+    for (let fieldIndex = 0; fieldIndex < fieldInputs.length; fieldIndex += 1) {
+        const field = fieldInputs[fieldIndex];
+        const fieldValues = ownDataValues(field);
         const publishedField = copyAllowedProperties(
             field,
-            FIELD_KEYS[field.type] || [],
+            Object.hasOwn(FIELD_KEYS, fieldValues.type)
+                ? FIELD_KEYS[fieldValues.type]
+                : [],
         );
-        if (field.type === 'image' && Array.isArray(field.accept)) {
-            publishedField.accept = field.accept.slice();
+        if (
+            fieldValues.type === 'image'
+            && Array.isArray(fieldValues.accept)
+        ) {
+            publishedField.accept = denseArrayValues(fieldValues.accept);
         }
-        if (field.type === 'choice' && Array.isArray(field.options)) {
-            publishedField.options = field.options.map((option) => (
-                copyAllowedProperties(option, ['value', 'label'])
-            ));
+        if (
+            fieldValues.type === 'choice'
+            && Array.isArray(fieldValues.options)
+        ) {
+            const optionInputs = denseArrayValues(fieldValues.options);
+            publishedField.options = new Array(optionInputs.length);
+            for (
+                let optionIndex = 0;
+                optionIndex < optionInputs.length;
+                optionIndex += 1
+            ) {
+                publishedField.options[optionIndex] = copyAllowedProperties(
+                    optionInputs[optionIndex],
+                    ['value', 'label'],
+                );
+            }
         }
-        return publishedField;
-    });
+        published.fields[fieldIndex] = publishedField;
+    }
+    const quickPrompts = (
+        Object.hasOwn(manifestValues, 'quickPrompts')
+        && Array.isArray(manifestValues.quickPrompts)
+    )
+        ? denseArrayValues(manifestValues.quickPrompts)
+        : [];
     Object.defineProperty(published, 'quickPrompts', {
-        value: (
-            Object.hasOwn(manifest, 'quickPrompts')
-            && Array.isArray(manifest.quickPrompts)
-        )
-            ? manifest.quickPrompts.slice()
-            : [],
+        value: quickPrompts,
         enumerable: true,
         writable: true,
         configurable: true,

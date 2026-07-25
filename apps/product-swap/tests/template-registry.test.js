@@ -232,10 +232,9 @@ test('accepts only plain manifests, fields, and choice options', () => {
         Object.create(null),
         validManifest(),
     );
-    assert.equal(
-        validateManifest(nullPrototypeManifest, 'sample'),
-        nullPrototypeManifest,
-    );
+    const validated = validateManifest(nullPrototypeManifest, 'sample');
+    assert.notEqual(validated, nullPrototypeManifest);
+    assert.equal(Object.getPrototypeOf(validated), null);
 });
 
 test('rejects hidden and symbol manifest properties', () => {
@@ -473,6 +472,58 @@ test('rejects sparse image accept and choice options arrays clearly', () => {
     );
 });
 
+test('rejects array instance overrides before invoking iteration methods', () => {
+    const fields = [validField('text')];
+    fields.forEach = () => {};
+    assert.throws(
+        () => validateManifest(validManifest({ fields }), 'sample'),
+        /Template sample fields has unknown array property forEach/,
+    );
+
+    const accept = ['image/gif'];
+    accept.some = () => false;
+    assert.throws(
+        () => validateManifest(validManifest({
+            fields: [validField('image', { accept })],
+        }), 'sample'),
+        /Template sample field targetImage accept has unknown array property some/,
+    );
+
+    const options = [{
+        value: 'square',
+        label: 'Square',
+    }];
+    options[Symbol.iterator] = function* iterator() {};
+    assert.throws(
+        () => validateManifest(validManifest({
+            fields: [validField('choice', { options })],
+        }), 'sample'),
+        /Template sample field ratio options has unknown array property Symbol\(Symbol.iterator\)/,
+    );
+
+    const quickPrompts = ['Prompt'];
+    quickPrompts.map = () => [];
+    assert.throws(
+        () => validateManifest(
+            validManifest({ quickPrompts }),
+            'sample',
+        ),
+        /Template sample quickPrompts has unknown array property map/,
+    );
+});
+
+test('rejects arrays with custom or null prototypes', () => {
+    for (const prototype of [{}, null]) {
+        const fields = [validField('text')];
+        Object.setPrototypeOf(fields, prototype);
+
+        assert.throws(
+            () => validateManifest(validManifest({ fields }), 'sample'),
+            /Template sample fields must use Array.prototype/,
+        );
+    }
+});
+
 test('rejects invalid field types and properties outside the type contract', () => {
     assert.throws(
         () => validateManifest({
@@ -679,6 +730,71 @@ test('publicManifest supplies an empty quickPrompts array when absent', () => {
     const published = publicManifest(validManifest());
 
     assert.deepEqual(published.quickPrompts, []);
+});
+
+test('canonical packages and public DTOs ignore Object prototype pollution', () => {
+    const polluted = {
+        required: 'polluted',
+        maxLength: 9999,
+        accept: ['image/gif'],
+        default: 'polluted',
+        placeholder: 'polluted',
+        quickPrompts: ['Polluted prompt'],
+    };
+    const previousDescriptors = new Map();
+    for (const [key, value] of Object.entries(polluted)) {
+        previousDescriptors.set(
+            key,
+            Object.getOwnPropertyDescriptor(Object.prototype, key),
+        );
+        Object.defineProperty(Object.prototype, key, {
+            value,
+            configurable: true,
+        });
+    }
+
+    try {
+        const productPackage = getTemplatePackage('product-swap');
+        const foodPackage = getTemplatePackage('food-copy-layout');
+        const productTarget = productPackage.manifest.fields.find(
+            (field) => field.key === 'targetImage',
+        );
+        const productText = productPackage.manifest.fields.find(
+            (field) => field.key === 'requirements',
+        );
+        const foodBoolean = foodPackage.manifest.fields.find(
+            (field) => field.key === 'showDateTime',
+        );
+        const foodChoice = foodPackage.manifest.fields.find(
+            (field) => field.key === 'aspectRatio',
+        );
+
+        assert.equal(Object.getPrototypeOf(productPackage.manifest), null);
+        assert.equal(Object.getPrototypeOf(productTarget), null);
+        assert.equal(Object.getPrototypeOf(foodChoice.options[0]), null);
+        assert.equal(productTarget.accept, undefined);
+        assert.equal(productText.placeholder, undefined);
+        assert.equal(foodBoolean.required, undefined);
+        assert.equal(foodBoolean.default, true);
+        assert.equal(foodChoice.default, '3:4');
+
+        const comingSoon = publicCatalog().find(
+            (template) => template.id === 'before-after',
+        );
+        assert.deepEqual(comingSoon.quickPrompts, []);
+        assert.equal(
+            Object.getPrototypeOf(comingSoon),
+            Object.prototype,
+        );
+    } finally {
+        for (const [key, descriptor] of previousDescriptors) {
+            if (descriptor) {
+                Object.defineProperty(Object.prototype, key, descriptor);
+            } else {
+                delete Object.prototype[key];
+            }
+        }
+    }
 });
 
 test('package manifests cannot be mutated through registry results', () => {
