@@ -22,10 +22,10 @@
         </header>
 
         <div id="workStatusFilters" class="task-filters" aria-label="作品状态">
-            <button class="active" type="button" data-status="">全部</button>
-            <button type="button" data-status="processing">生成中</button>
-            <button type="button" data-status="completed">已完成</button>
-            <button type="button" data-status="failed">失败</button>
+            <button class="active" type="button" data-status="" aria-pressed="true">全部</button>
+            <button type="button" data-status="processing" aria-pressed="false">生成中</button>
+            <button type="button" data-status="completed" aria-pressed="false">已完成</button>
+            <button type="button" data-status="failed" aria-pressed="false">失败</button>
         </div>
 
         <p id="historyLoading" class="history-state" role="status">正在加载任务…</p>

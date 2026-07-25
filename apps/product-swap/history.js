@@ -411,6 +411,7 @@
         }
         for (const item of elements.filters.querySelectorAll('button')) {
             item.classList.toggle('active', item === button);
+            item.setAttribute('aria-pressed', String(item === button));
         }
         activeStatus = button.dataset.status || '';
         loadTasks({ reset: true });

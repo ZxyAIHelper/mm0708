@@ -35,6 +35,22 @@ test('Works exposes list, status filters, states, pagination and detail', () => 
     assert.match(html, /data-status="completed"/);
     assert.match(html, /data-status="failed"/);
     assert.match(html, /data-nav="works"/);
+    assert.match(
+        html,
+        /class="active"[^>]*data-status=""[^>]*aria-pressed="true"/,
+    );
+    for (const status of ['processing', 'completed', 'failed']) {
+        assert.match(
+            html,
+            new RegExp(`data-status="${status}"[^>]*aria-pressed="false"`),
+        );
+    }
+
+    const script = fs.readFileSync(
+        path.join(root, 'history.js'),
+        'utf8',
+    );
+    assert.match(script, /setAttribute\('aria-pressed'/);
 });
 
 test('task center reads local blobs, urls, expiry and deletion', () => {
