@@ -29,6 +29,7 @@ const publicEntries = [
     'chat-materials.js',
     'tencent-map-picker.js',
     'chat-draft-client.js',
+    'wechat-chat-renderer.js',
     'dish-library-client.js',
     'assets',
 ];

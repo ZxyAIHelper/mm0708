@@ -50,6 +50,7 @@ const PUBLIC_STATIC_PATHS = new Set([
     'chat-materials.js',
     'tencent-map-picker.js',
     'chat-draft-client.js',
+    'wechat-chat-renderer.js',
     'dish-library-client.js',
 ].map((entry) => path.join(APP_ROOT, entry)));
 const SUPPORTED_MIME_TYPES = new Map([
