@@ -452,9 +452,9 @@ function publicManifest(manifest) {
         }
         return publishedField;
     });
-    if (Array.isArray(manifest.quickPrompts)) {
-        published.quickPrompts = manifest.quickPrompts.slice();
-    }
+    published.quickPrompts = Array.isArray(manifest.quickPrompts)
+        ? manifest.quickPrompts.slice()
+        : [];
     return published;
 }
 

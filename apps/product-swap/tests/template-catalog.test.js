@@ -133,10 +133,7 @@ test('public catalog exposes only the manifest DTO contract', () => {
     for (const template of publicCatalog()) {
         assert.deepEqual(
             Object.keys(template).sort(),
-            allowedManifestKeys.filter(
-                (key) => key !== 'quickPrompts'
-                    || Object.hasOwn(template, key),
-            ),
+            allowedManifestKeys,
         );
         for (const field of template.fields) {
             assert.deepEqual(

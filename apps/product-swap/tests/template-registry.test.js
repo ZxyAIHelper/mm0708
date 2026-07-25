@@ -473,6 +473,12 @@ test('publicManifest projects and deeply clones only public properties', () => {
     assert.deepEqual(source.quickPrompts, ['Try square']);
 });
 
+test('publicManifest supplies an empty quickPrompts array when absent', () => {
+    const published = publicManifest(validManifest());
+
+    assert.deepEqual(published.quickPrompts, []);
+});
+
 test('package manifests cannot be mutated through registry results', () => {
     const templatePackage = getTemplatePackage('food-copy-layout');
     const originalKey = templatePackage.manifest.fields[0].key;
