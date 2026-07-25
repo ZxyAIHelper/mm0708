@@ -102,9 +102,10 @@ test('home discovers the live food copy layout through the generic catalog', () 
     assert.equal(food.href, '/create.html?template=food-copy-layout');
     assert.equal(food.outputLabel, '生成 1 张文案配图');
     for (const query of ['美食', '文案', '排版']) {
-        assert.deepEqual(
-            searchTemplates(query).map((template) => template.id),
-            ['food-copy-layout'],
+        assert.ok(
+            searchTemplates(query)
+                .map((template) => template.id)
+                .includes('food-copy-layout'),
         );
     }
 

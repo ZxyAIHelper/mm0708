@@ -14,6 +14,21 @@ function ruleFor(source, selector) {
         .join('\n');
 }
 
+function atRuleBlockFor(source, header) {
+    const start = source.indexOf(header);
+    if (start < 0) return '';
+    const open = source.indexOf('{', start + header.length);
+    if (open < 0) return '';
+
+    let depth = 0;
+    for (let index = open; index < source.length; index += 1) {
+        if (source[index] === '{') depth += 1;
+        if (source[index] === '}') depth -= 1;
+        if (depth === 0) return source.slice(open + 1, index);
+    }
+    return '';
+}
+
 test('shared app chrome stays mobile-safe and keyboard accessible', () => {
     assert.match(appCss, /width:\s*min\(100%,\s*520px\)/);
     assert.match(appCss, /env\(safe-area-inset-bottom\)/);
@@ -39,6 +54,15 @@ test('creator uses the light merchant palette and narrow-screen layout', () => {
 });
 
 test('food creator has explicit desktop and 640px responsive layout contracts', () => {
+    const mobile640 = atRuleBlockFor(
+        creatorCss,
+        '@media (max-width: 640px)',
+    );
+    const mobile360 = atRuleBlockFor(
+        creatorCss,
+        '@media (max-width: 360px)',
+    );
+
     assert.match(
         ruleFor(creatorCss, '.product-swap-shell'),
         /width:\s*min\(100%,\s*460px\)/,
@@ -47,18 +71,21 @@ test('food creator has explicit desktop and 640px responsive layout contracts', 
         ruleFor(creatorCss, '.choice-group'),
         /overflow-x:\s*auto/,
     );
-    assert.match(creatorCss, /@media\s*\(max-width:\s*640px\)/);
+    assert.notEqual(mobile640, '');
     assert.match(
-        creatorCss,
-        /@media\s*\(max-width:\s*640px\)[\s\S]*?\.product-swap-shell\s*\{[^}]*padding-inline:\s*16px/,
+        ruleFor(mobile640, '.product-swap-shell'),
+        /padding-inline:\s*16px/,
     );
     assert.match(
-        creatorCss,
-        /@media\s*\(max-width:\s*640px\)[\s\S]*?body\[data-template-id="food-copy-layout"\] \.template-field-image \.upload-box\s*\{[^}]*min-height:\s*220px/,
+        ruleFor(
+            mobile640,
+            'body[data-template-id="food-copy-layout"] .template-field-image .upload-box',
+        ),
+        /min-height:\s*220px/,
     );
     assert.match(
-        creatorCss,
-        /@media\s*\(max-width:\s*360px\)[\s\S]*?\.product-swap-shell\s*\{[^}]*padding-inline:\s*16px/,
+        ruleFor(mobile360, '.product-swap-shell'),
+        /padding-inline:\s*16px/,
     );
 });
 

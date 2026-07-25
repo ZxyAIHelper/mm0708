@@ -147,14 +147,6 @@ test('creator styles every schema-driven food template control', () => {
 
     assert.match(ruleFor(css, '.switch-control'), /min-height:\s*44px/);
     assert.match(
-        ruleFor(css, '.switch-control[aria-checked="true"]'),
-        /background:\s*var\(--accent\)/,
-    );
-    assert.match(
-        ruleFor(css, '.switch-control[aria-checked="true"]'),
-        /color:\s*#fff/,
-    );
-    assert.match(
         ruleFor(css, '.template-field-text textarea'),
         /width:\s*100%/,
     );
@@ -180,6 +172,33 @@ test('creator styles every schema-driven food template control', () => {
     }
     assert.match(css, /\.choice-group button:hover[\s\S]*?border-color:\s*var\(--accent\)/);
     assert.match(css, /\.remove-image:hover[\s\S]*?border-color:\s*var\(--danger\)/);
+});
+
+test('generic previews stay bounded while food previews use their 3:4 frame', () => {
+    const css = fs.readFileSync(path.join(root, 'style.css'), 'utf8');
+
+    assert.match(
+        ruleFor(css, '.template-field-image .upload-box img'),
+        /max-height:\s*260px/,
+    );
+    assert.match(
+        ruleFor(
+            css,
+            'body[data-template-id="food-copy-layout"] .template-field-image .upload-box img',
+        ),
+        /max-height:\s*none/,
+    );
+});
+
+test('enabled switches use an accessible dark-red and white combination', () => {
+    const css = fs.readFileSync(path.join(root, 'style.css'), 'utf8');
+    const enabled = ruleFor(
+        css,
+        '.switch-control[aria-checked="true"]',
+    );
+
+    assert.match(enabled, /background:\s*#c63d48/);
+    assert.match(enabled, /color:\s*#fff/);
 });
 
 test('schema field rerenders preserve creator metadata structure', () => {
