@@ -30,6 +30,38 @@ function jsonResponse(request, body, status = 200) {
     });
 }
 
+function attachPageErrorListeners(page, errors, label) {
+    page.on('pageerror', (error) => {
+        errors.push(`${label} pageerror: ${String(error)}`);
+    });
+    page.on('console', (message) => {
+        if (message.type() === 'error') {
+            errors.push(`${label} console.error: ${message.text()}`);
+        }
+    });
+    page.on('requestfailed', (request) => {
+        const requestUrl = request.url();
+        if (
+            requestUrl.startsWith('data:')
+            || requestUrl.startsWith('blob:')
+        ) {
+            return;
+        }
+        errors.push(
+            `${label} request failed: ${request.method()} ${requestUrl}`
+            + ` (${request.failure()?.errorText || 'unknown'})`,
+        );
+    });
+    page.on('response', (response) => {
+        if (response.status() >= 400) {
+            errors.push(
+                `${label} unexpected HTTP ${response.status()}: `
+                + `${response.request().method()} ${response.url()}`,
+            );
+        }
+    });
+}
+
 (async () => {
     let appUrl = '';
     let generationCount = 0;
@@ -51,6 +83,7 @@ function jsonResponse(request, body, status = 200) {
     });
     let browser;
     let page;
+    let restrictedPage;
     const errors = [];
 
     try {
@@ -70,35 +103,7 @@ function jsonResponse(request, body, status = 200) {
             height: 980,
             deviceScaleFactor: 1,
         });
-        page.on('pageerror', (error) => {
-            errors.push(String(error));
-        });
-        page.on('console', (message) => {
-            if (message.type() === 'error') {
-                errors.push(`console.error: ${message.text()}`);
-            }
-        });
-        page.on('requestfailed', (request) => {
-            const requestUrl = request.url();
-            if (
-                requestUrl.startsWith('data:')
-                || requestUrl.startsWith('blob:')
-            ) {
-                return;
-            }
-            errors.push(
-                `request failed: ${request.method()} ${requestUrl}`
-                + ` (${request.failure()?.errorText || 'unknown'})`,
-            );
-        });
-        page.on('response', (response) => {
-            if (response.status() >= 400) {
-                errors.push(
-                    `unexpected HTTP ${response.status()}: `
-                    + `${response.request().method()} ${response.url()}`,
-                );
-            }
-        });
+        attachPageErrorListeners(page, errors, 'main');
         page.on('dialog', (dialog) => dialog.accept());
         await page.setRequestInterception(true);
         page.on('request', (request) => {
@@ -244,6 +249,18 @@ function jsonResponse(request, body, status = 200) {
                 'a[href="/create.html?template=product-swap"]',
             )?.getAttribute('href') || '',
             navItems: document.querySelectorAll('.bottom-nav a').length,
+            comingSoon: document.querySelectorAll(
+                '#templateGrid article.template-card[aria-disabled="true"]',
+            ).length,
+            comingSoonCreatorHrefs: Array.from(document.querySelectorAll(
+                '#templateGrid article.template-card[aria-disabled="true"]',
+            )).filter((card) => (
+                card.hasAttribute('href')
+                || card.querySelector('a[href*="/create.html"]')
+            )).length,
+            creatorHrefs: document.querySelectorAll(
+                '#templateGrid a[href*="/create.html"]',
+            ).length,
         }));
         await Promise.all([
             page.waitForNavigation({
@@ -413,11 +430,351 @@ function jsonResponse(request, body, status = 200) {
                 errorCode: recovered.errorCode,
             };
         });
+        historyState.filterTaskIds = await page.evaluate(async () => {
+            const processing = await window.LocalTaskHistory.startTask({
+                taskType: 'product_swap',
+                input: { requirements: 'processing filter test' },
+            });
+            const failed = await window.LocalTaskHistory.startTask({
+                taskType: 'product_swap',
+                input: { requirements: 'failed filter test' },
+            });
+            await window.LocalTaskHistory.failTask(
+                failed.id,
+                'SMOKE_FILTER_FAILED',
+                'filter test failure',
+            );
+            return {
+                processing: processing.id,
+                failed: failed.id,
+            };
+        });
+        await page.reload({ waitUntil: 'networkidle0' });
+        await page.waitForFunction(() =>
+            document.querySelectorAll('.task-card').length === 4,
+        );
+        historyState.statusFilters = [];
+        for (const status of ['processing', 'completed', 'failed']) {
+            const expectedIds = await page.evaluate(async (filterStatus) => {
+                const { tasks } = await window.LocalTaskHistory.listTasks({
+                    status: filterStatus,
+                    limit: 30,
+                });
+                return tasks.map((task) => task.id).sort();
+            }, status);
+            await page.click(
+                `#workStatusFilters button[data-status="${status}"]`,
+            );
+            await page.waitForFunction(
+                ({ filterStatus, ids }) => {
+                    const cards = Array.from(
+                        document.querySelectorAll('.task-card'),
+                    );
+                    const active = document.querySelector(
+                        `#workStatusFilters button[data-status="${filterStatus}"]`,
+                    );
+                    return (
+                        cards.length === ids.length
+                        && active?.classList.contains('active')
+                        && active?.getAttribute('aria-pressed') === 'true'
+                        && cards.every((card) => (
+                            ids.includes(card.dataset.taskId)
+                            && card.querySelector('.task-status')
+                                ?.classList.contains(`status-${filterStatus}`)
+                        ))
+                    );
+                },
+                { timeout: 60000 },
+                { filterStatus: status, ids: expectedIds },
+            );
+            historyState.statusFilters.push(await page.evaluate(
+                async ({ filterStatus, ids }) => {
+                    const { tasks } = await window.LocalTaskHistory.listTasks({
+                        status: filterStatus,
+                        limit: 30,
+                    });
+                    const repoIds = tasks.map((task) => task.id).sort();
+                    const cards = Array.from(
+                        document.querySelectorAll('.task-card'),
+                    );
+                    const cardIds = cards.map(
+                        (card) => card.dataset.taskId,
+                    ).sort();
+                    return {
+                        status: filterStatus,
+                        repoCount: tasks.length,
+                        cardCount: cards.length,
+                        repoOnlyStatus: tasks.every(
+                            (task) => task.status === filterStatus,
+                        ),
+                        cardsOnlyStatus: cards.every((card) => (
+                            card.querySelector('.task-status')
+                                ?.classList.contains(`status-${filterStatus}`)
+                        )),
+                        idsMatch:
+                            JSON.stringify(repoIds) === JSON.stringify(ids)
+                            && JSON.stringify(cardIds)
+                                === JSON.stringify(repoIds),
+                    };
+                },
+                { filterStatus: status, ids: expectedIds },
+            ));
+        }
+        const allTaskCount = await page.evaluate(async () => {
+            const { tasks } = await window.LocalTaskHistory.listTasks({
+                limit: 30,
+            });
+            return tasks.length;
+        });
+        await page.click('#workStatusFilters button[data-status=""]');
+        await page.waitForFunction(
+            (expectedCount) =>
+                document.querySelectorAll('.task-card').length
+                    === expectedCount,
+            { timeout: 60000 },
+            allTaskCount,
+        );
+        historyState.restoredCards = await page.evaluate(() =>
+            document.querySelectorAll('.task-card').length,
+        );
+        await page.evaluate(
+            (taskId) => window.LocalTaskHistory.failTask(
+                taskId,
+                'SMOKE_FILTER_CLEANUP',
+                'processing filter test complete',
+            ),
+            historyState.filterTaskIds.processing,
+        );
+
+        await Promise.all([
+            page.waitForNavigation({
+                waitUntil: 'networkidle0',
+                timeout: 60000,
+            }),
+            page.click('.bottom-nav a[href="/profile.html"]'),
+        ]);
+        await page.type('#shopName', '山野咖啡');
+        await page.type('#shopIndustry', '咖啡');
+        await page.type('#shopSlogan', '认真做咖啡');
+        await page.click('#shopForm button[type="submit"]');
+        await page.waitForFunction(() =>
+            document.getElementById('profileNotice')?.textContent
+                === '店铺资料已保存',
+        );
+        await page.type('#productName', '冰拿铁');
+        await page.type('#productSellingPoint', '清爽');
+        await page.type('#productPrice', '18');
+        await page.click('#productForm button[type="submit"]');
+        await page.waitForFunction(() => (
+            document.getElementById('profileNotice')?.textContent
+                === '产品已添加'
+            && document.querySelectorAll('.product-row').length === 1
+        ));
+        await page.reload({ waitUntil: 'networkidle0' });
+        const profileState = await page.evaluate(() => ({
+            title: document.querySelector('h1')?.textContent || '',
+            shopName: document.getElementById('shopName')?.value || '',
+            shopIndustry:
+                document.getElementById('shopIndustry')?.value || '',
+            shopSlogan: document.getElementById('shopSlogan')?.value || '',
+            products: Array.from(document.querySelectorAll('.product-row'))
+                .map((row) => row.textContent.replace(/\s+/g, ' ').trim()),
+        }));
+
+        const restrictedErrorStart = errors.length;
+        restrictedPage = await browser.newPage();
+        attachPageErrorListeners(
+            restrictedPage,
+            errors,
+            'restricted-profile',
+        );
+        await restrictedPage.evaluateOnNewDocument(() => {
+            Object.defineProperty(window, 'localStorage', {
+                configurable: true,
+                get() {
+                    throw new DOMException(
+                        'Storage access is blocked',
+                        'SecurityError',
+                    );
+                },
+            });
+        });
+        await restrictedPage.goto(`${appUrl}/profile.html`, {
+            waitUntil: 'networkidle0',
+            timeout: 60000,
+        });
+        await restrictedPage.waitForFunction(() =>
+            !document.getElementById('profileNotice')?.hidden,
+        );
+        const restrictedProfileState = await restrictedPage.evaluate(() => ({
+            notice:
+                document.getElementById('profileNotice')?.textContent || '',
+            disabledSubmits: document.querySelectorAll(
+                'form button[type="submit"]:disabled',
+            ).length,
+        }));
+        restrictedProfileState.errorDelta =
+            errors.length - restrictedErrorStart;
+        await restrictedPage.close();
+        restrictedPage = null;
+
+        const responsiveState = [];
+        const responsivePages = [
+            {
+                name: 'home',
+                path: '/',
+                action:
+                    '#templateGrid '
+                    + 'a[href="/create.html?template=product-swap"]',
+            },
+            {
+                name: 'creator',
+                path: '/create.html?template=product-swap',
+                action: '#generateButton',
+            },
+            {
+                name: 'history',
+                path: '/history.html',
+                action: '.task-card .task-card-actions button',
+            },
+            {
+                name: 'profile',
+                path: '/profile.html',
+                action: '#productForm button[type="submit"]',
+            },
+        ];
+        for (const width of [360, 390, 430]) {
+            await page.setViewport({
+                width,
+                height: 980,
+                deviceScaleFactor: 1,
+            });
+            for (const responsivePage of responsivePages) {
+                await page.goto(`${appUrl}${responsivePage.path}`, {
+                    waitUntil: 'networkidle0',
+                    timeout: 60000,
+                });
+                if (responsivePage.name === 'home') {
+                    await page.waitForSelector(
+                        '#templateGrid .template-card',
+                    );
+                }
+                if (responsivePage.name === 'creator') {
+                    const responsiveTarget = await page.$('#targetInput');
+                    await responsiveTarget.uploadFile(targetPath);
+                    await page.waitForSelector(
+                        '[data-slot="target"].has-preview',
+                    );
+                }
+                if (responsivePage.name === 'history') {
+                    await page.waitForSelector('.task-card');
+                }
+                responsiveState.push(await page.evaluate(
+                    async ({ name, actionSelector, viewportWidth }) => {
+                        const action = document.querySelector(actionSelector);
+                        action.scrollIntoView({
+                            block: 'end',
+                            inline: 'nearest',
+                        });
+                        await new Promise((resolve) =>
+                            requestAnimationFrame(() =>
+                                requestAnimationFrame(resolve),
+                            ),
+                        );
+                        const documentElement = document.documentElement;
+                        const nav = document.querySelector('.bottom-nav');
+                        const actionRect = action.getBoundingClientRect();
+                        const navRect = nav.getBoundingClientRect();
+                        const pointX = Math.min(
+                            window.innerWidth - 1,
+                            Math.max(
+                                0,
+                                actionRect.left + actionRect.width / 2,
+                            ),
+                        );
+                        const pointY = Math.min(
+                            window.innerHeight - 1,
+                            Math.max(
+                                0,
+                                actionRect.top + actionRect.height / 2,
+                            ),
+                        );
+                        const hit = document.elementFromPoint(pointX, pointY);
+                        const shell = document.querySelector(
+                            '.product-swap-shell',
+                        );
+                        const preview = document.querySelector(
+                            '[data-slot="target"] img',
+                        );
+                        const previewSlot = document.querySelector(
+                            '[data-slot="target"]',
+                        );
+                        const filters = document.querySelector(
+                            '#workStatusFilters',
+                        );
+                        const saveButtons = Array.from(
+                            document.querySelectorAll(
+                                '.settings-card button[type="submit"]',
+                            ),
+                        );
+                        const shellRect = shell?.getBoundingClientRect();
+                        const previewRect = preview?.getBoundingClientRect();
+                        const previewSlotRect =
+                            previewSlot?.getBoundingClientRect();
+                        const filterStyle = filters
+                            ? getComputedStyle(filters)
+                            : null;
+                        return {
+                            name,
+                            width: viewportWidth,
+                            noPageOverflow:
+                                documentElement.scrollWidth
+                                    <= documentElement.clientWidth + 1,
+                            actionAboveNav:
+                                actionRect.bottom <= navRect.top + 1,
+                            actionHit:
+                                hit === action || action.contains(hit),
+                            creatorShellFits: !shellRect
+                                || shellRect.width <= 460,
+                            previewFits: !previewRect || (
+                                previewRect.left
+                                    >= previewSlotRect.left - 1
+                                && previewRect.right
+                                    <= previewSlotRect.right + 1
+                                && previewRect.right
+                                    <= documentElement.clientWidth + 1
+                            ),
+                            filtersFit: !filters || (
+                                filters.scrollWidth
+                                    <= filters.clientWidth + 1
+                                || ['auto', 'scroll'].includes(
+                                    filterStyle.overflowX,
+                                )
+                            ),
+                            profileButtonsFit: !saveButtons.length
+                                || saveButtons.every(
+                                    (button) =>
+                                        button.getBoundingClientRect().height
+                                            >= 48,
+                                ),
+                        };
+                    },
+                    {
+                        name: responsivePage.name,
+                        actionSelector: responsivePage.action,
+                        viewportWidth: width,
+                    },
+                ));
+            }
+        }
 
         console.log(JSON.stringify({
             homeState,
             state,
             historyState,
+            profileState,
+            restrictedProfileState,
+            responsiveState,
             errors,
         }, null, 2));
 
@@ -427,6 +784,9 @@ function jsonResponse(request, body, status = 200) {
             || homeState.liveHref
                 !== '/create.html?template=product-swap'
             || homeState.navItems !== 4
+            || homeState.comingSoon !== 3
+            || homeState.comingSoonCreatorHrefs !== 0
+            || homeState.creatorHrefs !== 1
             || homeState.creatorUrl
                 !== `${appUrl}/create.html?template=product-swap`
             || state.title !== '爆款场景同款图'
@@ -457,10 +817,46 @@ function jsonResponse(request, body, status = 200) {
             || historyState.recoveredTask.status !== 'failed'
             || historyState.recoveredTask.errorCode
                 !== 'GENERATION_INTERRUPTED'
+            || !historyState.filterTaskIds.processing
+            || !historyState.filterTaskIds.failed
+            || historyState.statusFilters.length !== 3
+            || historyState.statusFilters.some((filter) => (
+                filter.repoCount < 1
+                || filter.cardCount !== filter.repoCount
+                || !filter.repoOnlyStatus
+                || !filter.cardsOnlyStatus
+                || !filter.idsMatch
+            ))
+            || historyState.restoredCards !== allTaskCount
+            || profileState.title !== '我的店铺'
+            || profileState.shopName !== '山野咖啡'
+            || profileState.shopIndustry !== '咖啡'
+            || profileState.shopSlogan !== '认真做咖啡'
+            || profileState.products.length !== 1
+            || !profileState.products[0].includes('冰拿铁')
+            || !profileState.products[0].includes('清爽')
+            || !profileState.products[0].includes('18')
+            || restrictedProfileState.notice
+                !== '浏览器存储不可用，请检查隐私设置后重试'
+            || restrictedProfileState.disabledSubmits !== 2
+            || restrictedProfileState.errorDelta !== 0
+            || responsiveState.length !== 12
+            || responsiveState.some((responsive) => (
+                !responsive.noPageOverflow
+                || !responsive.actionAboveNav
+                || !responsive.actionHit
+                || !responsive.creatorShellFits
+                || !responsive.previewFits
+                || !responsive.filtersFit
+                || !responsive.profileButtonsFit
+            ))
         ) {
             process.exitCode = 1;
         }
     } finally {
+        if (restrictedPage && !restrictedPage.isClosed()) {
+            await restrictedPage.close();
+        }
         if (browser) {
             await browser.close();
         }
