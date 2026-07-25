@@ -72,89 +72,10 @@
         </section>
 
         <form id="swapForm" novalidate>
-            <section class="upload-field" data-slot="target">
-                <label for="targetInput">
-                    目标图（样图模板）
-                    <span aria-hidden="true">*</span>
-                </label>
-                <input
-                    id="targetInput"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    hidden
-                >
-                <button
-                    class="upload-box"
-                    data-input="targetInput"
-                    type="button"
-                >
-                    <span>点击上传</span>
-                </button>
-                <button
-                    class="remove-image"
-                    data-remove="target"
-                    type="button"
-                    hidden
-                >删除</button>
-            </section>
-
-            <section class="upload-field" data-slot="product">
-                <label for="productInput">
-                    产品图
-                    <small>（选填）</small>
-                </label>
-                <input
-                    id="productInput"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    hidden
-                >
-                <button
-                    class="upload-box"
-                    data-input="productInput"
-                    type="button"
-                >
-                    <span>点击上传</span>
-                </button>
-                <button
-                    class="remove-image"
-                    data-remove="product"
-                    type="button"
-                    hidden
-                >删除</button>
-            </section>
-
-            <section class="upload-field" data-slot="scene">
-                <label for="sceneInput">
-                    场景图
-                    <small>（选填）</small>
-                </label>
-                <input
-                    id="sceneInput"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    hidden
-                >
-                <button
-                    class="upload-box dashed"
-                    data-input="sceneInput"
-                    type="button"
-                >
-                    <span>点击上传</span>
-                </button>
-                <button
-                    class="remove-image"
-                    data-remove="scene"
-                    type="button"
-                    hidden
-                >删除</button>
-            </section>
-
-            <textarea
-                id="requirementsInput"
-                maxlength="200"
-                placeholder="额外要求（选填，仅微调风格/细节，最多200字）"
-            ></textarea>
+            <div
+                id="templateFields"
+                class="template-fields"
+            ></div>
 
             <p
                 id="formError"
@@ -231,6 +152,7 @@
 
     <script src="/template-catalog.js"></script>
     <script src="/templates.js"></script>
+    <script src="/creator-form.js"></script>
     <script src="/creator-meta.js"></script>
     <script src="/api-client.js"></script>
     <script src="/local-history.js"></script>

@@ -51,11 +51,23 @@ function buildGeneratePayload(state) {
     };
 }
 
-function buildRefinePayload(state, requirements) {
+function buildRefinePayload(
+    initialPayloadOrState,
+    stateOrRequirements,
+    maybeRequirements,
+) {
+    const isSchemaCall = maybeRequirements !== undefined;
+    const state = isSchemaCall
+        ? stateOrRequirements
+        : initialPayloadOrState;
+    const initialPayload = isSchemaCall
+        ? initialPayloadOrState
+        : buildGeneratePayload(state);
+    const requirements = isSchemaCall
+        ? maybeRequirements
+        : stateOrRequirements;
     return {
-        targetImage: state.target || '',
-        productImage: state.product || '',
-        sceneImage: state.scene || '',
+        ...initialPayload,
         previousImage: state.result || '',
         conversationId: state.conversationId || '',
         messages: Array.isArray(state.messages)
@@ -67,11 +79,23 @@ function buildRefinePayload(state, requirements) {
 
 function historyInputFromPayload(payload, isRefinement = false) {
     return {
+        ...(payload?.templateId
+            ? { templateId: String(payload.templateId) }
+            : {}),
+        ...(payload?.aspectRatio
+            ? { aspectRatio: String(payload.aspectRatio) }
+            : {}),
+        ...(typeof payload?.showDateTime === 'boolean'
+            ? { showDateTime: payload.showDateTime }
+            : {}),
+        ...(payload?.generatedAt
+            ? { generatedAt: String(payload.generatedAt) }
+            : {}),
         requirements: String(payload?.requirements || '').trim(),
         isRefinement: Boolean(isRefinement),
         conversationId: String(payload?.conversationId || ''),
         messages: Array.isArray(payload?.messages)
-            ? payload.messages.map((message) => ({
+            ? payload.messages.slice(-6).map((message) => ({
                 role: String(message?.role || ''),
                 content: String(message?.content || ''),
             }))
@@ -198,19 +222,32 @@ function readFileAsDataUrl(file) {
     });
 }
 
+function readImageDimensions(source) {
+    return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve({
+            width: image.naturalWidth,
+            height: image.naturalHeight,
+        });
+        image.onerror = () => reject(
+            new Error('图片无法识别，请重新上传'),
+        );
+        image.src = source;
+    });
+}
+
 function boot() {
     const activeTemplate = window.CreatorMeta?.resolveCreatorTemplate(window.location.search);
+    const CreatorForm = window.CreatorForm;
     const state = {
-        target: '',
-        product: '',
-        scene: '',
-        requirements: '',
+        values: CreatorForm.initialValues(activeTemplate),
         result: '',
         conversationId: '',
         messages: [],
         isGenerating: false,
         isRefining: false,
     };
+    let lastInitialPayload = null;
     const apiBase = resolveApiBase(
         window.API_BASE_URL || '',
         window.location.hostname,
@@ -233,28 +270,21 @@ function boot() {
         document.getElementById('resultSection');
     const resultImage =
         document.getElementById('resultImage');
-    const requirementsInput =
-        document.getElementById('requirementsInput');
+    const templateFields =
+        document.getElementById('templateFields');
     const refineForm = document.getElementById('refineForm');
     const refineInput = document.getElementById('refineInput');
     const refineButton = document.getElementById('refineButton');
     const chatTimeline = document.getElementById('chatTimeline');
-    const slots = {
-        target: document.querySelector(
-            '[data-slot="target"]',
+    const fields = Array.isArray(activeTemplate?.fields)
+        ? activeTemplate.fields
+        : [];
+    const fieldSections = Object.fromEntries(fields.map((field) => [
+        field.key,
+        templateFields.querySelector(
+            `[data-field-key="${field.key}"]`,
         ),
-        product: document.querySelector(
-            '[data-slot="product"]',
-        ),
-        scene: document.querySelector(
-            '[data-slot="scene"]',
-        ),
-    };
-    const inputs = {
-        target: document.getElementById('targetInput'),
-        product: document.getElementById('productInput'),
-        scene: document.getElementById('sceneInput'),
-    };
+    ]));
 
     function showError(message) {
         formError.textContent = message;
@@ -281,10 +311,18 @@ function boot() {
                     templateId: activeTemplate?.id || 'product-swap',
                 },
                 images: [
-                    { role: 'target', source: payload.targetImage },
-                    { role: 'product', source: payload.productImage },
-                    { role: 'scene', source: payload.sceneImage },
-                    { role: 'previous', source: payload.previousImage },
+                    ...fields
+                        .filter((field) => field.type === 'image')
+                        .map((field) => ({
+                            role: field.role || field.key,
+                            source: payload[field.key],
+                        })),
+                    ...(payload.previousImage
+                        ? [{
+                            role: 'previous',
+                            source: payload.previousImage,
+                        }]
+                        : []),
                 ],
             });
         } catch {
@@ -400,12 +438,13 @@ function boot() {
                 activeTemplate?.creditCost ?? 3
             } 豆额度）`;
 
-        for (const input of Object.values(inputs)) {
-            input.disabled = value;
+        for (const control of templateFields.querySelectorAll(
+            'input, button, textarea',
+        )) {
+            control.disabled = value;
         }
-
-        for (const slot of Object.values(slots)) {
-            slot.classList.toggle('is-disabled', value);
+        for (const section of Object.values(fieldSections)) {
+            section.classList.toggle('is-disabled', value);
         }
     }
 
@@ -431,14 +470,14 @@ function boot() {
         chatTimeline.scrollTop = chatTimeline.scrollHeight;
     }
 
-    function renderSlot(name) {
-        const slot = slots[name];
-        const box = slot.querySelector('.upload-box');
+    function renderImageField(field) {
+        const section = fieldSections[field.key];
+        const box = section.querySelector('.upload-box');
         const removeButton =
-            slot.querySelector('.remove-image');
-        const value = state[name];
+            section.querySelector('.remove-image');
+        const value = state.values[field.key];
 
-        slot.classList.toggle(
+        section.classList.toggle(
             'has-preview',
             Boolean(value),
         );
@@ -448,7 +487,7 @@ function boot() {
         if (value) {
             const preview = document.createElement('img');
             preview.src = value;
-            preview.alt = `${name} 图片预览`;
+            preview.alt = `${field.label}预览`;
             box.appendChild(preview);
         } else {
             const hint = document.createElement('span');
@@ -464,14 +503,45 @@ function boot() {
         return asset?.sourceUrl || '';
     }
 
-    async function hydrateTaskState(task) {
-        for (const role of ['target', 'product', 'scene']) {
-            const asset = task.assets?.find((item) => item.role === role);
-            state[role] = await sourceForAsset(asset);
-            renderSlot(role);
+    function renderNonImageField(field) {
+        const section = fieldSections[field.key];
+        if (field.type === 'choice') {
+            for (const button of section.querySelectorAll('[data-value]')) {
+                const selected =
+                    button.dataset.value === state.values[field.key];
+                button.setAttribute('aria-checked', String(selected));
+                button.setAttribute('aria-pressed', String(selected));
+            }
+        } else if (field.type === 'boolean') {
+            const button = section.querySelector('[role="switch"]');
+            const checked = Boolean(state.values[field.key]);
+            button.setAttribute('aria-checked', String(checked));
+            button.textContent = checked ? '已开启' : '已关闭';
+        } else if (field.type === 'text') {
+            section.querySelector('textarea').value =
+                state.values[field.key] || '';
         }
-        state.requirements = task.input?.requirements || '';
-        requirementsInput.value = state.requirements;
+    }
+
+    async function hydrateTaskState(task) {
+        for (const field of fields) {
+            if (field.type === 'image') {
+                const role = field.role || field.key;
+                const asset = task.assets?.find(
+                    (item) => item.role === role,
+                );
+                state.values[field.key] = await sourceForAsset(asset);
+                renderImageField(field);
+            } else if (task.input?.[field.key] !== undefined) {
+                state.values[field.key] = task.input[field.key];
+                renderNonImageField(field);
+            }
+        }
+        lastInitialPayload = CreatorForm.buildTemplatePayload(
+            activeTemplate,
+            state.values,
+            task.input?.generatedAt || new Date().toISOString(),
+        );
         state.conversationId = task.input?.conversationId || '';
         state.messages = Array.isArray(task.input?.messages)
             ? task.input.messages.map((message) => ({ ...message }))
@@ -485,10 +555,13 @@ function boot() {
             state.result = task.result.imageUrl;
             state.conversationId = task.result.conversationId
                 || state.conversationId;
-            if (state.requirements.trim()) {
+            const requirements = String(
+                state.values.requirements || '',
+            ).trim();
+            if (requirements) {
                 state.messages.push({
                     role: 'user',
-                    content: state.requirements.trim(),
+                    content: requirements,
                 });
             }
             state.messages.push({
@@ -517,7 +590,7 @@ function boot() {
             rememberedTask = null;
         }
         const processingTask = await localHistory
-            .latestProcessingTask('product_swap');
+            .latestProcessingTask(activeTemplate?.taskType || 'product_swap');
         let task = rememberedTask?.status === 'processing'
             ? rememberedTask
             : (processingTask || rememberedTask);
@@ -532,9 +605,19 @@ function boot() {
         const isRefinement = Boolean(task.input?.isRefinement);
         if (task.status === 'processing') {
             if (!task.dispatchedAt) {
+                const restoredInitialPayload =
+                    CreatorForm.buildTemplatePayload(
+                        activeTemplate,
+                        state.values,
+                        task.input?.generatedAt || new Date().toISOString(),
+                    );
                 const payload = isRefinement
-                    ? buildRefinePayload(state, state.requirements)
-                    : buildGeneratePayload(state);
+                    ? buildRefinePayload(
+                        restoredInitialPayload,
+                        state,
+                        state.values.requirements,
+                    )
+                    : restoredInitialPayload;
                 const dispatched = await dispatchBackgroundGeneration(
                     task,
                     payload,
@@ -570,7 +653,7 @@ function boot() {
         setRefining(false);
     }
 
-    async function acceptFile(name, file) {
+    async function acceptFile(field, file) {
         if (!file || state.isGenerating) {
             return;
         }
@@ -582,50 +665,89 @@ function boot() {
         }
 
         try {
-            state[name] = await readFileAsDataUrl(file);
-            inputs[name].value = '';
-            renderSlot(name);
+            const source = await readFileAsDataUrl(file);
+            const dimensions = await readImageDimensions(source);
+            const dimensionError = CreatorForm.validateImageDimensions(
+                dimensions.width,
+                dimensions.height,
+            );
+            if (dimensionError) {
+                showError(dimensionError.message);
+                return;
+            }
+            state.values[field.key] = source;
+            const input = fieldSections[field.key]
+                .querySelector('input[type="file"]');
+            input.value = '';
+            renderImageField(field);
             showError('');
         } catch (error) {
             showError(error.message || '图片读取失败');
         }
     }
 
-    for (const [name, input] of Object.entries(inputs)) {
-        input.addEventListener('change', () => {
-            acceptFile(name, input.files[0]);
+    function focusField(fieldKey) {
+        const section = fieldSections[fieldKey];
+        section?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
         });
+        section?.querySelector(
+            '.upload-box, textarea, button',
+        )?.focus();
+    }
 
-        const slot = slots[name];
-        const box = slot.querySelector('.upload-box');
-
-        box.addEventListener('click', () => {
-            input.click();
-        });
-        box.addEventListener('dragover', (event) => {
-            event.preventDefault();
-            box.classList.add('dragover');
-        });
-        box.addEventListener('dragleave', () => {
-            box.classList.remove('dragover');
-        });
-        box.addEventListener('drop', (event) => {
-            event.preventDefault();
-            box.classList.remove('dragover');
-            acceptFile(
-                name,
-                event.dataTransfer.files[0],
-            );
-        });
-
-        slot.querySelector('.remove-image')
-            .addEventListener('click', () => {
-                state[name] = '';
-                input.value = '';
-                renderSlot(name);
+    for (const field of fields) {
+        const section = fieldSections[field.key];
+        if (field.type === 'image') {
+            const input = section.querySelector('input[type="file"]');
+            const box = section.querySelector('.upload-box');
+            input.addEventListener('change', () => {
+                acceptFile(field, input.files[0]);
             });
-
-        renderSlot(name);
+            box.addEventListener('click', () => input.click());
+            box.addEventListener('dragover', (event) => {
+                event.preventDefault();
+                box.classList.add('dragover');
+            });
+            box.addEventListener('dragleave', () => {
+                box.classList.remove('dragover');
+            });
+            box.addEventListener('drop', (event) => {
+                event.preventDefault();
+                box.classList.remove('dragover');
+                acceptFile(field, event.dataTransfer.files[0]);
+            });
+            section.querySelector('.remove-image')
+                .addEventListener('click', () => {
+                    state.values[field.key] = '';
+                    input.value = '';
+                    renderImageField(field);
+                });
+            renderImageField(field);
+        } else if (field.type === 'choice') {
+            for (const button of section.querySelectorAll('[data-value]')) {
+                button.addEventListener('click', () => {
+                    state.values[field.key] = button.dataset.value;
+                    renderNonImageField(field);
+                });
+            }
+            renderNonImageField(field);
+        } else if (field.type === 'boolean') {
+            section.querySelector('[role="switch"]')
+                .addEventListener('click', () => {
+                    state.values[field.key] =
+                        !state.values[field.key];
+                    renderNonImageField(field);
+                });
+            renderNonImageField(field);
+        } else if (field.type === 'text') {
+            section.querySelector('textarea')
+                .addEventListener('input', (event) => {
+                    state.values[field.key] = event.target.value;
+                });
+            renderNonImageField(field);
+        }
     }
 
     async function submitGeneration() {
@@ -633,17 +755,13 @@ function boot() {
             return;
         }
 
-        state.requirements = requirementsInput.value;
-
-        if (!state.target) {
-            showError('请上传目标图');
-            slots.target.querySelector('.upload-box').focus();
-            return;
-        }
-
-        if (state.requirements.trim().length > 200) {
-            showError('额外要求不能超过 200 字');
-            requirementsInput.focus();
+        const validation = CreatorForm.validateValues(
+            activeTemplate,
+            state.values,
+        );
+        if (validation) {
+            showError(validation.message);
+            focusField(validation.field);
             return;
         }
 
@@ -653,17 +771,25 @@ function boot() {
         let localTask = null;
 
         try {
-            const payload = buildGeneratePayload(state);
+            const payload = CreatorForm.buildTemplatePayload(
+                activeTemplate,
+                state.values,
+                new Date().toISOString(),
+            );
+            lastInitialPayload = payload;
             localTask = await startLocalTask(payload);
             const data = await runGeneration(localTask, payload);
 
             state.result = data.imageUrl;
             state.conversationId = data.conversationId || '';
             state.messages = [];
-            if (state.requirements.trim()) {
+            const requirements = String(
+                state.values.requirements || '',
+            ).trim();
+            if (requirements) {
                 state.messages.push({
                     role: 'user',
-                    content: state.requirements.trim(),
+                    content: requirements,
                 });
             }
             state.messages.push({
@@ -720,7 +846,15 @@ function boot() {
         let localTask = null;
 
         try {
-            const payload = buildRefinePayload(state, correction);
+            const payload = buildRefinePayload(
+                lastInitialPayload || CreatorForm.buildTemplatePayload(
+                    activeTemplate,
+                    state.values,
+                    new Date().toISOString(),
+                ),
+                state,
+                correction,
+            );
             localTask = await startLocalTask(payload, true);
             const data = await runGeneration(localTask, payload);
 

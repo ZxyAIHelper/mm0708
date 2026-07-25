@@ -17,6 +17,7 @@ test('build emits only deployable public assets', async () => {
         'app.css',
         'assets',
         'create.html',
+        'creator-form.js',
         'creator-meta.js',
         'generation-worker.js',
         'history.html',

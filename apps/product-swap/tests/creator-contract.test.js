@@ -14,10 +14,9 @@ test('creator page exposes the template-driven generator controls', () => {
     for (const id of [
         'creatorTitle',
         'creatorSummary',
-        'targetInput',
-        'productInput',
-        'sceneInput',
-        'requirementsInput',
+        'swapForm',
+        'templateFields',
+        'formError',
         'generateButton',
         'resultSection',
         'refineForm',
@@ -25,19 +24,22 @@ test('creator page exposes the template-driven generator controls', () => {
         assert.match(html, new RegExp(`id="${id}"`));
     }
 
-    assert.match(html, /templates\.js/);
-    assert.match(html, /creator-meta\.js/);
-    assert.match(html, /script\.js/);
-
-    const catalogScript = html.indexOf(
-        '<script src="/template-catalog.js"></script>',
-    );
-    const templateScript = html.indexOf(
-        '<script src="/templates.js"></script>',
-    );
-    assert.ok(catalogScript >= 0);
-    assert.ok(templateScript >= 0);
-    assert.ok(catalogScript < templateScript);
+    assert.doesNotMatch(html, /id="(?:target|product|scene)Input"/);
+    const scripts = [
+        '/template-catalog.js',
+        '/templates.js',
+        '/creator-form.js',
+        '/creator-meta.js',
+        '/api-client.js',
+        '/local-history.js',
+        '/script.js',
+    ];
+    let previousIndex = -1;
+    for (const script of scripts) {
+        const index = html.indexOf(`<script src="${script}"></script>`);
+        assert.ok(index > previousIndex, `${script} is in dependency order`);
+        previousIndex = index;
+    }
 });
 
 test('resolves only live creator templates', () => {
@@ -59,4 +61,18 @@ test('restores the active template generation label after loading', () => {
 
     assert.match(source, /activeTemplate\?\.outputLabel/);
     assert.match(source, /activeTemplate\?\.creditCost/);
+});
+
+test('creator metadata renders all supported schema field types', () => {
+    const meta = require('../creator-meta');
+    const source = fs.readFileSync(
+        path.join(root, 'creator-meta.js'),
+        'utf8',
+    );
+
+    assert.equal(typeof meta.renderTemplateFields, 'function');
+    assert.match(source, /template-field-\$\{field\.type\}/);
+    assert.match(source, /role', 'radiogroup'/);
+    assert.match(source, /role', 'switch'/);
+    assert.match(source, /field\.maxLength/);
 });

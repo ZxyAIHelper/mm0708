@@ -23,6 +23,7 @@ const publicEntries = [
     'home.js',
     'profile.js',
     'templates.js',
+    'creator-form.js',
     'creator-meta.js',
     'assets',
 ];

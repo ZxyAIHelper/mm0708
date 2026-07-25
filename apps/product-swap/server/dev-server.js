@@ -30,6 +30,7 @@ const PUBLIC_STATIC_PATHS = new Set([
     'home.js',
     'profile.js',
     'templates.js',
+    'creator-form.js',
     'creator-meta.js',
 ].map((entry) => path.join(APP_ROOT, entry)));
 const SUPPORTED_MIME_TYPES = new Map([

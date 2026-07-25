@@ -22,10 +22,8 @@ test('page exposes the screenshot-matching controls', () => {
     );
 
     for (const id of [
-        'targetInput',
-        'productInput',
-        'sceneInput',
-        'requirementsInput',
+        'templateFields',
+        'formError',
         'generateButton',
         'resultImage',
         'chatTimeline',
@@ -36,7 +34,7 @@ test('page exposes the screenshot-matching controls', () => {
     }
 
     assert.match(html, /生成（消耗 3 豆额度）/);
-    assert.match(html, /最多200字/);
+    assert.match(html, /id="swapForm" novalidate/);
 });
 
 test('builds a bounded conversational refinement payload', () => {
@@ -57,6 +55,33 @@ test('builds a bounded conversational refinement payload', () => {
     assert.equal(payload.requirements, '盘子改成白色');
     assert.equal(payload.messages.length, 6);
     assert.equal(payload.messages[0].content, 'message 2');
+});
+
+test('refinement preserves the initial template payload', () => {
+    const payload = buildRefinePayload({
+        templateId: 'food-copy-layout',
+        targetImage: 'target',
+        aspectRatio: '3:4',
+        showDateTime: true,
+        generatedAt: '2026-07-25T10:00:00.000Z',
+        requirements: 'initial',
+    }, {
+        result: 'previous',
+        conversationId: 'conversation_1',
+        messages: [{ role: 'assistant', content: 'first result' }],
+    }, ' move the text ');
+
+    assert.deepEqual(payload, {
+        templateId: 'food-copy-layout',
+        targetImage: 'target',
+        aspectRatio: '3:4',
+        showDateTime: true,
+        generatedAt: '2026-07-25T10:00:00.000Z',
+        requirements: 'move the text',
+        previousImage: 'previous',
+        conversationId: 'conversation_1',
+        messages: [{ role: 'assistant', content: 'first result' }],
+    });
 });
 
 test('uses same-origin locally and the shared API in production', () => {
@@ -133,17 +158,24 @@ test('root generator safely falls back without creator metadata', () => {
 });
 
 test('preserves the complete non-image refinement input in history', () => {
-    const payload = buildRefinePayload({
-        target: 'data:image/png;base64,dGFyZ2V0',
-        product: 'data:image/png;base64,cHJvZHVjdA==',
-        scene: '',
-        result: 'https://example.com/previous.png',
+    const payload = {
+        templateId: 'food-copy-layout',
+        targetImage: 'data:image/png;base64,dGFyZ2V0',
+        aspectRatio: '3:4',
+        showDateTime: true,
+        generatedAt: '2026-07-25T10:00:00.000Z',
+        requirements: 'make it white',
+        previousImage: 'https://example.com/previous.png',
         conversationId: 'conversation_1',
         messages: [{ role: 'user', content: 'first request' }],
-    }, 'make it white');
+    };
     const input = historyInputFromPayload(payload, true);
 
     assert.deepEqual(input, {
+        templateId: 'food-copy-layout',
+        aspectRatio: '3:4',
+        showDateTime: true,
+        generatedAt: '2026-07-25T10:00:00.000Z',
         requirements: 'make it white',
         isRefinement: true,
         conversationId: 'conversation_1',
@@ -151,6 +183,19 @@ test('preserves the complete non-image refinement input in history', () => {
     });
     assert.equal('targetImage' in input, false);
     assert.equal('previousImage' in input, false);
+});
+
+test('generation binds schema fields and builds a template payload', () => {
+    const source = fs.readFileSync(
+        path.join(root, 'script.js'),
+        'utf8',
+    );
+
+    assert.match(source, /CreatorForm\.initialValues\(activeTemplate\)/);
+    assert.match(source, /CreatorForm\.validateValues/);
+    assert.match(source, /CreatorForm\.buildTemplatePayload/);
+    assert.match(source, /activeTemplate\.fields/);
+    assert.doesNotMatch(source, /getElementById\('productInput'\)/);
 });
 
 test('builds the versioned service worker generation message', () => {

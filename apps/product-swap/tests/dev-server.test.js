@@ -206,6 +206,21 @@ test('serves the public template catalog for GET and HEAD', async (t) => {
     assert.equal(await headResponse.text(), '');
 });
 
+test('serves the schema-driven creator form helper', async (t) => {
+    const server = createProductSwapServer();
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    t.after(() => server.close());
+
+    const { port } = server.address();
+    const response = await fetch(
+        `http://127.0.0.1:${port}/creator-form.js`,
+    );
+
+    assert.equal(response.status, 200);
+    assert.match(await response.text(), /global\.CreatorForm/);
+});
+
 test('returns 500 when the public template catalog cannot serialize', async (t) => {
     const recursiveCatalog = {};
     recursiveCatalog.self = recursiveCatalog;
