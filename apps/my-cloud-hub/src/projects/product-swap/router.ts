@@ -91,6 +91,7 @@ type ProductSwapRouterOptions = {
 }
 
 const MAX_MAP_BYTES = 2 * 1024 * 1024
+const MAP_UPSTREAM_REFERER = 'https://product-swap.mm0708.top/'
 
 function chatProviderStatus(code: ChatDraftProviderError['code']) {
     if (code === 'CHAT_PROVIDER_NOT_CONFIGURED') return 503 as const
@@ -232,6 +233,9 @@ export function createProductSwapRouter(
         let upstream: Response
         try {
             upstream = await fetchImpl(upstreamUrl.toString(), {
+                headers: {
+                    Referer: MAP_UPSTREAM_REFERER,
+                },
                 signal: AbortSignal.timeout(15_000),
             })
         } catch {
@@ -246,8 +250,12 @@ export function createProductSwapRouter(
         const contentLength = Number(
             upstream.headers.get('content-length'),
         )
+        const contentType = (
+            upstream.headers.get('content-type') || ''
+        ).toLowerCase()
         if (
             !upstream.ok
+            || !contentType.startsWith('image/')
             || (
                 Number.isFinite(contentLength)
                 && contentLength > MAX_MAP_BYTES
@@ -274,8 +282,7 @@ export function createProductSwapRouter(
         return new Response(bytes, {
             status: 200,
             headers: {
-                'Content-Type':
-                    upstream.headers.get('content-type') || 'image/png',
+                'Content-Type': contentType,
                 'Cache-Control': 'public, max-age=86400',
             },
         })

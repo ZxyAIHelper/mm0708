@@ -147,9 +147,45 @@ describe('product swap router', () => {
         expect(url.searchParams.get('markers')).toContain(
             '39.998766,116.273938',
         )
+        expect(fetchMock.mock.calls[0][1]).toMatchObject({
+            headers: {
+                Referer: 'https://product-swap.mm0708.top/',
+            },
+        })
         expect(response.headers.get('Cache-Control')).toBe(
             'public, max-age=86400',
         )
+    })
+
+    it('rejects a Tencent error body returned with status 200', async () => {
+        const fetchMock = vi.fn(async () => Response.json({
+            status: 110,
+            message: 'source is not authorized',
+        }))
+        const provider: ProductSwapProvider = {
+            name: 'fake',
+            generate: async () => ({ imageUrl: targetImage }),
+        }
+        const app = new Hono()
+        app.route('/api/product-swap', createProductSwapRouter(
+            () => provider,
+            noOpArchive,
+            { fetchImpl: fetchMock },
+        ))
+
+        const response = await app.request(
+            '/api/product-swap/map-preview?lat=39.998766&lng=116.273938',
+            undefined,
+            {
+                TENCENT_MAP_KEY: 'map-key',
+                TENCENT_MAP_REFERER: 'product-swap',
+            },
+        )
+
+        expect(response.status).toBe(502)
+        expect(await response.json()).toMatchObject({
+            error: { code: 'MAP_PREVIEW_FAILED' },
+        })
     })
 
     it.each([
