@@ -8,10 +8,52 @@ const {
     initialValues,
     buildTemplatePayload,
     createOperationVersions,
+    createUploadOperations,
+    choiceTabIndex,
     nextChoiceIndex,
     validateImageDimensions,
     validateValues,
 } = require('../creator-form');
+
+test('separates per-field upload completion from global feedback ownership', () => {
+    const uploads = createUploadOperations();
+    const targetA = uploads.begin('targetImage');
+    const productB = uploads.begin('productImage');
+
+    assert.equal(
+        uploads.isFieldCurrent('targetImage', targetA),
+        true,
+    );
+    assert.equal(uploads.isLatestFeedback(targetA), false);
+    assert.equal(
+        uploads.isFieldCurrent('productImage', productB),
+        true,
+    );
+    assert.equal(uploads.isLatestFeedback(productB), true);
+
+    const targetC = uploads.begin('targetImage');
+    assert.equal(
+        uploads.isFieldCurrent('targetImage', targetA),
+        false,
+    );
+    assert.equal(uploads.isLatestFeedback(productB), false);
+    assert.equal(uploads.isLatestFeedback(targetC), true);
+});
+
+test('keeps exactly one choice reachable without a selected default', () => {
+    assert.deepEqual(
+        ['a', 'b', 'c'].map((value, index) => (
+            choiceTabIndex(value, '', index)
+        )),
+        [0, -1, -1],
+    );
+    assert.deepEqual(
+        ['a', 'b', 'c'].map((value, index) => (
+            choiceTabIndex(value, 'b', index)
+        )),
+        [-1, 0, -1],
+    );
+});
 
 test('only the latest operation version remains current per field', () => {
     const versions = createOperationVersions();

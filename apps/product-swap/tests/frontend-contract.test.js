@@ -13,6 +13,7 @@ const root = path.resolve(__dirname, '..');
 const {
     resolveApiBase,
     activeTaskStorageKey,
+    taskMatchesTemplate,
     validateClientFileMeta,
     buildGeneratePayload,
     buildRefinePayload,
@@ -142,6 +143,33 @@ test('scopes active task storage by creator template identity', () => {
     assert.notEqual(foodKey, productKey);
     assert.match(foodKey, /food-copy-layout/);
     assert.match(foodKey, /food_copy_layout/);
+});
+
+test('matches restored tasks to the active template identity', () => {
+    assert.equal(taskMatchesTemplate({
+        taskType: 'food_copy_layout',
+        input: { templateId: 'food-copy-layout' },
+    }, foodManifest), true);
+    assert.equal(taskMatchesTemplate({
+        taskType: 'food_copy_layout',
+        input: { templateId: 'other-food-template' },
+    }, foodManifest), false);
+    assert.equal(taskMatchesTemplate({
+        taskType: 'food_copy_layout',
+        input: {},
+    }, foodManifest), false);
+    assert.equal(taskMatchesTemplate({
+        taskType: 'product_swap',
+        input: {},
+    }, productSwapManifest), true);
+    assert.equal(taskMatchesTemplate({
+        taskType: 'product_swap',
+        input: { templateId: 'other-product-template' },
+    }, productSwapManifest), false);
+    assert.equal(taskMatchesTemplate({
+        taskType: 'wrong_task',
+        input: { templateId: 'food-copy-layout' },
+    }, foodManifest), false);
 });
 
 test('builds the stable request and maps provider errors', () => {

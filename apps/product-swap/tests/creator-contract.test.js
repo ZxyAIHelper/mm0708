@@ -84,6 +84,7 @@ test('creator metadata renders all supported schema field types', () => {
     assert.match(source, /button\.className = 'switch-control'/);
     assert.match(source, /role', 'switch'/);
     assert.match(source, /button\.appendChild\(text\)/);
+    assert.match(source, /CreatorForm\.choiceTabIndex/);
     assert.match(source, /field\.maxLength/);
 });
 
@@ -95,7 +96,7 @@ test('schema field rerenders preserve creator metadata structure', () => {
 
     assert.match(source, /hint\.textContent = '点击或拖拽上传'/);
     assert.match(source, /button\.firstElementChild\.textContent/);
-    assert.match(source, /button\.tabIndex = selected \? 0 : -1/);
+    assert.match(source, /CreatorForm\.choiceTabIndex/);
     assert.match(source, /CreatorForm\.nextChoiceIndex/);
     assert.match(source, /addEventListener\('keydown'/);
 });
@@ -113,7 +114,11 @@ test('creator boot isolates tasks and avoids interpolated selectors', () => {
     );
     assert.match(
         source,
-        /rememberedTask\.taskType !== activeTemplate\.taskType/,
+        /taskMatchesTemplate\(rememberedTask, activeTemplate\)/,
+    );
+    assert.match(
+        source,
+        /taskMatchesTemplate\(\s*processingTaskCandidate,\s*activeTemplate,/,
     );
     assert.match(
         source,
@@ -133,10 +138,25 @@ test('image binding invalidates stale uploads and uses field MIME types', () => 
 
     assert.match(
         source,
-        /CreatorForm\.createOperationVersions\(\)/,
+        /CreatorForm\.createUploadOperations\(\)/,
     );
-    assert.match(source, /uploadVersions\.next\(field\.key\)/);
-    assert.match(source, /uploadVersions\.isCurrent\(field\.key, version\)/);
+    assert.match(source, /uploadOperations\.begin\(field\.key\)/);
+    assert.match(
+        source,
+        /uploadOperations\.isFieldCurrent\(\s*field\.key,\s*operation,/,
+    );
+    assert.match(
+        source,
+        /uploadOperations\.isLatestFeedback\(operation\)/,
+    );
+    assert.match(
+        source,
+        /uploadOperations\.begin\('form-validation'\)/,
+    );
+    assert.match(
+        source,
+        /uploadOperations\.begin\('refine-validation'\)/,
+    );
     assert.match(source, /validateClientFileMeta\(file, field\.accept/);
-    assert.match(source, /input\.value = '';\s*const version/);
+    assert.match(source, /input\.value = '';\s*const operation/);
 });

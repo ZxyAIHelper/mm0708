@@ -2,6 +2,9 @@
     const catalog = typeof module !== 'undefined' && module.exports
         ? require('./templates')
         : global.ContentTemplates;
+    const CreatorForm = typeof module !== 'undefined' && module.exports
+        ? require('./creator-form')
+        : global.CreatorForm;
 
     function resolveCreatorTemplate(search = '') {
         const templateId = new URLSearchParams(search)
@@ -70,7 +73,7 @@
             'aria-required',
             String(Boolean(field.required)),
         );
-        for (const option of field.options || []) {
+        for (const [index, option] of (field.options || []).entries()) {
             const button = global.document.createElement('button');
             const selected = option.value === field.default;
             button.type = 'button';
@@ -78,7 +81,11 @@
             button.setAttribute('role', 'radio');
             button.setAttribute('aria-checked', String(selected));
             button.setAttribute('aria-pressed', String(selected));
-            button.tabIndex = selected ? 0 : -1;
+            button.tabIndex = CreatorForm.choiceTabIndex(
+                option.value,
+                field.default,
+                index,
+            );
             button.textContent = option.label;
             group.appendChild(button);
         }

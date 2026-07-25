@@ -19,6 +19,40 @@
         };
     }
 
+    function createUploadOperations() {
+        const fieldVersions = createOperationVersions();
+        let feedbackVersion = 0;
+        return {
+            begin(fieldKey) {
+                feedbackVersion += 1;
+                return {
+                    fieldKey,
+                    fieldVersion: fieldVersions.next(fieldKey),
+                    feedbackVersion,
+                };
+            },
+            isFieldCurrent(fieldKey, operation) {
+                return (
+                    operation?.fieldKey === fieldKey
+                    && fieldVersions.isCurrent(
+                        fieldKey,
+                        operation.fieldVersion,
+                    )
+                );
+            },
+            isLatestFeedback(operation) {
+                return operation?.feedbackVersion === feedbackVersion;
+            },
+        };
+    }
+
+    function choiceTabIndex(value, selectedValue, index) {
+        return (
+            value === selectedValue
+            || (!selectedValue && index === 0)
+        ) ? 0 : -1;
+    }
+
     function nextChoiceIndex(current, length, key) {
         if (length < 1) return -1;
         if (key === 'Home') return 0;
@@ -99,6 +133,8 @@
         initialValues,
         buildTemplatePayload,
         createOperationVersions,
+        createUploadOperations,
+        choiceTabIndex,
         nextChoiceIndex,
         validateImageDimensions,
         validateValues,

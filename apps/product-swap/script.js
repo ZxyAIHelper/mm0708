@@ -90,6 +90,15 @@ function activeTaskStorageKey(template) {
     return `${ACTIVE_TASK_KEY}:${identity}`;
 }
 
+function taskMatchesTemplate(task, template) {
+    if (!task || !template || task.taskType !== template.taskType) {
+        return false;
+    }
+    const templateId = task.input?.templateId;
+    if (templateId) return templateId === template.id;
+    return template.id === 'product-swap';
+}
+
 function safeHistoryPrimitive(value) {
     if (typeof value === 'string') {
         return !value.trimStart().toLowerCase().startsWith('data:');
@@ -289,7 +298,7 @@ function boot() {
     if (!activeTemplate) return;
     const CreatorForm = window.CreatorForm;
     const activeTaskKey = activeTaskStorageKey(activeTemplate);
-    const uploadVersions = CreatorForm.createOperationVersions();
+    const uploadOperations = CreatorForm.createUploadOperations();
     const state = {
         values: CreatorForm.initialValues(activeTemplate),
         result: '',
@@ -561,12 +570,19 @@ function boot() {
     function renderNonImageField(field) {
         const section = fieldSections[field.key];
         if (field.type === 'choice') {
-            for (const button of section.querySelectorAll('[data-value]')) {
+            const buttons = Array.from(
+                section.querySelectorAll('[data-value]'),
+            );
+            for (const [index, button] of buttons.entries()) {
                 const selected =
                     button.dataset.value === state.values[field.key];
                 button.setAttribute('aria-checked', String(selected));
                 button.setAttribute('aria-pressed', String(selected));
-                button.tabIndex = selected ? 0 : -1;
+                button.tabIndex = CreatorForm.choiceTabIndex(
+                    button.dataset.value,
+                    state.values[field.key],
+                    index,
+                );
             }
         } else if (field.type === 'boolean') {
             const button = section.querySelector('[role="switch"]');
@@ -645,7 +661,7 @@ function boot() {
             }
             if (
                 rememberedTask
-                && rememberedTask.taskType !== activeTemplate.taskType
+                && !taskMatchesTemplate(rememberedTask, activeTemplate)
             ) {
                 window.sessionStorage.removeItem(activeTaskKey);
                 rememberedTask = null;
@@ -653,8 +669,12 @@ function boot() {
         } catch {
             rememberedTask = null;
         }
-        const processingTask = await localHistory
+        const processingTaskCandidate = await localHistory
             .latestProcessingTask(activeTemplate?.taskType || 'product_swap');
+        const processingTask = taskMatchesTemplate(
+            processingTaskCandidate,
+            activeTemplate,
+        ) ? processingTaskCandidate : null;
         let task = rememberedTask?.status === 'processing'
             ? rememberedTask
             : (processingTask || rememberedTask);
@@ -721,7 +741,7 @@ function boot() {
         const input = fieldSections[field.key]
             .querySelector('input[type="file"]');
         input.value = '';
-        const version = uploadVersions.next(field.key);
+        const operation = uploadOperations.begin(field.key);
         if (!file || state.isGenerating) {
             return;
         }
@@ -730,7 +750,7 @@ function boot() {
             ...CLIENT_IMAGE_TYPES,
         ]);
         if (validation) {
-            if (uploadVersions.isCurrent(field.key, version)) {
+            if (uploadOperations.isLatestFeedback(operation)) {
                 showError(validation.message);
             }
             return;
@@ -738,24 +758,32 @@ function boot() {
 
         try {
             const source = await readFileAsDataUrl(file);
-            if (!uploadVersions.isCurrent(field.key, version)) return;
+            if (!uploadOperations.isFieldCurrent(
+                field.key,
+                operation,
+            )) return;
             const dimensions = await readImageDimensions(source);
-            if (!uploadVersions.isCurrent(field.key, version)) return;
+            if (!uploadOperations.isFieldCurrent(
+                field.key,
+                operation,
+            )) return;
             const dimensionError = CreatorForm.validateImageDimensions(
                 dimensions.width,
                 dimensions.height,
             );
             if (dimensionError) {
-                if (uploadVersions.isCurrent(field.key, version)) {
+                if (uploadOperations.isLatestFeedback(operation)) {
                     showError(dimensionError.message);
                 }
                 return;
             }
             state.values[field.key] = source;
             renderImageField(field);
-            showError('');
+            if (uploadOperations.isLatestFeedback(operation)) {
+                showError('');
+            }
         } catch (error) {
-            if (uploadVersions.isCurrent(field.key, version)) {
+            if (uploadOperations.isLatestFeedback(operation)) {
                 showError(error.message || '图片读取失败');
             }
         }
@@ -795,10 +823,11 @@ function boot() {
             });
             section.querySelector('.remove-image')
                 .addEventListener('click', () => {
-                    uploadVersions.next(field.key);
+                    uploadOperations.begin(field.key);
                     state.values[field.key] = '';
                     input.value = '';
                     renderImageField(field);
+                    showError('');
                 });
             renderImageField(field);
         } else if (field.type === 'choice') {
@@ -847,6 +876,7 @@ function boot() {
         if (state.isGenerating) {
             return;
         }
+        uploadOperations.begin('form-validation');
 
         const validation = CreatorForm.validateValues(
             activeTemplate,
@@ -925,6 +955,7 @@ function boot() {
         if (state.isRefining || state.isGenerating) {
             return;
         }
+        uploadOperations.begin('refine-validation');
 
         const correction = refineInput.value.trim();
         if (!correction) {
@@ -1024,6 +1055,7 @@ if (typeof module !== 'undefined') {
     module.exports = {
         resolveApiBase,
         activeTaskStorageKey,
+        taskMatchesTemplate,
         validateClientFileMeta,
         buildGeneratePayload,
         buildRefinePayload,
