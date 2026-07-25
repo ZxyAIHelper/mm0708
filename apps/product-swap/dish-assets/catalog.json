@@ -1,0 +1,20 @@
+[
+  {"id":"chili-fish","name":"香辣鱼","tags":["鱼类","辣味","主菜"],"width":480,"height":480,"url":"/assets/dish-library/chili-fish.webp"},
+  {"id":"noodle-bowl","name":"浇头面","tags":["主食","面食"],"width":480,"height":480,"url":"/assets/dish-library/noodle-bowl.webp"},
+  {"id":"tofu-platter","name":"豆腐拼盘","tags":["小吃","豆制品"],"width":480,"height":480,"url":"/assets/dish-library/tofu-platter.webp"},
+  {"id":"grilled-meat","name":"烤肉拼盘","tags":["肉类","烧烤","主菜"],"width":480,"height":480,"url":"/assets/dish-library/grilled-meat.webp"},
+  {"id":"green-vegetables","name":"青蔬拼盘","tags":["蔬菜","清淡"],"width":480,"height":480,"url":"/assets/dish-library/green-vegetables.webp"},
+  {"id":"crispy-rice","name":"香脆米食","tags":["小吃","主食"],"width":480,"height":480,"url":"/assets/dish-library/crispy-rice.webp"},
+  {"id":"fruit-platter","name":"水果拼盘","tags":["水果","甜品"],"width":480,"height":480,"url":"/assets/dish-library/fruit-platter.webp"},
+  {"id":"mixed-salad","name":"混合沙拉","tags":["蔬菜","清淡","西餐"],"width":480,"height":480,"url":"/assets/dish-library/mixed-salad.webp"},
+  {"id":"grain-dessert","name":"谷物甜品","tags":["甜品","谷物"],"width":480,"height":480,"url":"/assets/dish-library/grain-dessert.webp"},
+  {"id":"steak-platter","name":"牛排拼盘","tags":["肉类","西餐","主菜"],"width":480,"height":480,"url":"/assets/dish-library/steak-platter.webp"},
+  {"id":"salmon-toast","name":"三文鱼吐司","tags":["西餐","面包","小吃"],"width":480,"height":480,"url":"/assets/dish-library/salmon-toast.webp"},
+  {"id":"cheese-rice","name":"芝士拌饭","tags":["主食","芝士"],"width":480,"height":480,"url":"/assets/dish-library/cheese-rice.webp"},
+  {"id":"strawberry-dessert","name":"草莓甜品","tags":["甜品","水果"],"width":480,"height":480,"url":"/assets/dish-library/strawberry-dessert.webp"},
+  {"id":"cold-appetizer","name":"凉菜拼盘","tags":["凉菜","小吃"],"width":480,"height":480,"url":"/assets/dish-library/cold-appetizer.webp"},
+  {"id":"spicy-pot","name":"香辣锅","tags":["辣味","主菜"],"width":480,"height":480,"url":"/assets/dish-library/spicy-pot.webp"},
+  {"id":"fried-snacks","name":"炸物拼盘","tags":["油炸","小吃"],"width":480,"height":480,"url":"/assets/dish-library/fried-snacks.webp"},
+  {"id":"seafood-platter","name":"海鲜拼盘","tags":["海鲜","主菜"],"width":480,"height":480,"url":"/assets/dish-library/seafood-platter.webp"},
+  {"id":"dumpling-bowl","name":"面点小食","tags":["面食","小吃"],"width":480,"height":480,"url":"/assets/dish-library/dumpling-bowl.webp"}
+]
