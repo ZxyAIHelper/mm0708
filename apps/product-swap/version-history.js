@@ -6,6 +6,8 @@
     const DEFAULT_MAX_ENTRIES = 20;
     const DEFAULT_MAX_ESTIMATED_BYTES = 64 * 1024 * 1024;
     const DEFAULT_MAX_DOWNLOAD_BYTES = 10 * 1024 * 1024;
+    const MAX_PNG_DIMENSION = 16384;
+    const MAX_PNG_PIXELS = 16_000_000;
     const CANONICAL_BASE64 =
         /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
     const BASE64_ALPHABET =
@@ -91,6 +93,7 @@
         let chunkIndex = 0;
         let seenHeader = false;
         let seenImageData = false;
+        let pngMetadata = null;
         while (offset < bytes.length) {
             if (offset + 12 > bytes.length) {
                 throw new Error('INVALID_PNG');
@@ -110,7 +113,38 @@
                 }
                 const width = uint32(bytes, offset + 8);
                 const height = uint32(bytes, offset + 12);
-                if (!width || !height) throw new Error('INVALID_PNG');
+                const bitDepth = bytes[offset + 16];
+                const colorType = bytes[offset + 17];
+                const compression = bytes[offset + 18];
+                const filter = bytes[offset + 19];
+                const interlace = bytes[offset + 20];
+                const validBitDepths = {
+                    0: [1, 2, 4, 8, 16],
+                    2: [8, 16],
+                    3: [1, 2, 4, 8],
+                    4: [8, 16],
+                    6: [8, 16],
+                };
+                if (
+                    !width
+                    || !height
+                    || width > MAX_PNG_DIMENSION
+                    || height > MAX_PNG_DIMENSION
+                    || width * height > MAX_PNG_PIXELS
+                    || !validBitDepths[colorType]?.includes(bitDepth)
+                    || compression !== 0
+                    || filter !== 0
+                    || ![0, 1].includes(interlace)
+                ) {
+                    throw new Error('INVALID_PNG');
+                }
+                pngMetadata = {
+                    width,
+                    height,
+                    bitDepth,
+                    colorType,
+                    interlace,
+                };
                 seenHeader = true;
             } else if (type === 'IHDR') {
                 throw new Error('INVALID_PNG');
@@ -130,7 +164,7 @@
                 ) {
                     throw new Error('INVALID_PNG');
                 }
-                return true;
+                return pngMetadata;
             }
             offset = nextOffset;
             chunkIndex += 1;
@@ -273,44 +307,62 @@
     async function readBoundedResponseBody(
         response,
         maxBytes,
-        { abortController } = {},
+        {
+            abortController,
+            reader: suppliedReader,
+            releaseReader = true,
+            lifecycle = {},
+        } = {},
     ) {
         const boundedMax = Number(maxBytes);
         if (!Number.isFinite(boundedMax) || boundedMax <= 0) {
             throw new Error('DOWNLOAD_TOO_LARGE');
         }
-        const contentLength = response.headers?.get?.('content-length');
-        if (contentLength !== null && contentLength !== undefined) {
-            if (!/^\d+$/.test(String(contentLength))) {
-                throw new Error('DOWNLOAD_LENGTH_INVALID');
-            }
-            if (Number(contentLength) > boundedMax) {
-                abortController?.abort?.();
-                throw new Error('DOWNLOAD_TOO_LARGE');
-            }
-        }
-
-        const reader = response.body?.getReader?.();
-        if (!reader) {
+        const reader = suppliedReader || response.body?.getReader?.();
+        lifecycle.readerAcquired = Boolean(reader);
+        lifecycle.readerCancelled = false;
+        let abortCalled = false;
+        const abortOnce = () => {
             if (
-                contentLength === null
-                || contentLength === undefined
-                || !response.arrayBuffer
+                abortCalled
+                || abortController?.signal?.aborted
+                || typeof abortController?.abort !== 'function'
             ) {
-                throw new Error('DOWNLOAD_LENGTH_REQUIRED');
+                return;
             }
-            const buffer = await response.arrayBuffer();
-            const bytes = new Uint8Array(buffer);
-            if (bytes.byteLength > boundedMax) {
-                abortController?.abort?.();
-                throw new Error('DOWNLOAD_TOO_LARGE');
-            }
-            return bytes;
-        }
+            abortCalled = true;
+            abortController.abort();
+        };
 
-        const chunks = [];
-        let total = 0;
         try {
+            const contentLength = response.headers?.get?.('content-length');
+            if (contentLength !== null && contentLength !== undefined) {
+                if (!/^\d+$/.test(String(contentLength))) {
+                    throw new Error('DOWNLOAD_LENGTH_INVALID');
+                }
+                if (Number(contentLength) > boundedMax) {
+                    throw new Error('DOWNLOAD_TOO_LARGE');
+                }
+            }
+
+            if (!reader) {
+                if (
+                    contentLength === null
+                    || contentLength === undefined
+                    || !response.arrayBuffer
+                ) {
+                    throw new Error('DOWNLOAD_LENGTH_REQUIRED');
+                }
+                const buffer = await response.arrayBuffer();
+                const bytes = new Uint8Array(buffer);
+                if (bytes.byteLength > boundedMax) {
+                    throw new Error('DOWNLOAD_TOO_LARGE');
+                }
+                return bytes;
+            }
+
+            const chunks = [];
+            let total = 0;
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
@@ -318,27 +370,116 @@
                     ? value
                     : new Uint8Array(value);
                 if (total + chunk.byteLength > boundedMax) {
-                    abortController?.abort?.();
-                    try {
-                        await reader.cancel('DOWNLOAD_TOO_LARGE');
-                    } catch {
-                        // The hard ceiling still applies if cancel reports failure.
-                    }
                     throw new Error('DOWNLOAD_TOO_LARGE');
                 }
                 chunks.push(chunk);
                 total += chunk.byteLength;
             }
+            const bytes = new Uint8Array(total);
+            let offset = 0;
+            for (const chunk of chunks) {
+                bytes.set(chunk, offset);
+                offset += chunk.byteLength;
+            }
+            return bytes;
+        } catch (error) {
+            abortOnce();
+            if (reader && !lifecycle.readerCancelled) {
+                lifecycle.readerCancelled = true;
+                try {
+                    await reader.cancel(error?.message || 'DOWNLOAD_FAILED');
+                } catch {
+                    // Preserve the original validation or read failure.
+                }
+            }
+            throw error;
         } finally {
-            reader.releaseLock?.();
+            if (reader && releaseReader) {
+                reader.releaseLock?.();
+            }
         }
-        const bytes = new Uint8Array(total);
-        let offset = 0;
-        for (const chunk of chunks) {
-            bytes.set(chunk, offset);
-            offset += chunk.byteLength;
+    }
+
+    async function fetchValidatedPng(policy, environment = global) {
+        const fetchImpl = environment.fetch;
+        const AbortControllerConstructor = environment.AbortController;
+        const BlobConstructor = environment.Blob;
+        const decodePng = environment.ensureBrowserDecodablePng
+            || ensureBrowserDecodablePng;
+        if (
+            typeof fetchImpl !== 'function'
+            || typeof AbortControllerConstructor !== 'function'
+            || typeof BlobConstructor !== 'function'
+        ) {
+            throw new Error('DOWNLOAD_UNAVAILABLE');
         }
-        return bytes;
+
+        const abortController = new AbortControllerConstructor();
+        let abortCalled = false;
+        const abortOnce = {
+            signal: abortController.signal,
+            abort() {
+                if (abortCalled || abortController.signal?.aborted) return;
+                abortCalled = true;
+                abortController.abort();
+            },
+        };
+        let response;
+        let reader;
+        const lifecycle = {};
+        try {
+            response = await fetchImpl(policy.url, {
+                ...policy.fetchOptions,
+                signal: abortController.signal,
+            });
+            reader = response.body?.getReader?.();
+            validateDownloadResponse(policy, {
+                url: response.url,
+                ok: response.ok,
+                contentType: response.headers?.get?.('content-type'),
+                contentLength: response.headers?.get?.('content-length'),
+            });
+            const bytes = await readBoundedResponseBody(
+                response,
+                policy.maxBytes,
+                {
+                    abortController: abortOnce,
+                    reader,
+                    releaseReader: false,
+                    lifecycle,
+                },
+            );
+            const png = validatePngBytes(bytes);
+            const blob = new BlobConstructor([bytes], { type: 'image/png' });
+            await decodePng(blob);
+            return {
+                bytes,
+                blob,
+                png,
+                abort: () => abortOnce.abort(),
+            };
+        } catch (error) {
+            abortOnce.abort();
+            if (reader && !lifecycle.readerCancelled) {
+                lifecycle.readerCancelled = true;
+                try {
+                    await reader.cancel(error?.message || 'DOWNLOAD_FAILED');
+                } catch {
+                    // Preserve the original download failure.
+                }
+            } else if (!reader) {
+                try {
+                    await response?.body?.cancel?.(
+                        error?.message || 'DOWNLOAD_FAILED',
+                    );
+                } catch {
+                    // Preserve the original download failure.
+                }
+            }
+            throw error;
+        } finally {
+            reader?.releaseLock?.();
+        }
     }
 
     async function ensureBrowserDecodablePng(blob, environment = global) {
@@ -574,6 +715,7 @@
         createVersionHistory,
         createDownloadRequest,
         ensureBrowserDecodablePng,
+        fetchValidatedPng,
         findVersionIndexByIdentity,
         hydrateVersion,
         readBoundedResponseBody,

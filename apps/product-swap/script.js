@@ -1219,35 +1219,25 @@ function boot() {
 
         let objectUrl = '';
         let revokeScheduled = false;
+        let abortNetworkDownload = () => undefined;
         try {
             const request = VersionHistory.createDownloadRequest(
                 current.imageUrl,
                 window.location.origin,
             );
-            let bytes;
+            let blob;
             if (request.kind === 'data') {
-                bytes = request.bytes;
+                const bytes = request.bytes;
+                VersionHistory.validatePngBytes(bytes);
+                blob = new Blob([bytes], { type: 'image/png' });
+                await VersionHistory.ensureBrowserDecodablePng(blob);
             } else {
-                const abortController = new AbortController();
-                const response = await fetch(request.url, {
-                    ...request.fetchOptions,
-                    signal: abortController.signal,
-                });
-                VersionHistory.validateDownloadResponse(request, {
-                    url: response.url,
-                    ok: response.ok,
-                    contentType: response.headers.get('content-type'),
-                    contentLength: response.headers.get('content-length'),
-                });
-                bytes = await VersionHistory.readBoundedResponseBody(
-                    response,
-                    request.maxBytes,
-                    { abortController },
+                const networkPng = await VersionHistory.fetchValidatedPng(
+                    request,
                 );
+                blob = networkPng.blob;
+                abortNetworkDownload = networkPng.abort;
             }
-            VersionHistory.validatePngBytes(bytes);
-            const blob = new Blob([bytes], { type: 'image/png' });
-            await VersionHistory.ensureBrowserDecodablePng(blob);
             objectUrl = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = objectUrl;
@@ -1260,6 +1250,7 @@ function boot() {
             }, 0);
             revokeScheduled = true;
         } catch {
+            abortNetworkDownload();
             showError('下载失败，请保留当前页面后重试');
         } finally {
             if (objectUrl && !revokeScheduled) {

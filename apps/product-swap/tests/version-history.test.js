@@ -6,6 +6,7 @@ const {
     createVersionHistory,
     createDownloadRequest,
     ensureBrowserDecodablePng,
+    fetchValidatedPng,
     findVersionIndexByIdentity,
     hydrateVersion,
     readBoundedResponseBody,
@@ -19,6 +20,99 @@ const tinyPngBase64 = [
     'AAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
 ].join('');
 const tinyPngBytes = Buffer.from(tinyPngBase64, 'base64');
+
+function pngChunk(type, data) {
+    const chunk = Buffer.alloc(12 + data.length);
+    chunk.writeUInt32BE(data.length, 0);
+    chunk.write(type, 4, 4, 'ascii');
+    data.copy(chunk, 8);
+    return chunk;
+}
+
+function createTestPng({
+    width = 1,
+    height = 1,
+    bitDepth = 8,
+    colorType = 6,
+    compression = 0,
+    filter = 0,
+    interlace = 0,
+} = {}) {
+    const header = Buffer.alloc(13);
+    header.writeUInt32BE(width, 0);
+    header.writeUInt32BE(height, 4);
+    header[8] = bitDepth;
+    header[9] = colorType;
+    header[10] = compression;
+    header[11] = filter;
+    header[12] = interlace;
+    return Buffer.concat([
+        Buffer.from('89504e470d0a1a0a', 'hex'),
+        pngChunk('IHDR', header),
+        pngChunk('IDAT', Buffer.from([1])),
+        pngChunk('IEND', Buffer.alloc(0)),
+    ]);
+}
+
+function createAbortTracker() {
+    const tracker = {
+        calls: 0,
+        signal: { aborted: false },
+        abort() {
+            tracker.calls += 1;
+            tracker.signal.aborted = true;
+        },
+    };
+    return tracker;
+}
+
+function createNetworkResponse({
+    url = 'https://product-swap.example/result.png',
+    ok = true,
+    contentType = 'image/png',
+    contentLength = String(tinyPngBytes.length),
+    bytes = tinyPngBytes,
+    readError = null,
+} = {}) {
+    const state = {
+        bodyCancels: 0,
+        readerCancels: 0,
+        reads: 0,
+    };
+    const response = {
+        url,
+        ok,
+        headers: {
+            get(name) {
+                if (name === 'content-type') return contentType;
+                if (name === 'content-length') return contentLength;
+                return null;
+            },
+        },
+        body: {
+            getReader() {
+                return {
+                    async read() {
+                        state.reads += 1;
+                        if (readError) throw readError;
+                        if (state.reads === 1) {
+                            return { done: false, value: bytes };
+                        }
+                        return { done: true };
+                    },
+                    async cancel() {
+                        state.readerCancels += 1;
+                    },
+                    releaseLock() {},
+                };
+            },
+            async cancel() {
+                state.bodyCancels += 1;
+            },
+        },
+    };
+    return { response, state };
+}
 
 test('adds versions and selects the newest version', () => {
     const history = createVersionHistory();
@@ -486,7 +580,7 @@ test('never leaves a dangling parent ID after deterministic eviction', () => {
 });
 
 test('rejects truncated or structurally incomplete PNG bytes', () => {
-    assert.equal(validatePngBytes(tinyPngBytes), true);
+    assert.equal(validatePngBytes(tinyPngBytes).width, 1);
 
     for (const invalid of [
         tinyPngBytes.subarray(0, 8),
@@ -530,7 +624,7 @@ test('streams a valid PNG within the hard byte ceiling', async () => {
     );
 
     assert.deepEqual(Buffer.from(bytes), tinyPngBytes);
-    assert.equal(validatePngBytes(bytes), true);
+    assert.equal(validatePngBytes(bytes).height, 1);
 });
 
 test('cancels and aborts an oversized stream before reading it fully', async () => {
@@ -604,13 +698,101 @@ test('uses a known-length bounded fallback when response streams are absent', as
     assert.equal(buffered, true);
     assert.deepEqual(Buffer.from(bytes), tinyPngBytes);
 
+    const abortTracker = createAbortTracker();
     await assert.rejects(
         readBoundedResponseBody({
             ...response,
             headers: { get: () => null },
-        }, tinyPngBytes.length),
+        }, tinyPngBytes.length, {
+            abortController: abortTracker,
+        }),
         /DOWNLOAD_LENGTH_REQUIRED/,
     );
+    assert.equal(abortTracker.calls, 1);
+});
+
+test('readBoundedResponseBody cancels and aborts once for early and read failures', async () => {
+    for (const scenario of [
+        {
+            contentLength: 'invalid',
+            error: /DOWNLOAD_LENGTH_INVALID/,
+        },
+        {
+            contentLength: '65',
+            error: /DOWNLOAD_TOO_LARGE/,
+        },
+        {
+            contentLength: '1',
+            readError: new Error('reader exploded'),
+            error: /reader exploded/,
+        },
+    ]) {
+        let cancels = 0;
+        const abortTracker = createAbortTracker();
+        const response = {
+            headers: {
+                get: () => scenario.contentLength,
+            },
+            body: {
+                getReader() {
+                    return {
+                        async read() {
+                            if (scenario.readError) throw scenario.readError;
+                            return { done: true };
+                        },
+                        async cancel() {
+                            cancels += 1;
+                        },
+                        releaseLock() {},
+                    };
+                },
+            },
+        };
+
+        await assert.rejects(
+            readBoundedResponseBody(response, 64, {
+                abortController: abortTracker,
+            }),
+            scenario.error,
+        );
+        assert.equal(cancels, 1);
+        assert.equal(abortTracker.calls, 1);
+    }
+});
+
+test('readBoundedResponseBody leaves successful streams untouched', async () => {
+    let cancels = 0;
+    const abortTracker = createAbortTracker();
+    const response = {
+        headers: {
+            get: () => String(tinyPngBytes.length),
+        },
+        body: {
+            getReader() {
+                let complete = false;
+                return {
+                    async read() {
+                        if (complete) return { done: true };
+                        complete = true;
+                        return { done: false, value: tinyPngBytes };
+                    },
+                    async cancel() {
+                        cancels += 1;
+                    },
+                    releaseLock() {},
+                };
+            },
+        },
+    };
+
+    await readBoundedResponseBody(
+        response,
+        tinyPngBytes.length,
+        { abortController: abortTracker },
+    );
+
+    assert.equal(cancels, 0);
+    assert.equal(abortTracker.calls, 0);
 });
 
 test('forces browser PNG decoding and closes the decoded bitmap', async () => {
@@ -658,4 +840,234 @@ test('falls back to Image decoding and releases its temporary URL', async () => 
     });
 
     assert.equal(revoked, 'blob:temporary-decode');
+});
+
+test('releases the temporary Image URL when browser decoding fails', async () => {
+    let revoked = '';
+    class BrokenImage {
+        set src(value) {
+            this.value = value;
+            queueMicrotask(() => this.onerror());
+        }
+    }
+
+    await assert.rejects(
+        ensureBrowserDecodablePng(
+            new Blob([tinyPngBytes], { type: 'image/png' }),
+            {
+                Image: BrokenImage,
+                URL: {
+                    createObjectURL: () => 'blob:failed-decode',
+                    revokeObjectURL: (value) => {
+                        revoked = value;
+                    },
+                },
+            },
+        ),
+        /INVALID_PNG/,
+    );
+
+    assert.equal(revoked, 'blob:failed-decode');
+});
+
+test('returns bounded IHDR metadata for a valid PNG', () => {
+    assert.deepEqual(validatePngBytes(tinyPngBytes), {
+        width: 1,
+        height: 1,
+        bitDepth: 8,
+        colorType: 4,
+        interlace: 0,
+    });
+});
+
+test('rejects unsafe IHDR dimensions and format combinations', () => {
+    for (const invalid of [
+        createTestPng({ width: 16385 }),
+        createTestPng({ width: 5000, height: 4000 }),
+        createTestPng({ bitDepth: 4, colorType: 6 }),
+        createTestPng({ colorType: 5 }),
+        createTestPng({ compression: 1 }),
+        createTestPng({ filter: 1 }),
+        createTestPng({ interlace: 2 }),
+    ]) {
+        assert.throws(() => validatePngBytes(invalid), /INVALID_PNG/);
+    }
+
+    const oversizedDataUrl = [
+        'data:image/png;base64,',
+        createTestPng({ width: 16384, height: 16384 }).toString('base64'),
+    ].join('');
+    assert.throws(
+        () => createDownloadRequest(
+            oversizedDataUrl,
+            'https://product-swap.example',
+            1024,
+        ),
+        /UNSAFE_DOWNLOAD/,
+    );
+});
+
+test('aborts and cancels the reader for every response validation failure', async () => {
+    const policy = createDownloadRequest(
+        '/result.png',
+        'https://product-swap.example',
+        1024,
+    );
+    for (const responseOverride of [
+        { ok: false },
+        { url: 'https://other.example/result.png' },
+        { contentType: 'image/jpeg' },
+        { contentLength: 'invalid' },
+    ]) {
+        const { response, state } = createNetworkResponse(responseOverride);
+        const abortTracker = createAbortTracker();
+
+        await assert.rejects(
+            fetchValidatedPng(policy, {
+                fetch: async () => response,
+                AbortController: class {
+                    constructor() {
+                        return abortTracker;
+                    }
+                },
+                Blob,
+                ensureBrowserDecodablePng: async () => true,
+            }),
+            /UNSAFE_DOWNLOAD/,
+        );
+
+        assert.equal(abortTracker.calls, 1);
+        assert.equal(state.readerCancels, 1);
+        assert.equal(state.bodyCancels, 0);
+    }
+});
+
+test('cancels and aborts exactly once when a stream read throws', async () => {
+    const policy = createDownloadRequest(
+        '/result.png',
+        'https://product-swap.example',
+        1024,
+    );
+    const { response, state } = createNetworkResponse({
+        readError: new Error('stream failed'),
+    });
+    const abortTracker = createAbortTracker();
+
+    await assert.rejects(
+        fetchValidatedPng(policy, {
+            fetch: async () => response,
+            AbortController: class {
+                constructor() {
+                    return abortTracker;
+                }
+            },
+            Blob,
+            ensureBrowserDecodablePng: async () => true,
+        }),
+        /stream failed/,
+    );
+
+    assert.equal(abortTracker.calls, 1);
+    assert.equal(state.readerCancels, 1);
+});
+
+test('does not abort or cancel a successful network PNG download', async () => {
+    const policy = createDownloadRequest(
+        '/result.png',
+        'https://product-swap.example',
+        1024,
+    );
+    const { response, state } = createNetworkResponse();
+    const abortTracker = createAbortTracker();
+    let decodes = 0;
+
+    const result = await fetchValidatedPng(policy, {
+        fetch: async () => response,
+        AbortController: class {
+            constructor() {
+                return abortTracker;
+            }
+        },
+        Blob,
+        ensureBrowserDecodablePng: async () => {
+            decodes += 1;
+            return true;
+        },
+    });
+
+    assert.deepEqual(Buffer.from(result.bytes), tinyPngBytes);
+    assert.equal(result.png.width, 1);
+    assert.equal(result.png.height, 1);
+    assert.equal(decodes, 1);
+    assert.equal(abortTracker.calls, 0);
+    assert.equal(state.readerCancels, 0);
+    assert.equal(state.bodyCancels, 0);
+});
+
+test('rejects bomb-sized PNG headers before browser decode is called', async () => {
+    const oversizedHeaderPng = createTestPng({
+        width: 16384,
+        height: 16384,
+    });
+    const policy = createDownloadRequest(
+        '/result.png',
+        'https://product-swap.example',
+        1024,
+    );
+    const { response, state } = createNetworkResponse({
+        bytes: oversizedHeaderPng,
+        contentLength: String(oversizedHeaderPng.length),
+    });
+    const abortTracker = createAbortTracker();
+    let decodes = 0;
+
+    await assert.rejects(
+        fetchValidatedPng(policy, {
+            fetch: async () => response,
+            AbortController: class {
+                constructor() {
+                    return abortTracker;
+                }
+            },
+            Blob,
+            ensureBrowserDecodablePng: async () => {
+                decodes += 1;
+                return true;
+            },
+        }),
+        /INVALID_PNG/,
+    );
+
+    assert.equal(decodes, 0);
+    assert.equal(abortTracker.calls, 1);
+    assert.equal(state.readerCancels, 1);
+});
+
+test('aborts and cancels when browser decoding rejects network PNG bytes', async () => {
+    const policy = createDownloadRequest(
+        '/result.png',
+        'https://product-swap.example',
+        1024,
+    );
+    const { response, state } = createNetworkResponse();
+    const abortTracker = createAbortTracker();
+
+    await assert.rejects(
+        fetchValidatedPng(policy, {
+            fetch: async () => response,
+            AbortController: class {
+                constructor() {
+                    return abortTracker;
+                }
+            },
+            Blob,
+            ensureBrowserDecodablePng: async () => {
+                throw new Error('browser decode failed');
+            },
+        }),
+        /browser decode failed/,
+    );
+
+    assert.equal(abortTracker.calls, 1);
+    assert.equal(state.readerCancels, 1);
 });

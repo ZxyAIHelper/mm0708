@@ -481,16 +481,22 @@ test('downloads the current version through a checked blob response', () => {
     assert.match(source, /async function downloadCurrentVersion\(\)/);
     assert.match(source, /versions\.current\(\)/);
     assert.match(source, /VersionHistory\.createDownloadRequest/);
+    assert.match(source, /VersionHistory\.fetchValidatedPng/);
+    assert.match(source, /abortNetworkDownload\s*=\s*networkPng\.abort/);
     assert.match(
         source,
-        /fetch\(\s*request\.url,\s*\{[\s\S]*?\.\.\.request\.fetchOptions[\s\S]*?signal:/,
+        /catch\s*\{[\s\S]*?abortNetworkDownload\(\)[\s\S]*?showError/,
+    );
+    assert.match(
+        source,
+        /fetchImpl\(\s*policy\.url,\s*\{[\s\S]*?\.\.\.policy\.fetchOptions[\s\S]*?signal:/,
     );
     assert.match(source, /credentials:\s*'omit'/);
     assert.match(source, /redirect:\s*'error'/);
     assert.match(source, /referrerPolicy:\s*'no-referrer'/);
-    assert.match(source, /VersionHistory\.validateDownloadResponse/);
-    assert.match(source, /new AbortController\(\)/);
-    assert.match(source, /VersionHistory\.readBoundedResponseBody/);
+    assert.match(source, /validateDownloadResponse\(policy,/);
+    assert.match(source, /new AbortControllerConstructor\(\)/);
+    assert.match(source, /readBoundedResponseBody\(/);
     assert.match(source, /VersionHistory\.validatePngBytes/);
     assert.match(source, /VersionHistory\.ensureBrowserDecodablePng/);
     assert.match(source, /request\.kind\s*===\s*'data'/);
