@@ -13,6 +13,25 @@ const { publicCatalog } = require('./template-registry');
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_REQUEST_BYTES = 42 * 1024 * 1024;
 const APP_ROOT = path.resolve(__dirname, '..');
+const PUBLIC_ASSETS_ROOT = path.join(APP_ROOT, 'assets');
+const PUBLIC_STATIC_PATHS = new Set([
+    'index.html',
+    'create.html',
+    'history.html',
+    'profile.html',
+    'style.css',
+    'app.css',
+    'api-client.js',
+    'local-history.js',
+    'merchant-store.js',
+    'generation-worker.js',
+    'script.js',
+    'history.js',
+    'home.js',
+    'profile.js',
+    'templates.js',
+    'creator-meta.js',
+].map((entry) => path.join(APP_ROOT, entry)));
 const SUPPORTED_MIME_TYPES = new Map([
     ['image/jpeg', '.jpg'],
     ['image/png', '.png'],
@@ -305,6 +324,13 @@ function resolveStaticPath(urlPath) {
         return null;
     }
 
+    if (
+        !PUBLIC_STATIC_PATHS.has(resolved)
+        && !resolved.startsWith(`${PUBLIC_ASSETS_ROOT}${path.sep}`)
+    ) {
+        return null;
+    }
+
     return resolved;
 }
 
@@ -343,10 +369,29 @@ async function serveStatic(request, response) {
     }
 }
 
-function sendTemplateCatalog(response, method = 'GET') {
-    const source = `globalThis.__TEMPLATE_CATALOG__ = ${JSON.stringify(
-        publicCatalog(),
-    )};\n`;
+function sendTemplateCatalog(
+    response,
+    method = 'GET',
+    catalogProvider = publicCatalog,
+) {
+    let source;
+
+    try {
+        source = `globalThis.__TEMPLATE_CATALOG__ = ${JSON.stringify(
+            catalogProvider(),
+        )};\n`;
+    } catch {
+        response.writeHead(500, {
+            'Content-Type': 'text/plain; charset=utf-8',
+            'Cache-Control': 'no-store',
+        });
+        response.end(
+            method === 'HEAD'
+                ? undefined
+                : 'Internal server error',
+        );
+        return;
+    }
 
     response.writeHead(200, {
         'Content-Type': 'text/javascript; charset=utf-8',
@@ -363,6 +408,7 @@ function sendTemplateCatalog(response, method = 'GET') {
 
 function createProductSwapServer({
     provider = generateWithCodex,
+    catalogProvider = publicCatalog,
 } = {}) {
     let generationActive = false;
 
@@ -425,7 +471,11 @@ function createProductSwapServer({
                 || request.method === 'HEAD'
             )
         ) {
-            sendTemplateCatalog(response, request.method);
+            sendTemplateCatalog(
+                response,
+                request.method,
+                catalogProvider,
+            );
             return;
         }
 
