@@ -80,6 +80,15 @@ Or use the deployment script:
 bash deploy.sh
 ```
 
+## Pages
+
+- `/` — hotspot template discovery
+- `/create.html?template=product-swap` — first live template creator
+- `/history.html` — Works and generation status
+- `/profile.html` — local shop and product profile
+
+Merchant profile data and task history are browser-local in the first phase.
+
 ## Environment Variables
 
 ### Backend (`apps/my-cloud-hub`)

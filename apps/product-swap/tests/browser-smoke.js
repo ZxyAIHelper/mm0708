@@ -207,6 +207,18 @@ function jsonResponse(request, body, status = 200) {
             waitUntil: 'networkidle0',
             timeout: 60000,
         });
+        await page.waitForSelector('#templateGrid .template-card');
+        const homeState = await page.evaluate(() => ({
+            title: document.querySelector('h1')?.textContent || '',
+            liveHref: document.querySelector(
+                'a[href="/create.html?template=product-swap"]',
+            )?.getAttribute('href') || '',
+            navItems: document.querySelectorAll('.bottom-nav a').length,
+        }));
+        await page.goto(`${appUrl}/create.html?template=product-swap`, {
+            waitUntil: 'networkidle0',
+            timeout: 60000,
+        });
         const targetInput = await page.$('#targetInput');
         await targetInput.uploadFile(targetPath);
         await page.waitForSelector('[data-slot="target"].has-preview');
@@ -330,12 +342,21 @@ function jsonResponse(request, body, status = 200) {
             };
         });
 
-        console.log(JSON.stringify({ state, historyState, errors }, null, 2));
+        console.log(JSON.stringify({
+            homeState,
+            state,
+            historyState,
+            errors,
+        }, null, 2));
 
         if (
             errors.length
-            || state.title !== '一键换产品'
-            || state.button !== '生成（消耗 3 豆额度）'
+            || homeState.title !== '今天想发什么？'
+            || homeState.liveHref
+                !== '/create.html?template=product-swap'
+            || homeState.navItems !== 4
+            || state.title !== '爆款场景同款图'
+            || state.button !== '生成 1 张场景图（消耗 3 豆额度）'
             || state.width > 460
             || !state.targetPreview
             || !state.productPreview
@@ -346,7 +367,7 @@ function jsonResponse(request, body, status = 200) {
             || state.taskStatuses.some((task) => task.status !== 'completed')
             || initialGenerationCount !== 1
             || generationCount !== 2
-            || historyState.title !== '所有任务'
+            || historyState.title !== '作品'
             || historyState.cards !== 2
             || historyState.expired !== 2
             || historyState.expiredAfterCleanup !== 2
