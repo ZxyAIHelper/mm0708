@@ -91,6 +91,27 @@ test('home card models preserve only live template links', () => {
     assert.equal(unavailable.statusLabel, '即将上线');
 });
 
+test('home discovers the live food copy layout through the generic catalog', () => {
+    const { templateCardModel } = require('../home');
+    const { listTemplates, searchTemplates } = require('../templates');
+    const food = listTemplates()
+        .map(templateCardModel)
+        .find((template) => template.id === 'food-copy-layout');
+
+    assert.equal(food.status, 'live');
+    assert.equal(food.href, '/create.html?template=food-copy-layout');
+    assert.equal(food.outputLabel, '生成 1 张文案配图');
+    for (const query of ['美食', '文案', '排版']) {
+        assert.deepEqual(
+            searchTemplates(query).map((template) => template.id),
+            ['food-copy-layout'],
+        );
+    }
+
+    const source = fs.readFileSync(path.join(appRoot, 'home.js'), 'utf8');
+    assert.doesNotMatch(source, /food-copy-layout/);
+});
+
 test('unavailable templates render as disabled articles', () => {
     const source = fs.readFileSync(path.join(appRoot, 'home.js'), 'utf8');
 

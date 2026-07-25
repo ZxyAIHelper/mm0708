@@ -5,6 +5,13 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 
+function ruleFor(source, selector) {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return [...source.matchAll(new RegExp(`${escaped}\\s*\\{([^}]+)\\}`, 'g'))]
+        .map((match) => match[1])
+        .join('\n');
+}
+
 test('creator page exposes the template-driven generator controls', () => {
     const html = fs.readFileSync(
         path.join(root, 'create.html'),
@@ -86,6 +93,93 @@ test('creator metadata renders all supported schema field types', () => {
     assert.match(source, /button\.appendChild\(text\)/);
     assert.match(source, /CreatorForm\.choiceTabIndex/);
     assert.match(source, /field\.maxLength/);
+});
+
+test('creator styles every schema-driven food template control', () => {
+    const css = fs.readFileSync(path.join(root, 'style.css'), 'utf8');
+
+    assert.match(ruleFor(css, '.template-field-image'), /position:\s*relative/);
+    assert.match(
+        ruleFor(css, '.template-field-image .upload-box'),
+        /width:\s*100%/,
+    );
+    assert.match(
+        ruleFor(
+            css,
+            'body[data-template-id="food-copy-layout"] .template-field-image .upload-box',
+        ),
+        /min-height:\s*280px/,
+    );
+    assert.match(
+        ruleFor(css, '.template-field-image .upload-box'),
+        /border:\s*1px dashed #d7c5b5/,
+    );
+    assert.match(
+        ruleFor(css, '.template-field-image .upload-box'),
+        /border-radius:\s*20px/,
+    );
+    assert.match(
+        ruleFor(css, '.template-field-image .upload-box'),
+        /background:\s*#fffaf4/,
+    );
+    assert.match(
+        ruleFor(
+            css,
+            'body[data-template-id="food-copy-layout"] .template-field-image.has-preview .upload-box',
+        ),
+        /aspect-ratio:\s*3\s*\/\s*4/,
+    );
+    assert.match(
+        ruleFor(css, '.template-field-image .upload-box img'),
+        /object-fit:\s*contain/,
+    );
+
+    assert.match(ruleFor(css, '.choice-group'), /grid-template-columns:\s*repeat\(3,/);
+    assert.match(ruleFor(css, '.choice-group'), /gap:\s*8px/);
+    assert.match(
+        ruleFor(css, '.choice-group button'),
+        /min-height:\s*44px/,
+    );
+    assert.match(
+        ruleFor(css, '.choice-group button[aria-checked="true"]'),
+        /border-color:\s*var\(--accent\)/,
+    );
+
+    assert.match(ruleFor(css, '.switch-control'), /min-height:\s*44px/);
+    assert.match(
+        ruleFor(css, '.switch-control[aria-checked="true"]'),
+        /background:\s*var\(--accent\)/,
+    );
+    assert.match(
+        ruleFor(css, '.switch-control[aria-checked="true"]'),
+        /color:\s*#fff/,
+    );
+    assert.match(
+        ruleFor(css, '.template-field-text textarea'),
+        /width:\s*100%/,
+    );
+    assert.match(
+        ruleFor(css, 'body[data-template-id="food-copy-layout"] .example-card'),
+        /display:\s*none/,
+    );
+    assert.match(ruleFor(css, '.remove-image'), /min-height:\s*44px/);
+    assert.match(
+        ruleFor(css, '.remove-image'),
+        /background:\s*rgb\(255 255 255 \/ 94%\)/,
+    );
+    for (const selector of [
+        '.choice-group button:focus-visible',
+        '.switch-control:focus-visible',
+        '.template-field-text textarea:focus-visible',
+        '.remove-image:focus-visible',
+    ]) {
+        const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        assert.match(css, new RegExp(
+            `${escaped}[\\s\\S]*?outline:\\s*3px solid #c63d48`,
+        ));
+    }
+    assert.match(css, /\.choice-group button:hover[\s\S]*?border-color:\s*var\(--accent\)/);
+    assert.match(css, /\.remove-image:hover[\s\S]*?border-color:\s*var\(--danger\)/);
 });
 
 test('schema field rerenders preserve creator metadata structure', () => {

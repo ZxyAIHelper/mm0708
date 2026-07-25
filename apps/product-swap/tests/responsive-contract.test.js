@@ -38,6 +38,26 @@ test('creator uses the light merchant palette and narrow-screen layout', () => {
     assert.match(creatorCss, /@media\s*\(max-width:\s*360px\)/);
 });
 
+test('food creator has explicit desktop and 640px responsive layout contracts', () => {
+    assert.match(
+        ruleFor(creatorCss, '.product-swap-shell'),
+        /width:\s*min\(100%,\s*460px\)/,
+    );
+    assert.match(
+        ruleFor(creatorCss, '.choice-group'),
+        /overflow-x:\s*auto/,
+    );
+    assert.match(creatorCss, /@media\s*\(max-width:\s*640px\)/);
+    assert.match(
+        creatorCss,
+        /@media\s*\(max-width:\s*640px\)[\s\S]*?\.product-swap-shell\s*\{[^}]*padding-inline:\s*16px/,
+    );
+    assert.match(
+        creatorCss,
+        /@media\s*\(max-width:\s*640px\)[\s\S]*?body\[data-template-id="food-copy-layout"\] \.template-field-image \.upload-box\s*\{[^}]*min-height:\s*220px/,
+    );
+});
+
 test('creator inputs and Works surfaces retain readable light-theme contrast', () => {
     assert.match(ruleFor(creatorCss, '#refineInput'), /background:\s*var\(--panel-soft\)/);
     assert.match(ruleFor(creatorCss, '.state-card'), /background:\s*var\(--panel-soft\)/);
@@ -52,9 +72,15 @@ test('creator inputs and Works surfaces retain readable light-theme contrast', (
         ruleFor(creatorCss, '.task-detail-toolbar'),
         /background:\s*rgb\(255 255 255 \/ 94%\)/,
     );
-    assert.doesNotMatch(ruleFor(creatorCss, '#requirementsInput'), /outline:\s*none/);
+    assert.doesNotMatch(
+        ruleFor(creatorCss, '.template-field-text textarea'),
+        /outline:\s*none/,
+    );
     assert.doesNotMatch(ruleFor(creatorCss, '#refineInput'), /outline:\s*none/);
-    assert.match(ruleFor(creatorCss, '#requirementsInput::placeholder'), /color:\s*var\(--muted\)/);
+    assert.match(
+        ruleFor(creatorCss, '.template-field-text textarea::placeholder'),
+        /color:\s*var\(--muted\)/,
+    );
     assert.match(ruleFor(creatorCss, '.history-footnote'), /color:\s*#5f5a55/);
     assert.doesNotMatch(creatorCss, /rgba\(21,\s*185,\s*212|#0b8ea7/);
 });
