@@ -10,7 +10,7 @@ module.exports = {
     tags: ['换背景', '产品图', '同款'],
     status: 'live',
     href: '/create.html?template=product-swap',
-    cover: '/assets/example-result.jpg',
+    cover: '/assets/product-swap-cover.jpg',
     outputLabel: '生成 1 张场景图',
     creditCost: 3,
     fields: [

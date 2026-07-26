@@ -49,6 +49,23 @@ test('lists, filters, and searches the catalog', () => {
     assert.equal(getTemplate('unknown-template'), null);
 });
 
+test('every template publishes a unique template-owned cover', () => {
+    const templates = listTemplates();
+
+    assert.equal(
+        new Set(templates.map(({ cover }) => cover)).size,
+        templates.length,
+    );
+    for (const template of templates) {
+        assert.match(
+            template.cover,
+            new RegExp(
+                `/assets/${template.id}-cover\\.(svg|png|jpe?g|webp)$`,
+            ),
+        );
+    }
+});
+
 test('browser catalog stays safe without CommonJS require or metadata arrays', () => {
     const source = fs.readFileSync(
         path.resolve(__dirname, '..', 'templates.js'),

@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-labelledby="title desc">
+  <title id="title">夏日产品种草模板封面</title>
+  <desc id="desc">清爽夏日饮品、阳光和绿叶组成的社交平台种草封面</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#b8eee8"/>
+      <stop offset=".55" stop-color="#78cfc8"/>
+      <stop offset="1" stop-color="#3d9ea3"/>
+    </linearGradient>
+    <linearGradient id="drink" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff9c7"/>
+      <stop offset="1" stop-color="#f4a64b"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#246d72" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <rect width="600" height="600" rx="38" fill="url(#bg)"/>
+  <circle cx="490" cy="102" r="64" fill="#ffe178"/>
+  <path d="M490 18v28m0 112v28m-84-84h28m112 0h28m-143-59 20 20m78 78 20 20m0-118-20 20m-78 78-20 20" stroke="#fff0a6" stroke-width="10" stroke-linecap="round"/>
+  <path d="M0 447c84-53 147-48 217 5 77-61 163-61 239 0 53-29 96-32 144-5v153H0z" fill="#ecf8dc"/>
+  <path d="M30 475c72-41 130-33 190 13 73-49 152-49 224 0 57-31 105-31 156-7v119H30z" fill="#d4efb6"/>
+  <text x="45" y="70" fill="#155e65" font-family="Microsoft YaHei, PingFang SC, sans-serif" font-size="26" font-weight="800">夏日清爽上新</text>
+  <g filter="url(#shadow)">
+    <rect x="54" y="107" width="300" height="354" rx="28" fill="#fffaf0"/>
+  </g>
+  <rect x="76" y="129" width="256" height="223" rx="20" fill="#c7eee5"/>
+  <ellipse cx="204" cy="323" rx="77" ry="15" fill="#4d9f9d" opacity=".28"/>
+  <path d="M147 174h114l-15 142a18 18 0 0 1-18 16h-48a18 18 0 0 1-18-16z" fill="url(#drink)"/>
+  <path d="M155 189h98" stroke="#fff" stroke-width="12" stroke-linecap="round" opacity=".75"/>
+  <path d="M209 177l36-67" stroke="#e85d68" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="193" cy="231" r="19" fill="#fff3a6" opacity=".8"/>
+  <circle cx="225" cy="278" r="14" fill="#fff3a6" opacity=".72"/>
+  <path d="M126 264c-34-35-32-73 7-92 37 25 38 64-7 92zm158-7c37-29 42-66 8-91-40 19-47 58-8 91z" fill="#60a66d"/>
+  <text x="204" y="397" text-anchor="middle" fill="#1e6a6e" font-family="Microsoft YaHei, PingFang SC, sans-serif" font-size="28" font-weight="800">冰爽果茶</text>
+  <text x="204" y="429" text-anchor="middle" fill="#708e81" font-family="Microsoft YaHei, PingFang SC, sans-serif" font-size="18">清甜果香 · 解暑必喝</text>
+  <g transform="translate(378 217) rotate(5)">
+    <rect width="168" height="178" rx="24" fill="#fff" opacity=".94"/>
+    <rect x="20" y="22" width="128" height="28" rx="14" fill="#f3d765"/>
+    <text x="84" y="43" text-anchor="middle" fill="#426e68" font-family="Microsoft YaHei, PingFang SC, sans-serif" font-size="16" font-weight="700">今日种草</text>
+    <text x="22" y="88" fill="#245d62" font-family="Microsoft YaHei, PingFang SC, sans-serif" font-size="21" font-weight="800">一口喝到</text>
+    <text x="22" y="119" fill="#245d62" font-family="Microsoft YaHei, PingFang SC, sans-serif" font-size="21" font-weight="800">整个夏天</text>
+    <path d="M24 146h82" stroke="#abd5ca" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="135" cy="146" r="13" fill="#ee796f"/>
+  </g>
+  <path d="M421 430c-35-30-36-67-2-89 39 19 45 57 2 89zm81 20c-23-37-10-72 29-82 30 31 19 68-29 82z" fill="#4d9e70"/>
+  <text x="300" y="565" text-anchor="middle" fill="#1e6a70" font-family="Microsoft YaHei, PingFang SC, sans-serif" font-size="22">产品亮点，变成让人想收藏的封面</text>
+</svg>

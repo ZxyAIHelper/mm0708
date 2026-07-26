@@ -10,7 +10,7 @@ module.exports = {
     tags: ['门店', '活动', '周末'],
     status: 'coming_soon',
     href: '',
-    cover: '/assets/example-template.jpg',
+    cover: '/assets/store-promotion-cover.svg',
     outputLabel: '生成活动发布包',
     creditCost: 0,
     fields: [],

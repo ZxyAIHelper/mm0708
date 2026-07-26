@@ -18,7 +18,7 @@ function sampleManifest(fields) {
         tags: ['测试'],
         status: 'coming_soon',
         href: '',
-        cover: '/assets/example.jpg',
+        cover: '/assets/sample-cover.jpg',
         outputLabel: '生成',
         creditCost: 0,
         fields,

@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-labelledby="title desc">
+  <title id="title">周末到店活动模板封面</title>
+  <desc id="desc">店铺门面、周末日历和到店优惠信息组成的活动海报</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff816c"/>
+      <stop offset="1" stop-color="#d94852"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#812833" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <rect width="600" height="600" rx="38" fill="url(#bg)"/>
+  <circle cx="88" cy="88" r="54" fill="#ffd975" opacity=".32"/>
+  <circle cx="520" cy="516" r="94" fill="#7b1f37" opacity=".13"/>
+  <text x="48" y="70" fill="#fff9ed" font-family="Microsoft YaHei, PingFang SC, sans-serif" font-size="28" font-weight="800">这个周末，来店里逛逛</text>
+  <g filter="url(#shadow)">
+    <rect x="48" y="112" width="504" height="416" rx="30" fill="#fff8ec"/>
+  </g>
+  <rect x="77" y="158" width="300" height="286" rx="18" fill="#f4d9b2"/>
+  <rect x="99" y="236" width="256" height="208" fill="#f0c795"/>
+  <path d="M83 176h288l-18 74H101z" fill="#f8f0df"/>
+  <path d="M83 176h48l-10 74H101zm96 0h48v74h-58zm96 0h48l10 74h-58z" fill="#cf4a51"/>
+  <rect x="129" y="279" width="86" height="165" rx="8" fill="#875444"/>
+  <rect x="239" y="279" width="86" height="98" rx="8" fill="#91b7ad"/>
+  <path d="M250 327h64M282 289v77" stroke="#dcefe9" stroke-width="8"/>
+  <rect x="143" y="304" width="58" height="74" rx="6" fill="#f3d9ad"/>
+  <circle cx="188" cy="363" r="5" fill="#7d4b3d"/>
+  <rect x="112" y="128" width="230" height="54" rx="12" fill="#4c3432"/>
+  <text x="227" y="164" text-anchor="middle" fill="#fff7e8" font-family="Microsoft YaHei, PingFang SC, sans-serif" font-size="24" font-weight="700">山野小店</text>
+  <g transform="translate(398 151)">
+    <rect width="125" height="132" rx="20" fill="#fff"/>
+    <path d="M0 25a20 20 0 0 1 20-20h85a20 20 0 0 1 20 20v26H0z" fill="#4e766c"/>
+    <text x="62" y="38" text-anchor="middle" fill="#fff" font-family="Microsoft YaHei, PingFang SC, sans-serif" font-size="18" font-weight="700">周末</text>
+    <text x="62" y="100" text-anchor="middle" fill="#cf4a51" font-family="Microsoft YaHei, PingFang SC, sans-serif" font-size="44" font-weight="800">六日</text>
+  </g>
+  <g transform="translate(395 313)">
+    <rect width="132" height="106" rx="22" fill="#ffd975"/>
+    <text x="66" y="38" text-anchor="middle" fill="#7a3435" font-family="Microsoft YaHei, PingFang SC, sans-serif" font-size="20" font-weight="700">到店福利</text>
+    <text x="66" y="74" text-anchor="middle" fill="#b3343e" font-family="Microsoft YaHei, PingFang SC, sans-serif" font-size="25" font-weight="800">第二份半价</text>
+    <circle cx="0" cy="53" r="12" fill="#fff8ec"/>
+    <circle cx="132" cy="53" r="12" fill="#fff8ec"/>
+  </g>
+  <rect x="101" y="472" width="398" height="34" rx="17" fill="#f4dfc6"/>
+  <text x="300" y="496" text-anchor="middle" fill="#76544b" font-family="Microsoft YaHei, PingFang SC, sans-serif" font-size="18">门店信息 · 活动时间 · 优惠亮点</text>
+  <text x="300" y="570" text-anchor="middle" fill="#ffe9db" font-family="Microsoft YaHei, PingFang SC, sans-serif" font-size="22">一键整理成到店活动宣传图</text>
+</svg>

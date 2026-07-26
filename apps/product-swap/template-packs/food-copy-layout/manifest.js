@@ -10,7 +10,7 @@ module.exports = {
     tags: ['美食', '文案', '排版', '探店'],
     status: 'live',
     href: '/create.html?template=food-copy-layout',
-    cover: '/assets/example-result.jpg',
+    cover: '/assets/food-copy-layout-cover.webp',
     outputLabel: '生成 1 张文案配图',
     creditCost: 3,
     fields: [

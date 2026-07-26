@@ -10,7 +10,7 @@ module.exports = {
     tags: ['聊天', '微信风格', '探店', '种草'],
     status: 'live',
     href: '/create.html?template=wechat-chat-screenshot',
-    cover: '/assets/wechat-chat-screenshot-cover.svg',
+    cover: '/assets/wechat-chat-screenshot-cover.webp',
     outputLabel: '生成聊天对话',
     creditCost: 0,
     fields: [{

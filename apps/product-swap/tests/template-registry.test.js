@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+    assertCoverAssetExists,
     getTemplatePackage,
     listTemplatePackages,
     publicCatalog,
@@ -20,7 +21,7 @@ function validManifest(overrides = {}) {
         tags: ['示例'],
         status: 'coming_soon',
         href: '',
-        cover: '/assets/sample.jpg',
+        cover: '/assets/sample-cover.jpg',
         outputLabel: '生成示例',
         creditCost: 0,
         fields: [],
@@ -707,6 +708,24 @@ test('validates choice options and defaults', () => {
             })],
         }), 'sample'),
         /Template sample field ratio option preview must be supported/,
+    );
+});
+
+test('requires each manifest to own its cover path', () => {
+    assert.throws(
+        () => validateManifest(validManifest({
+            cover: '/assets/shared-cover.svg',
+        }), 'sample'),
+        /Template sample cover must use its template-owned filename/,
+    );
+});
+
+test('requires each discovered template cover asset to exist', () => {
+    assert.throws(
+        () => assertCoverAssetExists(validManifest({
+            cover: '/assets/sample-cover.svg',
+        })),
+        /Template sample cover asset does not exist/,
     );
 });
 

@@ -10,7 +10,7 @@ module.exports = {
     tags: ['夏日', '种草', '产品'],
     status: 'coming_soon',
     href: '',
-    cover: '/assets/example-product.jpg',
+    cover: '/assets/summer-seeding-cover.svg',
     outputLabel: '生成 3 张种草图',
     creditCost: 0,
     fields: [],

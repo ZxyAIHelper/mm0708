@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
+const { publicCatalog } = require('../server/template-registry');
+
 const appRoot = path.resolve(__dirname, '..');
 
 test('build emits only deployable public assets', async () => {
@@ -60,6 +62,16 @@ test('build emits only deployable public assets', async () => {
         ).then((stat) => stat.isFile()),
         true,
     );
+    for (const { cover } of publicCatalog()) {
+        assert.equal(
+            await fs.stat(path.join(
+                appRoot,
+                'dist',
+                cover.replace(/^\//, ''),
+            )).then((stat) => stat.isFile()),
+            true,
+        );
+    }
 });
 
 test('build emits a browser-safe generated template catalog', async () => {

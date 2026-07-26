@@ -163,14 +163,23 @@ test('chat template mounts its own editor and skips image generation', () => {
     );
 });
 
-test('chat template cover exists as a local svg', () => {
+test('chat template cover uses a local real-output raster', () => {
+    const manifest = require(
+        '../template-packs/wechat-chat-screenshot/manifest',
+    );
     const cover = path.join(
         root,
-        'assets',
-        'wechat-chat-screenshot-cover.svg',
+        manifest.cover.replace(/^\//, ''),
+    );
+
+    assert.equal(
+        manifest.cover,
+        '/assets/wechat-chat-screenshot-cover.webp',
     );
     assert.equal(fs.existsSync(cover), true);
-    assert.match(fs.readFileSync(cover, 'utf8'), /<svg/);
+    const bytes = fs.readFileSync(cover);
+    assert.equal(bytes.subarray(0, 4).toString('ascii'), 'RIFF');
+    assert.equal(bytes.subarray(8, 12).toString('ascii'), 'WEBP');
 });
 
 test('creator styles every schema-driven food template control', () => {

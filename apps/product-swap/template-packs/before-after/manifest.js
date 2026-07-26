@@ -10,7 +10,7 @@ module.exports = {
     tags: ['对比', '效果', '案例'],
     status: 'coming_soon',
     href: '',
-    cover: '/assets/example-result.jpg',
+    cover: '/assets/before-after-cover.svg',
     outputLabel: '生成 1 张对比图',
     creditCost: 0,
     fields: [],

@@ -4,6 +4,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const PACKS_ROOT = path.resolve(__dirname, '..', 'template-packs');
+const ASSETS_ROOT = path.resolve(__dirname, '..', 'assets');
+const COVER_EXTENSIONS = new Set([
+    '.jpeg',
+    '.jpg',
+    '.png',
+    '.svg',
+    '.webp',
+]);
 const REQUIRED_KEYS = [
     'id',
     'taskType',
@@ -688,6 +696,16 @@ function validateManifest(manifest, directoryName) {
             `Template ${values.id} cover must be a non-empty string`,
         );
     }
+    const coverFilename = path.posix.basename(values.cover);
+    if (
+        values.cover !== `/assets/${coverFilename}`
+        || !coverFilename.startsWith(`${values.id}-cover.`)
+        || !COVER_EXTENSIONS.has(path.posix.extname(coverFilename))
+    ) {
+        throw new Error(
+            `Template ${values.id} cover must use its template-owned filename`,
+        );
+    }
 
     const fieldInputs = denseArrayValues(values.fields);
     const canonicalFields = new Array(fieldInputs.length);
@@ -719,6 +737,16 @@ function validateManifest(manifest, directoryName) {
     return canonical;
 }
 
+function assertCoverAssetExists(manifest, assetsRoot = ASSETS_ROOT) {
+    const filename = path.posix.basename(manifest.cover);
+    if (!fs.existsSync(path.join(assetsRoot, filename))) {
+        throw new Error(
+            `Template ${manifest.id} cover asset does not exist:`
+            + ` ${manifest.cover}`,
+        );
+    }
+}
+
 function deepFreeze(value) {
     if (
         !value
@@ -740,12 +768,12 @@ function listTemplatePackages() {
         .filter((entry) => entry.isDirectory())
         .map((entry) => {
             const packRoot = path.join(PACKS_ROOT, entry.name);
-            const manifest = deepFreeze(
-                validateManifest(
-                    require(path.join(packRoot, 'manifest.js')),
-                    entry.name,
-                ),
+            const validatedManifest = validateManifest(
+                require(path.join(packRoot, 'manifest.js')),
+                entry.name,
             );
+            assertCoverAssetExists(validatedManifest);
+            const manifest = deepFreeze(validatedManifest);
             const buildPrompt = manifest.status === 'live'
                 ? require(path.join(packRoot, 'prompt.js')).buildPrompt
                 : null;
@@ -856,6 +884,7 @@ function publicCatalog() {
 
 module.exports = {
     PACKS_ROOT,
+    assertCoverAssetExists,
     validateManifest,
     listTemplatePackages,
     getTemplatePackage,
