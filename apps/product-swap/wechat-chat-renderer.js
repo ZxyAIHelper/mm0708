@@ -381,18 +381,17 @@
         if (image) {
             drawImageCover(ctx, image, item.x, item.y, item.width, 196);
         } else {
-            ctx.fillStyle = '#dce7df';
-            ctx.fillRect(item.x, item.y, item.width, 178);
-            ctx.fillStyle = '#07c160';
-            ctx.beginPath();
-            ctx.arc(
+            ctx.fillStyle = '#e4e7e5';
+            ctx.fillRect(item.x, item.y, item.width, 196);
+            ctx.fillStyle = '#767676';
+            ctx.font = '400 32px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(
+                '地图暂不可用',
                 item.x + item.width / 2,
                 item.y + 90,
-                20,
-                0,
-                Math.PI * 2,
             );
-            ctx.fill();
         }
         ctx.restore();
         const location = locations[item.refId] || {};
@@ -535,7 +534,34 @@
         }${digits(date.getMinutes())}${pageSuffix}.png`;
     }
 
-    async function loadResources(materials, mapPreviewUrl, avatars) {
+    async function loadLocationMap(
+        materials,
+        mapPreviewImage,
+        mapPreviewUrl,
+        imageLoader = loadImage,
+    ) {
+        if (!materials.location) return null;
+        try {
+            if (typeof mapPreviewImage === 'function') {
+                return await mapPreviewImage(materials.location);
+            }
+            if (typeof mapPreviewUrl === 'function') {
+                return await imageLoader(
+                    mapPreviewUrl(materials.location),
+                );
+            }
+        } catch {
+            return null;
+        }
+        return null;
+    }
+
+    async function loadResources(
+        materials,
+        mapPreviewUrl,
+        avatars,
+        mapPreviewImage,
+    ) {
         const resources = {
             locations: {},
             avatars: await loadAvatarResources(avatars),
@@ -546,14 +572,13 @@
         }
         if (materials.location) {
             resources.locations[materials.location.id] = materials.location;
-            if (typeof mapPreviewUrl === 'function') {
-                try {
-                    resources[materials.location.id] = await loadImage(
-                        mapPreviewUrl(materials.location),
-                    );
-                } catch {
-                    // The location card remains usable with its safe fallback.
-                }
+            const mapImage = await loadLocationMap(
+                materials,
+                mapPreviewImage,
+                mapPreviewUrl,
+            );
+            if (mapImage) {
+                resources[materials.location.id] = mapImage;
             }
         }
         return resources;
@@ -564,6 +589,7 @@
         materials,
         {
             canvasFactory = () => document.createElement('canvas'),
+            mapPreviewImage = global.TencentMapPicker?.loadMapPreviewImage,
             mapPreviewUrl = global.TencentMapPicker?.mapPreviewUrl,
             avatars = {},
         } = {},
@@ -572,6 +598,7 @@
             materials,
             mapPreviewUrl,
             avatars,
+            mapPreviewImage,
         );
         const measureCanvas = document.createElement('canvas');
         const measureContext = measureCanvas.getContext('2d');
@@ -608,6 +635,7 @@
         materials,
         {
             canvas = document.createElement('canvas'),
+            mapPreviewImage = global.TencentMapPicker?.loadMapPreviewImage,
             mapPreviewUrl = global.TencentMapPicker?.mapPreviewUrl,
             avatars = {},
         } = {},
@@ -618,6 +646,7 @@
                     ? canvas
                     : document.createElement('canvas')
             ),
+            mapPreviewImage,
             mapPreviewUrl,
             avatars,
         });
@@ -635,6 +664,7 @@
         layoutChat,
         loadAvatarResources,
         loadChromeResources,
+        loadLocationMap,
         outputFileName,
         paginateChat,
         renderChatPages,
