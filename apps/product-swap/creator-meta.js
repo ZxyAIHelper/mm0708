@@ -92,6 +92,16 @@
         section.append(input, upload, status, cards);
     }
 
+    function previewBlockCount(preview) {
+        return {
+            tier: 5,
+            'grid-4': 4,
+            'grid-9': 9,
+            hero: 5,
+            leaderboard: 9,
+        }[preview] || 0;
+    }
+
     function renderChoiceField(section, field, controlId) {
         const label = appendLabel(section, field, controlId);
         const group = global.document.createElement('div');
@@ -103,6 +113,9 @@
             'aria-required',
             String(Boolean(field.required)),
         );
+        if ((field.options || []).some((option) => option.preview)) {
+            group.classList.add('choice-group-with-previews');
+        }
         for (const [index, option] of (field.options || []).entries()) {
             const button = global.document.createElement('button');
             const selected = option.value === field.default;
@@ -116,7 +129,27 @@
                 field.default,
                 index,
             );
-            button.textContent = option.label;
+            if (option.preview) {
+                const preview = global.document.createElement('span');
+                preview.className =
+                    `choice-preview choice-preview-${option.preview}`;
+                preview.setAttribute('aria-hidden', 'true');
+                const blockCount = previewBlockCount(option.preview);
+                for (
+                    let blockIndex = 0;
+                    blockIndex < blockCount;
+                    blockIndex += 1
+                ) {
+                    const block = global.document.createElement('i');
+                    preview.appendChild(block);
+                }
+                const text = global.document.createElement('span');
+                text.className = 'choice-label';
+                text.textContent = option.label;
+                button.append(preview, text);
+            } else {
+                button.textContent = option.label;
+            }
             group.appendChild(button);
         }
         section.appendChild(group);

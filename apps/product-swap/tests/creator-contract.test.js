@@ -120,6 +120,13 @@ test('creator metadata renders all supported schema field types', () => {
     assert.match(source, /role', 'switch'/);
     assert.match(source, /button\.appendChild\(text\)/);
     assert.match(source, /CreatorForm\.choiceTabIndex/);
+    assert.match(source, /choice-group-with-previews/);
+    assert.match(source, /choice-preview choice-preview-\$\{option\.preview\}/);
+    assert.match(source, /preview\.setAttribute\('aria-hidden', 'true'\)/);
+    assert.match(source, /global\.document\.createElement\('i'\)/);
+    assert.match(source, /text\.className = 'choice-label'/);
+    assert.match(source, /button\.append\(preview, text\)/);
+    assert.match(source, /button\.textContent = option\.label/);
     assert.match(source, /field\.maxLength/);
     assert.match(source, /field\.type === 'chat-materials'/);
     assert.match(source, /chat-editor-slot/);
