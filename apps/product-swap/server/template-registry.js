@@ -87,6 +87,13 @@ const IMAGE_MEDIA_TYPES = new Set([
     'image/png',
     'image/webp',
 ]);
+const CHOICE_PREVIEWS = new Set([
+    'tier',
+    'grid-4',
+    'grid-9',
+    'hero',
+    'leaderboard',
+]);
 
 function firstUnknownKey(value, allowedKeys) {
     const allowed = new Set(allowedKeys);
@@ -417,7 +424,7 @@ function validateField(field, manifestId) {
                 }
                 const unknownOptionKey = firstUnknownKey(
                     option,
-                    ['value', 'label'],
+                    ['value', 'label', 'preview'],
                 );
                 if (unknownOptionKey !== undefined) {
                     throw new Error(
@@ -439,9 +446,23 @@ function validateField(field, manifestId) {
                 const optionData = ownDataValues(option);
                 optionValues[index] = optionData.value;
                 optionLabels[index] = optionData.label;
+                if (
+                    Object.hasOwn(optionData, 'preview')
+                    && (
+                        typeof optionData.preview !== 'string'
+                        || !CHOICE_PREVIEWS.has(optionData.preview)
+                    )
+                ) {
+                    throw new Error(
+                        `${fieldContext} option preview must be supported`,
+                    );
+                }
                 const canonicalOption = Object.create(null);
                 canonicalOption.value = optionData.value;
                 canonicalOption.label = optionData.label;
+                if (Object.hasOwn(optionData, 'preview')) {
+                    canonicalOption.preview = optionData.preview;
+                }
                 canonicalOptions[index] = canonicalOption;
             }
             let invalidOptions = optionInputs.length === 0;
@@ -806,7 +827,7 @@ function publicManifest(manifest) {
             ) {
                 publishedField.options[optionIndex] = copyAllowedProperties(
                     optionInputs[optionIndex],
-                    ['value', 'label'],
+                    ['value', 'label', 'preview'],
                 );
             }
         }

@@ -32,7 +32,31 @@ module.exports = {
             required: true,
             default: 'tier',
             options: [
-                { value: 'tier', label: '从拉到夯' },
+                {
+                    value: 'tier',
+                    label: '从拉到夯',
+                    preview: 'tier',
+                },
+                {
+                    value: 'grid-4',
+                    label: '四宫格精选',
+                    preview: 'grid-4',
+                },
+                {
+                    value: 'grid-9',
+                    label: '九宫格榜单',
+                    preview: 'grid-9',
+                },
+                {
+                    value: 'hero',
+                    label: '主推封面',
+                    preview: 'hero',
+                },
+                {
+                    value: 'leaderboard',
+                    label: 'TOP 榜单',
+                    preview: 'leaderboard',
+                },
             ],
         },
         {

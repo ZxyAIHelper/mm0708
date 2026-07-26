@@ -46,10 +46,33 @@ test('publishes the live dish ranking template', () => {
         accept: ['image/jpeg', 'image/png', 'image/webp'],
     });
     const layout = template.fields.find((field) => field.key === 'layout');
-    assert.deepEqual(layout.options, [{
-        value: 'tier',
-        label: '从拉到夯',
-    }]);
+    assert.deepEqual(layout.options, [
+        {
+            value: 'tier',
+            label: '从拉到夯',
+            preview: 'tier',
+        },
+        {
+            value: 'grid-4',
+            label: '四宫格精选',
+            preview: 'grid-4',
+        },
+        {
+            value: 'grid-9',
+            label: '九宫格榜单',
+            preview: 'grid-9',
+        },
+        {
+            value: 'hero',
+            label: '主推封面',
+            preview: 'hero',
+        },
+        {
+            value: 'leaderboard',
+            label: 'TOP 榜单',
+            preview: 'leaderboard',
+        },
+    ]);
     assert.equal(
         template.fields.some((field) => field.key === 'requirements'),
         false,

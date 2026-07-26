@@ -696,6 +696,18 @@ test('validates choice options and defaults', () => {
         }), 'sample'),
         /Template sample field ratio option has unknown property internalNotes/,
     );
+    assert.throws(
+        () => validateManifest(validManifest({
+            fields: [validField('choice', {
+                options: [{
+                    value: 'square',
+                    label: 'Square',
+                    preview: 'untrusted-preview',
+                }],
+            })],
+        }), 'sample'),
+        /Template sample field ratio option preview must be supported/,
+    );
 });
 
 test('validates boolean defaults and text presentation properties', () => {
@@ -723,7 +735,19 @@ test('validates boolean defaults and text presentation properties', () => {
 
 test('publicManifest projects and deeply clones only public properties', () => {
     const source = validManifest({
-        fields: [validField('choice')],
+        fields: [validField('choice', {
+            options: [
+                {
+                    value: 'square',
+                    label: 'Square',
+                    preview: 'grid-4',
+                },
+                {
+                    value: 'portrait',
+                    label: 'Portrait',
+                },
+            ],
+        })],
         quickPrompts: ['Try square'],
         internalNotes: {
             secret: true,
@@ -753,6 +777,14 @@ test('publicManifest projects and deeply clones only public properties', () => {
     assert.equal('internalNotes' in published, false);
     assert.notEqual(published.fields, source.fields);
     assert.notEqual(published.fields[0].options, source.fields[0].options);
+    assert.equal(
+        published.fields[0].options[0].preview,
+        'grid-4',
+    );
+    assert.equal(
+        'preview' in published.fields[0].options[1],
+        false,
+    );
 
     published.fields[0].options[0].label = 'Changed';
     published.quickPrompts.push('Changed');
