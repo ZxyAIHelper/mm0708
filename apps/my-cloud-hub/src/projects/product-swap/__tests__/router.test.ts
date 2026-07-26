@@ -258,7 +258,8 @@ describe('product swap router', () => {
         expect(url.origin).toBe('https://apis.map.qq.com')
         expect(url.pathname).toBe('/ws/staticmap/v2/')
         expect(url.searchParams.get('zoom')).toBe('16')
-        expect(url.searchParams.get('size')).toBe('720*260')
+        expect(url.searchParams.get('size')).toBe('640*260')
+        expect(url.searchParams.get('scale')).toBe('2')
         expect(url.searchParams.get('maptype')).toBe('roadmap')
         expect(url.searchParams.get('key')).toBe('map-key')
         expect(url.searchParams.get('markers')).toContain(

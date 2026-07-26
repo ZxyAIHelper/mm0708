@@ -389,7 +389,8 @@ export function createProductSwapRouter(
         const center = `${coordinates.lat},${coordinates.lng}`
         upstreamUrl.searchParams.set('center', center)
         upstreamUrl.searchParams.set('zoom', '16')
-        upstreamUrl.searchParams.set('size', '720*260')
+        upstreamUrl.searchParams.set('size', '640*260')
+        upstreamUrl.searchParams.set('scale', '2')
         upstreamUrl.searchParams.set('maptype', 'roadmap')
         upstreamUrl.searchParams.set(
             'markers',
