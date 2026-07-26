@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const {
     DEFAULT_HEIGHT,
@@ -8,6 +10,7 @@ const {
     layoutChat,
     loadAvatarResources,
     loadChromeResources,
+    loadLocationMap,
     paginateChat,
     wrapMessageText,
 } = require('../wechat-chat-renderer');
@@ -214,4 +217,45 @@ test('loads the cropped reference chrome assets', async () => {
         source.startsWith('/assets/chat-chrome/')
         && source.endsWith('.png')
     )));
+});
+
+test('loads a selected location through the shared map image loader', async () => {
+    const image = { width: 640, height: 260 };
+    let calls = 0;
+    const loaded = await loadLocationMap(
+        {
+            location: {
+                id: 'store-location',
+                name: '深圳湖贝里',
+                address: '深圳市罗湖区湖贝路1068号',
+                city: '深圳市',
+                lat: 22.546394,
+                lng: 114.128133,
+            },
+        },
+        async () => {
+            calls += 1;
+            return image;
+        },
+    );
+
+    assert.strictEqual(loaded, image);
+    assert.equal(calls, 1);
+});
+
+test('uses an honest unavailable map placeholder', () => {
+    const source = fs.readFileSync(
+        path.join(__dirname, '..', 'wechat-chat-renderer.js'),
+        'utf8',
+    );
+
+    assert.match(source, /地图暂不可用/);
+    assert.match(
+        source,
+        /mapPreviewImage = global\.TencentMapPicker\?\.loadMapPreviewImage/,
+    );
+    assert.doesNotMatch(
+        source,
+        /ctx\.arc\(\s*item\.x \+ item\.width \/ 2/,
+    );
 });
