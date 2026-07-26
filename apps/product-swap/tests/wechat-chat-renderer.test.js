@@ -116,6 +116,25 @@ test('keeps a short conversation on one page', () => {
     assert.equal(pages[0].pageCount, 1);
 });
 
+test('reserves phone status and composer chrome outside messages', () => {
+    const layout = layoutChat({
+        messages: messages.slice(-3),
+        measureText: (text) => Array.from(text).length * 34,
+        assets: {},
+    });
+
+    assert.deepEqual(layout.chrome.statusBar, {
+        top: 0,
+        height: 104,
+    });
+    assert.equal(layout.chrome.composer.height, 156);
+    assert.equal(
+        layout.chrome.composer.top,
+        layout.height - layout.chrome.composer.height,
+    );
+    assert.ok(layout.safeBottom <= layout.chrome.composer.top - 24);
+});
+
 test('loads independent avatars and keeps a fallback when one fails', async () => {
     const calls = [];
     const resources = await loadAvatarResources({

@@ -4,7 +4,8 @@
     const DEFAULT_WIDTH = 1080;
     const DEFAULT_HEIGHT = 1920;
     const TOP_CONTENT = 300;
-    const BOTTOM_SAFE = 160;
+    const COMPOSER_HEIGHT = 156;
+    const BOTTOM_CONTENT_GAP = 24;
     const MESSAGE_GAP = 26;
     const AVATAR_SIZE = 88;
     const TEXT_LINE_HEIGHT = 52;
@@ -101,7 +102,8 @@
             items.push(item);
             y = item.bottom + MESSAGE_GAP;
         }
-        const safeBottom = height - BOTTOM_SAFE;
+        const composerTop = height - COMPOSER_HEIGHT;
+        const safeBottom = composerTop - BOTTOM_CONTENT_GAP;
         return {
             width,
             height,
@@ -110,6 +112,13 @@
             contentBottom: items.at(-1)?.bottom || TOP_CONTENT,
             safeBottom,
             overflow: items.some((item) => item.bottom > safeBottom),
+            chrome: {
+                statusBar: { top: 0, height: 104 },
+                composer: {
+                    top: composerTop,
+                    height: COMPOSER_HEIGHT,
+                },
+            },
         };
     }
 
@@ -214,6 +223,8 @@
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
         ctx.fillText('20:43', 54, 54);
+        drawStatusIcons(ctx);
+        ctx.fillStyle = '#111111';
         ctx.textAlign = 'center';
         ctx.font = '600 42px sans-serif';
         ctx.fillText(layout.contactName, layout.width / 2, 162);
@@ -233,6 +244,114 @@
         ctx.fillStyle = '#a5a5a5';
         ctx.font = '400 30px sans-serif';
         ctx.fillText('20:43', layout.width / 2, 268);
+    }
+
+    function drawStatusIcons(ctx) {
+        ctx.fillStyle = '#111111';
+        for (let index = 0; index < 4; index += 1) {
+            const height = 12 + index * 8;
+            roundedRect(
+                ctx,
+                774 + index * 17,
+                72 - height,
+                11,
+                height,
+                4,
+            );
+            ctx.fill();
+        }
+
+        ctx.strokeStyle = '#111111';
+        ctx.lineWidth = 7;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.arc(862, 67, 32, Math.PI * 1.2, Math.PI * 1.8);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(862, 68, 20, Math.PI * 1.2, Math.PI * 1.8);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(862, 69, 7, Math.PI * 1.2, Math.PI * 1.8);
+        ctx.stroke();
+
+        roundedRect(ctx, 944, 35, 76, 43, 14);
+        ctx.fillStyle = '#111111';
+        ctx.fill();
+        roundedRect(ctx, 1022, 48, 7, 17, 3);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '600 25px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('99', 982, 57);
+    }
+
+    function drawComposer(ctx, layout) {
+        const top = layout.chrome?.composer?.top
+            ?? layout.height - COMPOSER_HEIGHT;
+        ctx.fillStyle = '#f7f7f7';
+        ctx.fillRect(0, top, layout.width, COMPOSER_HEIGHT);
+        ctx.strokeStyle = '#d8d8d8';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, top);
+        ctx.lineTo(layout.width, top);
+        ctx.stroke();
+
+        roundedRect(ctx, 112, top + 26, 700, 102, 14);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+
+        ctx.strokeStyle = '#161616';
+        ctx.fillStyle = '#161616';
+        ctx.lineWidth = 5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        ctx.beginPath();
+        ctx.arc(58, top + 78, 34, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(58, top + 78, 18, -0.85, 0.85);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(52, top + 78, 9, -0.85, 0.85);
+        ctx.stroke();
+
+        const micX = 762;
+        const micY = top + 73;
+        roundedRect(ctx, micX - 9, micY - 22, 18, 38, 9);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(micX, micY - 1, 20, 0.15, Math.PI - 0.15);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(micX, micY + 19);
+        ctx.lineTo(micX, micY + 31);
+        ctx.moveTo(micX - 13, micY + 31);
+        ctx.lineTo(micX + 13, micY + 31);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(876, top + 78, 34, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(864, top + 70, 3, 0, Math.PI * 2);
+        ctx.arc(888, top + 70, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(876, top + 78, 17, 0.2, Math.PI - 0.2);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(1004, top + 78, 34, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(984, top + 78);
+        ctx.lineTo(1024, top + 78);
+        ctx.moveTo(1004, top + 58);
+        ctx.lineTo(1004, top + 98);
+        ctx.stroke();
     }
 
     function drawTextMessage(ctx, item) {
@@ -366,6 +485,7 @@
                 );
             }
         }
+        drawComposer(ctx, layout);
         return canvas;
     }
 
