@@ -97,7 +97,7 @@ test('loads picker configuration through the shared api client', async () => {
     });
 });
 
-test('searches and normalizes real Tencent locations through the shared api', async () => {
+test('searches and preserves fallback status through the shared api', async () => {
     const calls = [];
     const locations = await searchLocations({
         region: ' 北京 ',
@@ -107,12 +107,13 @@ test('searches and normalizes real Tencent locations through the shared api', as
             return {
                 success: true,
                 locations: [{
-                    id: 'poi-1',
-                    name: '颐和园',
-                    address: '新建宫门路19号',
-                    city: '北京市',
-                    lat: 39.998766,
-                    lng: 116.273938,
+                    id: 'fallback-shenzhen-hubeili',
+                    name: '深圳湖贝里',
+                    address: '深圳市罗湖区湖贝路1068号',
+                    city: '深圳市',
+                    lat: 22.546394,
+                    lng: 114.128133,
+                    fallback: true,
                     tel: 'must-be-removed',
                 }, {
                     id: 'bad',
@@ -133,12 +134,13 @@ test('searches and normalizes real Tencent locations through the shared api', as
     assert.equal(request.searchParams.get('keyword'), '颐和园');
     assert.deepEqual(locations, [{
         id: 'store-location',
-        sourceId: 'poi-1',
-        name: '颐和园',
-        address: '新建宫门路19号',
-        city: '北京市',
-        lat: 39.998766,
-        lng: 116.273938,
+        sourceId: 'fallback-shenzhen-hubeili',
+        name: '深圳湖贝里',
+        address: '深圳市罗湖区湖贝路1068号',
+        city: '深圳市',
+        lat: 22.546394,
+        lng: 114.128133,
+        fallback: true,
     }]);
 });
 

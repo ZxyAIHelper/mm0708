@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
     normalizeChatMaterials,
+    normalizeLocation,
     validateChatMaterials,
 } = require('../chat-materials');
 
@@ -18,6 +19,20 @@ test('normalizes store text and optional material collections', () => {
         location: null,
         requirements: '像朋友聊天',
     });
+});
+
+test('preserves a strict fallback marker on normalized locations', () => {
+    const location = normalizeLocation({
+        id: 'store-location',
+        name: '深圳湖贝里',
+        address: '深圳市罗湖区湖贝路1068号',
+        city: '深圳市',
+        lat: 22.546394,
+        lng: 114.128133,
+        fallback: true,
+    });
+
+    assert.equal(location.fallback, true);
 });
 
 test('requires at least one store material', () => {

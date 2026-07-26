@@ -37,10 +37,34 @@ const response = {
 
 test('posts normalized materials to the chat draft endpoint', async () => {
     const calls = [];
-    const draft = await requestChatDraft(materials, {
+    const requestMaterials = {
+        ...materials,
+        location: {
+            id: 'store-location',
+            name: '深圳湖贝里',
+            address: '深圳市罗湖区湖贝路1068号',
+            city: '深圳市',
+            lat: 22.546394,
+            lng: 114.128133,
+            fallback: true,
+        },
+    };
+    const responseWithLocation = {
+        ...response,
+        draft: {
+            ...response.draft,
+            messages: [{
+                id: 'm1',
+                side: 'right',
+                type: 'location_ref',
+                refId: 'store-location',
+            }, ...response.draft.messages.slice(1)],
+        },
+    };
+    const draft = await requestChatDraft(requestMaterials, {
         apiJson: async (path, init) => {
             calls.push({ path, init });
-            return response;
+            return responseWithLocation;
         },
     });
 
@@ -48,8 +72,23 @@ test('posts normalized materials to the chat draft endpoint', async () => {
     assert.equal(calls[0].init.method, 'POST');
     assert.deepEqual(JSON.parse(calls[0].init.body), {
         templateId: 'wechat-chat-screenshot',
-        ...materials,
+        ...requestMaterials,
+        location: {
+            id: 'store-location',
+            name: '深圳湖贝里',
+            address: '深圳市罗湖区湖贝路1068号',
+            city: '深圳市',
+            lat: 22.546394,
+            lng: 114.128133,
+        },
     });
+    assert.equal(
+        Object.hasOwn(
+            JSON.parse(calls[0].init.body).location,
+            'fallback',
+        ),
+        false,
+    );
     assert.equal(draft.messages.length, 10);
 });
 
