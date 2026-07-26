@@ -93,6 +93,20 @@ type ProductSwapRouterOptions = {
 const MAX_MAP_BYTES = 2 * 1024 * 1024
 const MAX_LOCATION_SEARCH_BYTES = 512 * 1024
 const MAP_UPSTREAM_REFERER = 'https://product-swap.mm0708.top/'
+const FALLBACK_LOCATION = Object.freeze({
+    id: 'fallback-shenzhen-hubeili',
+    name: '深圳湖贝里',
+    address: '深圳市罗湖区湖贝路1068号',
+    city: '深圳市',
+    lat: 22.546394,
+    lng: 114.128133,
+    fallback: true,
+})
+
+type LocationFallbackReason =
+    | 'not_configured'
+    | 'upstream_unavailable'
+    | 'quota_exhausted'
 
 function chatProviderStatus(code: ChatDraftProviderError['code']) {
     if (code === 'CHAT_PROVIDER_NOT_CONFIGURED') return 503 as const
@@ -202,14 +216,19 @@ export function createProductSwapRouter(
                 },
             }, 400)
         }
-        if (!key) {
+
+        const fallbackResponse = (reason: LocationFallbackReason) => {
+            c.header('Cache-Control', 'no-store')
             return c.json({
-                success: false,
-                error: {
-                    code: 'TENCENT_MAP_NOT_CONFIGURED',
-                    message: '腾讯地图尚未配置',
-                },
-            }, 503)
+                success: true,
+                locations: [{ ...FALLBACK_LOCATION }],
+                fallback: true,
+                fallbackReason: reason,
+            }, 200)
+        }
+
+        if (!key) {
+            return fallbackResponse('not_configured')
         }
 
         const upstreamUrl = new URL(
@@ -231,13 +250,7 @@ export function createProductSwapRouter(
                 signal: AbortSignal.timeout(15_000),
             })
         } catch {
-            return c.json({
-                success: false,
-                error: {
-                    code: 'LOCATION_SEARCH_FAILED',
-                    message: '地点搜索暂时不可用',
-                },
-            }, 502)
+            return fallbackResponse('upstream_unavailable')
         }
 
         const contentLength = Number(
@@ -250,26 +263,14 @@ export function createProductSwapRouter(
                 && contentLength > MAX_LOCATION_SEARCH_BYTES
             )
         ) {
-            return c.json({
-                success: false,
-                error: {
-                    code: 'LOCATION_SEARCH_FAILED',
-                    message: '地点搜索暂时不可用',
-                },
-            }, 502)
+            return fallbackResponse('upstream_unavailable')
         }
         const text = await upstream.text()
         if (
             new TextEncoder().encode(text).byteLength
                 > MAX_LOCATION_SEARCH_BYTES
         ) {
-            return c.json({
-                success: false,
-                error: {
-                    code: 'LOCATION_SEARCH_FAILED',
-                    message: '地点搜索暂时不可用',
-                },
-            }, 502)
+            return fallbackResponse('upstream_unavailable')
         }
         let payload: unknown
         try {
@@ -294,22 +295,11 @@ export function createProductSwapRouter(
                     ? result.message.slice(0, 120)
                     : undefined,
             })
-            if (result?.status === 121) {
-                return c.json({
-                    success: false,
-                    error: {
-                        code: 'TENCENT_MAP_QUOTA_EXHAUSTED',
-                        message: '腾讯地图今日搜索额度已用完，请提高 Key 日额度或明日再试',
-                    },
-                }, 429)
-            }
-            return c.json({
-                success: false,
-                error: {
-                    code: 'LOCATION_SEARCH_FAILED',
-                    message: '地点搜索暂时不可用',
-                },
-            }, 502)
+            return fallbackResponse(
+                result?.status === 121
+                    ? 'quota_exhausted'
+                    : 'upstream_unavailable',
+            )
         }
 
         const locations = result.data.flatMap((item: unknown) => {
