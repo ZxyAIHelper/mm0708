@@ -194,6 +194,48 @@
         };
     }
 
+    async function runChatGeneration({
+        state,
+        requestDraft,
+        renderDraft,
+        taskLifecycle,
+    }) {
+        const input = state.snapshot().materials;
+        let task = null;
+        let archiveWarning = '';
+        try {
+            task = await taskLifecycle?.start(input);
+        } catch {
+            archiveWarning = '生成可继续，但本次任务记录无法保存';
+        }
+
+        try {
+            const draft = await state.regenerate(requestDraft);
+            const pages = await renderDraft(
+                draft,
+                state.snapshot().materials,
+            );
+            if (task) {
+                try {
+                    await taskLifecycle.complete(task, {
+                        draft,
+                        pages,
+                    });
+                } catch {
+                    archiveWarning =
+                        '生成成功，但任务记录保存失败';
+                }
+            }
+            return { draft, pages, archiveWarning };
+        } catch (error) {
+            if (task) {
+                await taskLifecycle.fail(task, error)
+                    .catch(() => undefined);
+            }
+            throw error;
+        }
+    }
+
     function element(tag, className, text) {
         const node = global.document.createElement(tag);
         if (className) node.className = className;
@@ -807,6 +849,7 @@
         CHAT_AVATARS,
         createChatEditorState,
         createSafeExampleDraft,
+        runChatGeneration,
         mountWechatChatEditor,
     };
     global.WechatChatEditor = api;

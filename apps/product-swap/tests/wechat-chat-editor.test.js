@@ -6,6 +6,7 @@ const path = require('node:path');
 const {
     createChatEditorState,
     createSafeExampleDraft,
+    runChatGeneration,
 } = require('../wechat-chat-editor');
 
 const validDraft = {
@@ -69,6 +70,95 @@ test('keeps the current draft when regeneration fails', async () => {
         /network failed/,
     );
     assert.deepEqual(state.snapshot().draft, validDraft);
+});
+
+test('records one completed task for each generated chat draft', async () => {
+    const calls = [];
+    const state = createChatEditorState();
+    state.setStoreName('三山山');
+
+    const result = await runChatGeneration({
+        state,
+        requestDraft: async () => validDraft,
+        renderDraft: async () => [{
+            blob: new Blob(['page'], { type: 'image/png' }),
+        }],
+        taskLifecycle: {
+            start: async () => {
+                calls.push('start');
+                return { id: 'task_chat_1' };
+            },
+            complete: async (task, output) => {
+                calls.push([
+                    'complete',
+                    task.id,
+                    output.pages.length,
+                ]);
+            },
+            fail: async () => calls.push('fail'),
+        },
+    });
+
+    assert.deepEqual(calls, [
+        'start',
+        ['complete', 'task_chat_1', 1],
+    ]);
+    assert.equal(result.pages.length, 1);
+    assert.equal(result.archiveWarning, '');
+});
+
+test('fails the local task when chat rendering fails', async () => {
+    const calls = [];
+    const state = createChatEditorState();
+    state.setStoreName('三山山');
+    const renderError = new Error('render failed');
+
+    await assert.rejects(runChatGeneration({
+        state,
+        requestDraft: async () => validDraft,
+        renderDraft: async () => {
+            throw renderError;
+        },
+        taskLifecycle: {
+            start: async () => ({ id: 'task_chat_2' }),
+            complete: async () => calls.push('complete'),
+            fail: async (task, error) => {
+                calls.push(['fail', task.id, error]);
+            },
+        },
+    }), renderError);
+
+    assert.deepEqual(calls, [
+        ['fail', 'task_chat_2', renderError],
+    ]);
+});
+
+test('continues generation when local task creation fails', async () => {
+    const calls = [];
+    const state = createChatEditorState();
+    state.setStoreName('三山山');
+
+    const result = await runChatGeneration({
+        state,
+        requestDraft: async () => validDraft,
+        renderDraft: async () => [{
+            blob: new Blob(['page'], { type: 'image/png' }),
+        }],
+        taskLifecycle: {
+            start: async () => {
+                throw new Error('storage unavailable');
+            },
+            complete: async () => calls.push('complete'),
+            fail: async () => calls.push('fail'),
+        },
+    });
+
+    assert.equal(result.pages.length, 1);
+    assert.equal(
+        result.archiveWarning,
+        '生成可继续，但本次任务记录无法保存',
+    );
+    assert.deepEqual(calls, []);
 });
 
 test('creates a safe editable example with every supplied reference', () => {
