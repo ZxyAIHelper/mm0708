@@ -125,7 +125,11 @@ test('draws original images and exports the same canvas as PNG', async () => {
         rect: (...args) => calls.push(['rect', ...args]),
         clip: () => calls.push(['clip']),
         fillRect: (...args) => calls.push(['fillRect', ...args]),
-        fillText: (...args) => calls.push(['fillText', ...args]),
+        fillText: (...args) => calls.push([
+            'fillText',
+            context.font,
+            ...args,
+        ]),
         drawImage: (...args) => calls.push(['drawImage', ...args]),
     };
     const canvas = {
@@ -162,9 +166,13 @@ test('draws original images and exports the same canvas as PNG', async () => {
     );
     const labels = calls
         .filter((call) => call[0] === 'fillText')
-        .map((call) => call[1]);
+        .map((call) => call[2]);
     assert.ok(labels.includes('夯'));
     assert.ok(labels.includes('拉完了'));
     assert.ok(labels.includes('闭眼冲'));
     assert.ok(labels.includes('自家'));
+    const commentCall = calls.find((call) => (
+        call[0] === 'fillText' && call[2] === '闭眼冲'
+    ));
+    assert.match(commentCall[1], /(?:2[6-9]|[3-9]\d)px/);
 });

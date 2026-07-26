@@ -86,7 +86,6 @@ test('accepts a valid owned multi-dish request', async () => {
         ],
         layout: 'tier',
         aspectRatio: '3:4',
-        requirements: '',
     });
 
     assert.equal(value.values.dishes.length, 2);

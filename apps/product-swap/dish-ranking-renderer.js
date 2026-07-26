@@ -242,7 +242,7 @@
                 );
                 context.fillStyle = '#25262a';
                 context.font = `600 ${Math.round(
-                    Math.min(28, card.commentHeight * 0.48),
+                    Math.min(28, card.commentHeight * 0.66),
                 )}px "Microsoft YaHei", sans-serif`;
                 context.textAlign = 'center';
                 context.textBaseline = 'middle';
