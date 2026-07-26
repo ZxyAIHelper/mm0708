@@ -300,6 +300,7 @@ export function createProductSwapRouter(
         }
         const result = payload as {
             status?: unknown
+            message?: unknown
             data?: unknown
         } | null
         if (
@@ -307,6 +308,22 @@ export function createProductSwapRouter(
             || result.status !== 0
             || !Array.isArray(result.data)
         ) {
+            console.warn('Tencent location search rejected', {
+                upstreamStatus: upstream.status,
+                resultStatus: result?.status,
+                resultMessage: typeof result?.message === 'string'
+                    ? result.message.slice(0, 120)
+                    : undefined,
+            })
+            if (result?.status === 121) {
+                return c.json({
+                    success: false,
+                    error: {
+                        code: 'TENCENT_MAP_QUOTA_EXHAUSTED',
+                        message: '腾讯地图今日搜索额度已用完，请提高 Key 日额度或明日再试',
+                    },
+                }, 429)
+            }
             return c.json({
                 success: false,
                 error: {
@@ -358,7 +375,12 @@ export function createProductSwapRouter(
             success: true,
             locations,
         }, 200, {
-            'Cache-Control': 'private, max-age=60',
+            'Cache-Control': [
+                'public',
+                'max-age=3600',
+                's-maxage=86400',
+                'stale-if-error=604800',
+            ].join(', '),
         })
     })
 

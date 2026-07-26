@@ -153,6 +153,9 @@ describe('product swap router', () => {
         const data = await response.json() as any
 
         expect(response.status).toBe(200)
+        expect(response.headers.get('Cache-Control')).toContain(
+            's-maxage=86400',
+        )
         expect(url.origin).toBe('https://apis.map.qq.com')
         expect(url.pathname).toBe('/ws/place/v1/search')
         expect(url.searchParams.get('boundary')).toBe('region(北京,1)')
@@ -223,6 +226,34 @@ describe('product swap router', () => {
         expect(response.status).toBe(502)
         expect(await response.json()).toMatchObject({
             error: { code: 'LOCATION_SEARCH_FAILED' },
+        })
+    })
+
+    it('reports exhausted Tencent location quota clearly', async () => {
+        const fetchMock = vi.fn(async () => Response.json({
+            status: 121,
+            message: 'daily quota exhausted',
+        }))
+        const provider: ProductSwapProvider = {
+            name: 'fake',
+            generate: async () => ({ imageUrl: targetImage }),
+        }
+        const app = new Hono()
+        app.route('/api/product-swap', createProductSwapRouter(
+            () => provider,
+            noOpArchive,
+            { fetchImpl: fetchMock },
+        ))
+
+        const response = await app.request(
+            '/api/product-swap/location-search?region=北京&keyword=颐和园',
+            undefined,
+            { TENCENT_MAP_KEY: 'map-key' },
+        )
+
+        expect(response.status).toBe(429)
+        expect(await response.json()).toMatchObject({
+            error: { code: 'TENCENT_MAP_QUOTA_EXHAUSTED' },
         })
     })
 
