@@ -193,7 +193,7 @@ function parseMessage(value: unknown): ChatDraftMessage {
     }
     const side = value.side as 'left' | 'right'
     if (type === 'text') {
-        const text = cleanText(value.text, 80, '消息文字')
+        const text = cleanText(value.text, 120, '消息文字')
         if (!text) invalid('消息文字不能为空')
         return { id, side, type, text }
     }
@@ -213,8 +213,8 @@ export function parseChatDraft(
         || !hasOnlyKeys(value, ['version', 'contactName', 'messages'])
         || value.version !== 1
         || !Array.isArray(value.messages)
-        || value.messages.length < 6
-        || value.messages.length > 10
+        || value.messages.length < 10
+        || value.messages.length > 16
     ) {
         invalid('对话结构无效')
     }
@@ -236,7 +236,7 @@ export function parseChatDraft(
         ),
         0,
     )
-    if (totalText > 500) invalid('对话文字总长度过长')
+    if (totalText > 1000) invalid('对话文字总长度过长')
 
     const expectedRefs = [
         ...refs.imageIds,
@@ -299,14 +299,16 @@ export function buildChatDraftMessages(
         content: [
             '你是中文微信单聊对话编剧。',
             '只输出 JSON，不要 Markdown、解释或额外字段。',
-            '严格结构示例：{"version":1,"contactName":"小林","messages":[{"id":"m1","side":"right","type":"text","text":"刚发现一家店"},{"id":"m2","side":"left","type":"text","text":"怎么样？"}]}。',
-            '输出 version=1、contactName 和 6 至 10 条 messages。',
+            '严格结构示例（只展示字段格式，实际消息数必须达到要求）：{"version":1,"contactName":"小林","messages":[{"id":"m1","side":"right","type":"text","text":"刚发现一家店"},{"id":"m2","side":"left","type":"text","text":"怎么样？"}]}。',
+            '输出 version=1、contactName 和 10 至 16 条 messages。',
             '消息 side 只能是 left/right，type 只能是 text/image_ref/location_ref。',
             'text 消息只能包含 id、side、type、text；image_ref 和 location_ref 消息只能包含 id、side、type、refId。',
             '每条消息 id 使用 m1、m2、m3 这样的唯一值。',
             '每个已提供的图片和地点素材必须且只能引用一次。',
-            '文本像真实朋友聊天，不编造价格、优惠、销量、地址或联系方式。',
-            '单条文字不超过 80 字，总文字不超过 500 字。',
+            '对话要像朋友强烈安利：允许兴奋感叹、连续追问、口语停顿和少量表情。',
+            '围绕味道、氛围、出片感和主观感受展开，内容要丰富且有来有回。',
+            '夸张只用于主观感受，不得编造可核验事实，包括价格、优惠、销量、排队时长、具体菜名、地址或联系方式。',
+            '单条文字不超过 120 字，总文字不超过 1000 字。',
         ].join('\n'),
     }, {
         role: 'user',

@@ -37,10 +37,10 @@
                 message.type === 'text'
                 && (
                     !String(message.text || '').trim()
-                    || String(message.text).trim().length > 80
+                    || String(message.text).trim().length > 120
                 )
             ) {
-                throw new Error('单条消息不能超过 80 字');
+                throw new Error('单条消息不能超过 120 字');
             }
         }
         return draft;
@@ -80,8 +80,8 @@
             setDraft,
             editText(id, value) {
                 const text = String(value || '').trim();
-                if (!text || text.length > 80) {
-                    throw new Error('单条消息不能超过 80 字');
+                if (!text || text.length > 120) {
+                    throw new Error('单条消息不能超过 120 字');
                 }
                 const message = draft?.messages.find(
                     (item) => item.id === id,

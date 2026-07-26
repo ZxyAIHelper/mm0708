@@ -16,7 +16,7 @@
         }
         if (message.type === 'text') {
             const text = String(message.text || '').trim();
-            if (!text || text.length > 80) {
+            if (!text || text.length > 120) {
                 invalid('AI 返回的消息文字无效');
             }
             return {
@@ -49,19 +49,26 @@
             || !draft.contactName.trim()
             || draft.contactName.trim().length > 12
             || !Array.isArray(draft.messages)
-            || draft.messages.length < 6
-            || draft.messages.length > 10
+            || draft.messages.length < 10
+            || draft.messages.length > 16
         ) {
             invalid('AI 返回的对话结构无效');
         }
         const messages = draft.messages.map(normalizeMessage);
+        const totalText = messages.reduce(
+            (total, message) => (
+                total + (message.type === 'text' ? message.text.length : 0)
+            ),
+            0,
+        );
         if (
             new Set(messages.map((message) => message.id)).size
                 !== messages.length
             || !messages.some((message) => message.side === 'left')
             || !messages.some((message) => message.side === 'right')
+            || totalText > 1000
         ) {
-            invalid('AI 返回的对话双方或消息 ID 无效');
+            invalid('AI 返回的对话双方、消息 ID 或文字总量无效');
         }
         const expectedRefs = [
             ...(materials?.images || []).map((image) => image.id),

@@ -23,6 +23,10 @@ const validDraft = {
         { id: 'm4', side: 'left', type: 'text', text: '下次带我去。' },
         { id: 'm5', side: 'right', type: 'text', text: '可以呀。' },
         { id: 'm6', side: 'left', type: 'text', text: '说定了。' },
+        { id: 'm7', side: 'right', type: 'text', text: '我现在还在回味。' },
+        { id: 'm8', side: 'left', type: 'text', text: '被你说得马上想去。' },
+        { id: 'm9', side: 'right', type: 'text', text: '真的很适合慢慢坐。' },
+        { id: 'm10', side: 'left', type: 'text', text: '那就周末去。' },
     ],
 }
 
@@ -52,7 +56,7 @@ describe('chat draft provider', () => {
         )
         expect(body.model).toBe('ep-chat')
         expect(body.stream).toBe(false)
-        expect(result.draft.messages).toHaveLength(6)
+        expect(result.draft.messages).toHaveLength(10)
         expect(fetchMock).toHaveBeenCalledTimes(1)
     })
 

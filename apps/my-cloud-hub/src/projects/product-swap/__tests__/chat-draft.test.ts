@@ -13,6 +13,10 @@ const validMessages = [
     { id: 'm4', side: 'left', type: 'text', text: '位置也挺好找。' },
     { id: 'm5', side: 'right', type: 'text', text: '下次一起去。' },
     { id: 'm6', side: 'left', type: 'text', text: '可以呀。' },
+    { id: 'm7', side: 'right', type: 'text', text: '我现在还在回味。' },
+    { id: 'm8', side: 'left', type: 'text', text: '被你说得马上想去。' },
+    { id: 'm9', side: 'right', type: 'text', text: '真的很适合慢慢坐。' },
+    { id: 'm10', side: 'left', type: 'text', text: '那就说定了。' },
 ]
 
 const validRequest = {
@@ -46,12 +50,12 @@ describe('chat draft contract', () => {
         }, {
             imageIds: ['image-1'],
             locationId: 'store-location',
-        }).messages).toHaveLength(6)
+        }).messages).toHaveLength(10)
     })
 
     it.each([
         ['unknown keys', { extra: true }],
-        ['too few messages', { messages: validMessages.slice(0, 5) }],
+        ['too few messages', { messages: validMessages.slice(0, 9) }],
         ['one-sided chat', {
             messages: validMessages.map((message) => ({
                 ...message,
@@ -73,7 +77,7 @@ describe('chat draft contract', () => {
         ['long text', {
             messages: validMessages.map((message, index) => (
                 index === 1
-                    ? { ...message, text: '长'.repeat(81) }
+                    ? { ...message, text: '长'.repeat(121) }
                     : message
             )),
         }],
@@ -94,7 +98,7 @@ describe('chat draft contract', () => {
             (message) => message.type !== 'image_ref',
         )
         missingImage.push({
-            id: 'm7',
+            id: 'm11',
             side: 'right',
             type: 'text',
             text: '补一句。',
@@ -151,6 +155,9 @@ ${JSON.stringify({
         expect(prompt[0].content).toContain(
             'text 消息只能包含 id、side、type、text',
         )
+        expect(prompt[0].content).toContain('强烈安利')
+        expect(prompt[0].content).toContain('主观感受')
+        expect(prompt[0].content).toContain('不得编造可核验事实')
         expect(prompt[1].content).toContain(
             '---BEGIN_UNTRUSTED_CHAT_MATERIALS---',
         )

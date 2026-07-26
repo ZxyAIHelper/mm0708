@@ -53,8 +53,8 @@ test('enforces message, text, and image editing limits', () => {
     });
     assert.throws(() => state.removeMessage('m1'), /至少保留/);
     assert.throws(
-        () => state.editText('m2', '长'.repeat(81)),
-        /80/,
+        () => state.editText('m2', '长'.repeat(121)),
+        /120/,
     );
 });
 

@@ -25,6 +25,10 @@ const response = {
             { id: 'm4', side: 'left', type: 'text', text: '下次一起去。' },
             { id: 'm5', side: 'right', type: 'text', text: '好呀。' },
             { id: 'm6', side: 'left', type: 'text', text: '说定了。' },
+            { id: 'm7', side: 'right', type: 'text', text: '我现在还在回味。' },
+            { id: 'm8', side: 'left', type: 'text', text: '被你说得马上想去。' },
+            { id: 'm9', side: 'right', type: 'text', text: '真的很适合慢慢坐。' },
+            { id: 'm10', side: 'left', type: 'text', text: '那就说定了。' },
         ],
     },
     provider: 'volcano',
@@ -46,7 +50,7 @@ test('posts normalized materials to the chat draft endpoint', async () => {
         templateId: 'wechat-chat-screenshot',
         ...materials,
     });
-    assert.equal(draft.messages.length, 6);
+    assert.equal(draft.messages.length, 10);
 });
 
 test('rejects malformed browser responses', () => {
@@ -55,7 +59,7 @@ test('rejects malformed browser responses', () => {
             ...response,
             draft: {
                 ...response.draft,
-                messages: response.draft.messages.slice(0, 5),
+                messages: response.draft.messages.slice(0, 9),
             },
         }, materials),
         /对话/,
@@ -75,5 +79,50 @@ test('rejects malformed browser responses', () => {
             },
         }, materials),
         /消息/,
+    );
+});
+
+test('accepts up to sixteen richer messages and enforces text budgets', () => {
+    const messages = Array.from({ length: 16 }, (_, index) => ({
+        id: `rich-${index + 1}`,
+        side: index % 2 ? 'left' : 'right',
+        type: 'text',
+        text: index === 0 ? '太惊艳了！'.repeat(12) : '真的很想马上去。',
+    }));
+    const draft = normalizeChatDraftResponse({
+        ...response,
+        draft: {
+            ...response.draft,
+            messages,
+        },
+    }, materials);
+
+    assert.equal(draft.messages.length, 16);
+    assert.throws(
+        () => normalizeChatDraftResponse({
+            ...response,
+            draft: {
+                ...response.draft,
+                messages: messages.map((message, index) => (
+                    index === 0
+                        ? { ...message, text: '长'.repeat(121) }
+                        : message
+                )),
+            },
+        }, materials),
+        /文字/,
+    );
+    assert.throws(
+        () => normalizeChatDraftResponse({
+            ...response,
+            draft: {
+                ...response.draft,
+                messages: messages.map((message) => ({
+                    ...message,
+                    text: '总字数预算'.repeat(13),
+                })),
+            },
+        }, materials),
+        /文字/,
     );
 });
