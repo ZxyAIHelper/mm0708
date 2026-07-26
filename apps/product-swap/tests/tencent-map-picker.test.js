@@ -4,11 +4,22 @@ const assert = require('node:assert/strict');
 const {
     buildPickerUrl,
     getMapConfig,
+    loadMapPreviewImage,
     mapPreviewUrl,
     normalizePickerMessage,
     normalizeSearchResults,
     searchLocations,
 } = require('../tencent-map-picker');
+
+const hubeiliLocation = {
+    id: 'store-location',
+    name: '深圳湖贝里',
+    address: '深圳市罗湖区湖贝路1068号',
+    city: '深圳市',
+    lat: 22.546394,
+    lng: 114.128133,
+    fallback: true,
+};
 
 const pickerEvent = {
     origin: 'https://apis.map.qq.com',
@@ -76,6 +87,57 @@ test('builds encoded picker and preview urls', () => {
     assert.equal(preview.searchParams.get('lat'), '39.998766');
     assert.equal(preview.searchParams.get('lng'), '116.273938');
     assert.equal(preview.searchParams.get('v'), '2');
+});
+
+test('loads one static map image for repeated coordinate requests', async () => {
+    const created = [];
+    const imageFactory = () => {
+        const image = {};
+        created.push(image);
+        return image;
+    };
+
+    const first = loadMapPreviewImage(hubeiliLocation, {
+        apiBase: 'https://api.example.com',
+        imageFactory,
+    });
+    const second = loadMapPreviewImage(hubeiliLocation, {
+        apiBase: 'https://api.example.com',
+        imageFactory,
+    });
+
+    assert.strictEqual(first, second);
+    assert.equal(created.length, 1);
+    created[0].onload();
+    assert.strictEqual(await first, created[0]);
+});
+
+test('does not retry a failed static map during the page session', async () => {
+    const created = [];
+    const imageFactory = () => {
+        const image = {};
+        created.push(image);
+        return image;
+    };
+    const location = {
+        ...hubeiliLocation,
+        lat: 22.546395,
+    };
+
+    const first = loadMapPreviewImage(location, {
+        apiBase: 'https://api.example.com',
+        imageFactory,
+    });
+    const second = loadMapPreviewImage(location, {
+        apiBase: 'https://api.example.com',
+        imageFactory,
+    });
+
+    assert.strictEqual(first, second);
+    assert.equal(created.length, 1);
+    created[0].onerror();
+    assert.equal(await first, null);
+    assert.equal(await second, null);
 });
 
 test('loads picker configuration through the shared api client', async () => {
