@@ -125,5 +125,11 @@ test('uses the first-party Tencent location search dialog', () => {
     assert.match(source, /chat-map-keyword/);
     assert.match(source, /chat-map-results/);
     assert.match(source, /map\.searchLocations/);
+    assert.match(source, /备用位置/);
+    assert.match(source, /地图暂不可用，已提供备用地点/);
+    assert.match(source, /loadMapPreviewImage/);
+    assert.match(source, /正在加载地图/);
+    assert.match(source, /chat-location-fallback-badge/);
+    assert.match(source, /chat-location-map-preview/);
     assert.doesNotMatch(source, /chat-map-frame/);
 });
