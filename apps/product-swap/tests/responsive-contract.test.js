@@ -119,8 +119,6 @@ test('creator inputs and Works surfaces retain readable light-theme contrast', (
 test('coral actions retain readable text and primary touch targets', () => {
     for (const selector of [
         '.search-row button',
-        '.quick-task-primary',
-        '.quick-task-primary span',
         '.category-strip button.active',
         '.settings-card button',
     ]) {

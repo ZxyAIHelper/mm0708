@@ -75,7 +75,6 @@
         const shopSummary = document.querySelector('#shopSummary');
         const searchForm = document.querySelector('#templateSearch');
         const searchInput = document.querySelector('#templateSearchInput');
-        const quickTasks = document.querySelector('#quickTasks');
         const hotTemplates = document.querySelector('#hotTemplates');
         const categoryList = document.querySelector('#templateCategories');
         const templateGrid = document.querySelector('#templateGrid');
@@ -126,13 +125,10 @@
         searchForm.addEventListener('submit', (event) => {
             event.preventDefault();
             setCategory('全部');
-        });
-
-        quickTasks.addEventListener('click', (event) => {
-            const task = event.target.closest('button[data-query]');
-            if (!task) return;
-            searchInput.value = task.dataset.query;
-            setCategory('全部');
+            templateGrid.closest('.templates-section').scrollIntoView({
+                behavior: 'smooth',
+                block: 'start',
+            });
         });
 
         render();

@@ -11,7 +11,6 @@ test('homepage exposes the hotspot template discovery contract', () => {
     for (const id of [
         'shopSummary',
         'templateSearch',
-        'quickTasks',
         'hotTemplates',
         'templateCategories',
         'templateGrid',
@@ -20,7 +19,6 @@ test('homepage exposes the hotspot template discovery contract', () => {
         assert.match(html, new RegExp(`id=["']${id}["']`), `missing #${id}`);
     }
 
-    assert.match(html, /href=["']\/create\.html\?template=product-swap["']/);
     assert.match(html, /今日热点/);
     assert.match(html, /平台精选/);
     assert.match(html, /试试“产品”“门店”“活动”或“背景”。/);
@@ -56,16 +54,14 @@ test('homepage exposes the hotspot template discovery contract', () => {
         html,
         /id="homeEmpty"[^>]*role="status"[^>]*aria-live="polite"/,
     );
-
-    const quickTasks = html.match(/<section id="quickTasks"[\s\S]*?<\/section>/)?.[0] || '';
-    assert.equal(
-        (quickTasks.match(/href="\/create\.html\?template=product-swap"/g) || []).length,
-        1,
+    assert.doesNotMatch(html, /id=["']quickTasks["']/);
+    assert.doesNotMatch(
+        fs.readFileSync(path.join(appRoot, 'home.js'), 'utf8'),
+        /quickTasks/,
     );
-    assert.deepEqual(
-        [...quickTasks.matchAll(/<button[^>]*data-query="([^"]+)"/g)]
-            .map((match) => match[1]),
-        ['门店', '活动', '背景'],
+    assert.doesNotMatch(
+        fs.readFileSync(path.join(appRoot, 'app.css'), 'utf8'),
+        /\.quick-task/,
     );
 });
 

@@ -301,6 +301,47 @@ function attachPageErrorListeners(page, errors, label) {
                 }),
             };
         });
+        await page.type('#templateSearchInput', '\u6587\u6848');
+        await page.click('#templateSearch button[type="submit"]');
+        await page.waitForFunction(() => {
+            const cards = document.querySelectorAll(
+                '#templateGrid .template-card',
+            );
+            return cards.length > 0 && Array.from(cards).every((card) => (
+                card.textContent.includes('\u6587\u6848')
+            ));
+        });
+        await page.waitForFunction(() => {
+            const firstResult = document.querySelector(
+                '#templateGrid .template-card',
+            );
+            const bounds = firstResult?.getBoundingClientRect();
+            return bounds
+                && bounds.top >= 0
+                && bounds.top < window.innerHeight / 2
+                && bounds.bottom < window.innerHeight;
+        });
+        Object.assign(homeState, await page.evaluate(() => {
+            const rendered = Array.from(document.querySelectorAll(
+                '#templateGrid .template-card',
+            ));
+            const expected = window.ContentTemplates.searchTemplates(
+                '\u6587\u6848',
+            );
+            const firstResult = rendered[0];
+            const bounds = firstResult.getBoundingClientRect();
+            return {
+                searchFiltersCatalog: rendered.length === expected.length,
+                searchResultsVisible: bounds.top >= 0
+                    && bounds.top < window.innerHeight / 2
+                    && bounds.bottom < window.innerHeight,
+            };
+        }));
+        await page.$eval('#templateSearchInput', (input) => {
+            input.value = '';
+        });
+        await page.click('#templateSearch button[type="submit"]');
+        await page.waitForSelector(liveTemplateSelector);
         await Promise.all([
             page.waitForNavigation({
                 waitUntil: 'networkidle0',
@@ -978,6 +1019,8 @@ function attachPageErrorListeners(page, errors, label) {
             || homeState.comingSoon !== homeState.expectedComingSoon
             || !homeState.foodSearchable
             || !homeState.genericCardBehavior
+            || !homeState.searchFiltersCatalog
+            || !homeState.searchResultsVisible
             || homeState.creatorUrl
                 !== `${appUrl}/create.html?template=product-swap`
             || JSON.stringify(productSchema) !== JSON.stringify([
