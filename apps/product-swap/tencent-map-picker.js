@@ -3,6 +3,7 @@
 (function (global) {
     const PICKER_ORIGIN = 'https://apis.map.qq.com';
     const DEFAULT_API_BASE = 'https://api.mm0708.top';
+    const mapPreviewImageCache = new Map();
 
     function cleanText(value) {
         return typeof value === 'string' ? value.trim() : '';
@@ -147,10 +148,33 @@
         return url.toString();
     }
 
+    function loadMapPreviewImage(
+        location,
+        {
+            apiBase = global.API_BASE_URL || DEFAULT_API_BASE,
+            imageFactory = () => new Image(),
+        } = {},
+    ) {
+        const source = mapPreviewUrl(location, apiBase);
+        if (mapPreviewImageCache.has(source)) {
+            return mapPreviewImageCache.get(source);
+        }
+        const promise = new Promise((resolve) => {
+            const image = imageFactory();
+            image.onload = () => resolve(image);
+            image.onerror = () => resolve(null);
+            image.crossOrigin = 'anonymous';
+            image.src = source;
+        });
+        mapPreviewImageCache.set(source, promise);
+        return promise;
+    }
+
     const api = {
         PICKER_ORIGIN,
         buildPickerUrl,
         getMapConfig,
+        loadMapPreviewImage,
         mapPreviewUrl,
         normalizePickerMessage,
         normalizeSearchResults,
