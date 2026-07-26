@@ -91,7 +91,7 @@ describe('product swap router', () => {
         expect(chatGenerator).toHaveBeenCalledOnce()
     })
 
-    it('returns public Tencent picker configuration', async () => {
+    it('does not expose the Tencent map key to browsers', async () => {
         const provider: ProductSwapProvider = {
             name: 'fake',
             generate: async () => ({ imageUrl: targetImage }),
@@ -105,12 +105,8 @@ describe('product swap router', () => {
             },
         )
 
-        expect(response.status).toBe(200)
-        expect(await response.json()).toEqual({
-            success: true,
-            key: 'map-key',
-            referer: 'product-swap',
-        })
+        expect(response.status).toBe(404)
+        expect(await response.text()).not.toContain('map-key')
     })
 
     it('searches Tencent POIs through a fixed, normalized proxy', async () => {

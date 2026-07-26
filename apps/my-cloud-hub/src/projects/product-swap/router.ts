@@ -184,27 +184,6 @@ export function createProductSwapRouter(
         }
     })
 
-    router.get('/map-config', (c) => {
-        const key = c.env?.TENCENT_MAP_KEY?.trim()
-        const referer = c.env?.TENCENT_MAP_REFERER?.trim()
-        if (!key || !referer) {
-            return c.json({
-                success: false,
-                error: {
-                    code: 'TENCENT_MAP_NOT_CONFIGURED',
-                    message: '腾讯地图尚未配置',
-                },
-            }, 503)
-        }
-        return c.json({
-            success: true,
-            key,
-            referer,
-        }, 200, {
-            'Cache-Control': 'public, max-age=300',
-        })
-    })
-
     router.get('/location-search', async (c) => {
         const region = (c.req.query('region') || '').trim()
         const keyword = (c.req.query('keyword') || '').trim()
