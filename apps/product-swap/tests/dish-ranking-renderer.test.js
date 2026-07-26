@@ -1,0 +1,170 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const {
+    canvasSize,
+    coverRect,
+    layoutRanking,
+    renderDishRankingDataUrl,
+} = require('../dish-ranking-renderer');
+
+const ranking = {
+    version: 1,
+    items: [
+        {
+            refId: 'dish-0',
+            tier: 'top',
+            order: 0,
+            comment: '闭眼冲',
+            owned: true,
+            inputIndex: 0,
+        },
+        {
+            refId: 'dish-1',
+            tier: 'good',
+            order: 0,
+            comment: '挺稳的',
+            owned: false,
+            inputIndex: 1,
+        },
+    ],
+};
+
+test('uses fixed pixel sizes for all supported ratios', () => {
+    assert.deepEqual(canvasSize('3:4'), {
+        width: 1080,
+        height: 1440,
+    });
+    assert.deepEqual(canvasSize('1:1'), {
+        width: 1080,
+        height: 1080,
+    });
+    assert.deepEqual(canvasSize('9:16'), {
+        width: 1080,
+        height: 1920,
+    });
+    assert.deepEqual(canvasSize('unknown'), {
+        width: 1080,
+        height: 1440,
+    });
+});
+
+test('computes centered cover cropping without distortion', () => {
+    assert.deepEqual(coverRect(400, 200, 100, 100), {
+        sx: 100,
+        sy: 0,
+        sw: 200,
+        sh: 200,
+    });
+    assert.deepEqual(coverRect(200, 400, 100, 100), {
+        sx: 0,
+        sy: 100,
+        sw: 200,
+        sh: 200,
+    });
+});
+
+test('lays out five fixed tiers with a bounded card area', () => {
+    const layout = layoutRanking({ ratio: '3:4', items: ranking.items });
+
+    assert.equal(layout.rows.length, 5);
+    assert.equal(layout.labelWidth, Math.round(1080 * 0.18));
+    assert.deepEqual(layout.rows.map((row) => row.label), [
+        '夯',
+        '顶级',
+        '人上人',
+        'NPC',
+        '拉完了',
+    ]);
+    assert.deepEqual(
+        layout.rows.flatMap((row) => row.cards)
+            .map((card) => card.refId),
+        ['dish-0', 'dish-1'],
+    );
+    for (const row of layout.rows) {
+        for (const card of row.cards) {
+            assert.ok(card.x >= layout.labelWidth);
+            assert.ok(card.x + card.width <= layout.width);
+            assert.ok(card.y >= row.y);
+            assert.ok(card.y + card.height <= row.y + row.height);
+            assert.ok(card.imageHeight < card.height);
+        }
+    }
+});
+
+test('wraps a dense tier into at most six columns', () => {
+    const items = Array.from({ length: 12 }, (_, index) => ({
+        refId: `dish-${index}`,
+        tier: 'top',
+        order: index,
+        comment: '闭眼冲',
+        owned: true,
+        inputIndex: index,
+    }));
+    const row = layoutRanking({ ratio: '1:1', items }).rows[0];
+
+    assert.equal(row.cards.length, 12);
+    assert.equal(new Set(row.cards.map((card) => card.y)).size, 2);
+    assert.equal(
+        Math.max(...row.cards.map((card) => card.column)),
+        5,
+    );
+});
+
+test('draws original images and exports the same canvas as PNG', async () => {
+    const calls = [];
+    const context = {
+        fillStyle: '',
+        font: '',
+        textAlign: '',
+        textBaseline: '',
+        save: () => calls.push(['save']),
+        restore: () => calls.push(['restore']),
+        beginPath: () => calls.push(['beginPath']),
+        rect: (...args) => calls.push(['rect', ...args]),
+        clip: () => calls.push(['clip']),
+        fillRect: (...args) => calls.push(['fillRect', ...args]),
+        fillText: (...args) => calls.push(['fillText', ...args]),
+        drawImage: (...args) => calls.push(['drawImage', ...args]),
+    };
+    const canvas = {
+        width: 0,
+        height: 0,
+        getContext: () => context,
+        toDataURL: (type) => {
+            assert.equal(type, 'image/png');
+            return 'data:image/png;base64,rendered';
+        },
+    };
+    const dishes = [
+        { image: 'first', owned: true },
+        { image: 'second', owned: false },
+    ];
+    const result = await renderDishRankingDataUrl({
+        ratio: '3:4',
+        dishes,
+        ranking,
+        canvas,
+        imageLoader: async (source) => ({
+            source,
+            naturalWidth: 400,
+            naturalHeight: 300,
+        }),
+    });
+
+    assert.equal(result, 'data:image/png;base64,rendered');
+    assert.equal(canvas.width, 1080);
+    assert.equal(canvas.height, 1440);
+    assert.equal(
+        calls.filter((call) => call[0] === 'drawImage').length,
+        2,
+    );
+    const labels = calls
+        .filter((call) => call[0] === 'fillText')
+        .map((call) => call[1]);
+    assert.ok(labels.includes('夯'));
+    assert.ok(labels.includes('拉完了'));
+    assert.ok(labels.includes('闭眼冲'));
+    assert.ok(labels.includes('自家'));
+});
