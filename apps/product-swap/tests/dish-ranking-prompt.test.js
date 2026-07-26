@@ -38,13 +38,19 @@ test('the active ranking path asks AI only for ordering and comments', () => {
     assert.doesNotMatch(renderer, /result\.png|\/generate|fetch\(/);
 });
 
-test('the ranking template exposes only the fixed tier layout', () => {
+test('layout choices keep ranking generation free of image credits', () => {
     const layout = manifest.fields.find((field) => field.key === 'layout');
 
-    assert.deepEqual(layout.options, [{
-        value: 'tier',
-        label: '从拉到夯',
-    }]);
+    assert.deepEqual(
+        layout.options.map((option) => option.value),
+        ['tier', 'grid-4', 'grid-9', 'hero', 'leaderboard'],
+    );
+    assert.equal(
+        layout.options.every((option) => (
+            option.preview === option.value
+        )),
+        true,
+    );
     assert.equal(manifest.creditCost, 0);
     assert.deepEqual(manifest.quickPrompts, []);
 });
