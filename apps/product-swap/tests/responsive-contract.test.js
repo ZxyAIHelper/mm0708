@@ -105,10 +105,6 @@ test('desktop pages use independent wide layouts while mobile widths remain the 
         /width:\s*min\(calc\(100% - 64px\),\s*1180px\)/,
     );
     assert.match(
-        ruleFor(appDesktop, '.home-header'),
-        /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(360px,\s*0\.8fr\)/,
-    );
-    assert.match(
         ruleFor(appDesktop, '.template-grid'),
         /grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/,
     );
@@ -136,6 +132,26 @@ test('desktop pages use independent wide layouts while mobile widths remain the 
             'body[data-template-id="wechat-chat-screenshot"] .product-swap-shell',
         ),
         /display:\s*block/,
+    );
+});
+
+test('desktop home stacks the search below the heading at a readable width', () => {
+    const appDesktop = atRuleBlockFor(
+        appCss,
+        '@media (min-width: 900px)',
+    );
+
+    assert.match(
+        ruleFor(appDesktop, '.home-header'),
+        /grid-template-columns:\s*1fr/,
+    );
+    assert.match(
+        ruleFor(appDesktop, '.template-search'),
+        /width:\s*100%/,
+    );
+    assert.match(
+        ruleFor(appDesktop, '.template-search'),
+        /max-width:\s*760px/,
     );
 });
 

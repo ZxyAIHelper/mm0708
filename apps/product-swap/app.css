@@ -889,9 +889,14 @@ body[data-template-id="wechat-chat-screenshot"] #swapForm {
 
     .home-header {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(360px, 0.8fr);
-        align-items: end;
-        gap: 40px;
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .template-search {
+        width: 100%;
+        max-width: 760px;
+        justify-self: start;
     }
 
     .home-section {
