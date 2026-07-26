@@ -763,7 +763,7 @@ body[data-template-id="wechat-chat-screenshot"] #swapForm {
 .chat-preview-canvas {
     display: block;
     width: 100%;
-    aspect-ratio: 9 / 16;
+    height: auto;
     background: #ededed;
 }
 
