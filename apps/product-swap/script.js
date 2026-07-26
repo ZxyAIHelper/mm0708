@@ -527,6 +527,67 @@ function boot() {
         archiveNotice.hidden = !message;
     }
 
+    function createChatTaskLifecycle() {
+        return {
+            start(materials) {
+                return localHistory.startTask({
+                    taskType:
+                        activeTemplate?.taskType
+                        || 'wechat_chat_screenshot',
+                    title:
+                        activeTemplate?.name
+                        || '微信聊天截图',
+                    input: {
+                        templateId:
+                            activeTemplate?.id
+                            || 'wechat-chat-screenshot',
+                        storeName: String(
+                            materials?.storeName || '',
+                        ),
+                        requirements: String(
+                            materials?.requirements || '',
+                        ),
+                        locationName: String(
+                            materials?.location?.name || '',
+                        ),
+                        locationAddress: String(
+                            materials?.location?.address || '',
+                        ),
+                        imageCount: Array.isArray(materials?.images)
+                            ? materials.images.length
+                            : 0,
+                        hasLocation: Boolean(materials?.location),
+                    },
+                    images: Array.isArray(materials?.images)
+                        ? materials.images.map((image, index) => ({
+                            role: `chat-image-${index}`,
+                            source: image.dataUrl,
+                        }))
+                        : [],
+                });
+            },
+            complete(task, { pages }) {
+                return localHistory.completeTask(
+                    task.id,
+                    {
+                        imageUrl: '',
+                        pageCount: pages.length,
+                        assistantMessage:
+                            `已生成 ${pages.length} 张微信聊天截图。`,
+                    },
+                    pages.map((page) => page.blob),
+                );
+            },
+            fail(task, error) {
+                return localHistory.failTask(
+                    task.id,
+                    error?.code || 'GENERATION_FAILED',
+                    error?.message || '微信聊天截图生成失败',
+                );
+            },
+        };
+    }
+
     function showVersion(version) {
         if (!version) return;
         state.result = version.imageUrl;
@@ -1254,6 +1315,8 @@ function boot() {
                 api: window.ChatDraftClient,
                 map: window.TencentMapPicker,
                 renderer: window.WechatChatRenderer,
+                taskLifecycle: createChatTaskLifecycle(),
+                onArchiveWarning: showArchiveNotice,
             });
         } else if (field.type === 'image') {
             const input = section.querySelector('input[type="file"]');

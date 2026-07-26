@@ -161,6 +161,32 @@ test('continues generation when local task creation fails', async () => {
     assert.deepEqual(calls, []);
 });
 
+test('keeps generated pages when task completion cannot be saved', async () => {
+    const state = createChatEditorState();
+    state.setStoreName('三山山');
+
+    const result = await runChatGeneration({
+        state,
+        requestDraft: async () => validDraft,
+        renderDraft: async () => [{
+            blob: new Blob(['page'], { type: 'image/png' }),
+        }],
+        taskLifecycle: {
+            start: async () => ({ id: 'task_chat_3' }),
+            complete: async () => {
+                throw new Error('quota exceeded');
+            },
+            fail: async () => undefined,
+        },
+    });
+
+    assert.equal(result.pages.length, 1);
+    assert.equal(
+        result.archiveWarning,
+        '生成成功，但任务记录保存失败',
+    );
+});
+
 test('creates a safe editable example with every supplied reference', () => {
     const draft = createSafeExampleDraft({
         storeName: '三山山',
@@ -201,8 +227,13 @@ test('renders and downloads chat screenshots as multiple pages', () => {
     );
 
     assert.match(source, /renderChatPages/);
+    assert.match(source, /runChatGeneration\(/);
     assert.match(source, /chat-page-preview/);
     assert.match(source, /chat-download-all-button/);
+    const downloadHandler = source.match(
+        /downloadAll\.addEventListener\('click'[\s\S]*?closeDialog/,
+    )?.[0] || '';
+    assert.doesNotMatch(downloadHandler, /taskLifecycle/);
 });
 
 test('uses the first-party Tencent location search dialog', () => {

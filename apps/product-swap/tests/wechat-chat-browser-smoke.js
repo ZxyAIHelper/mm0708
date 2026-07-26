@@ -301,9 +301,53 @@ function draftFor(input) {
             oldGenerateHidden: true,
             canvas: { width: 1179, height: 2556 },
         });
+        const taskState = await page.evaluate(async () => {
+            const { tasks } =
+                await window.LocalTaskHistory.listTasks();
+            const task = tasks.find(
+                (item) => (
+                    item.taskType === 'wechat_chat_screenshot'
+                ),
+            );
+            const detail = task
+                ? await window.LocalTaskHistory.getTask(task.id)
+                : null;
+            return {
+                status: task?.status || '',
+                outputCount: detail?.assets.filter(
+                    (asset) => asset.role === 'output',
+                ).length || 0,
+                hasPreview: Boolean(task?.previewAsset),
+            };
+        });
+        assert.deepEqual(taskState, {
+            status: 'completed',
+            outputCount: expectedPages,
+            hasPreview: true,
+        });
+
+        await page.goto(`${origin}/history.html`, {
+            waitUntil: 'networkidle0',
+        });
+        await page.waitForSelector('.task-card');
+        const historyCard = await page.$eval(
+            '.task-card',
+            (card) => ({
+                title: card.querySelector(
+                    '.task-card-heading h2',
+                )?.textContent,
+                statusClass: card.querySelector(
+                    '.task-status',
+                )?.className,
+            }),
+        );
+        assert.equal(historyCard.title, state.title);
+        assert.match(historyCard.statusClass, /status-completed/);
         assert.deepEqual(pageErrors, []);
         console.log(JSON.stringify({
             state,
+            taskState,
+            historyCard,
             screenshot: path.join(tempDir, 'creator.png'),
             png: stableExportPath,
         }, null, 2));

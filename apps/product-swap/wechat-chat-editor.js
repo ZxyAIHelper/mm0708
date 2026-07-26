@@ -258,6 +258,8 @@
         api = global.ChatDraftClient,
         map = global.TencentMapPicker,
         renderer = global.WechatChatRenderer,
+        taskLifecycle,
+        onArchiveWarning = () => undefined,
     }) {
         const state = createChatEditorState();
         const avatarSelection = {
@@ -617,10 +619,12 @@
             }
         }
 
-        async function refreshPreview() {
+        async function refreshPreview({
+            throwOnError = false,
+        } = {}) {
             const version = ++renderVersion;
             const snapshot = state.snapshot();
-            if (!snapshot.draft) return;
+            if (!snapshot.draft) return [];
             try {
                 const next = await renderer.renderChatPages(
                     snapshot.draft,
@@ -629,7 +633,7 @@
                 );
                 if (version !== renderVersion) {
                     next.forEach((page) => URL.revokeObjectURL(page.url));
-                    return;
+                    return renderedPages;
                 }
                 renderedPages.forEach(
                     (page) => URL.revokeObjectURL(page.url),
@@ -674,9 +678,14 @@
                 }
                 downloadAll.disabled = false;
                 showError('');
+                return renderedPages;
             } catch (renderError) {
                 downloadAll.disabled = renderedPages.length === 0;
                 showError(renderError.message || '预览生成失败');
+                if (throwOnError) {
+                    throw renderError;
+                }
+                return [];
             }
         }
 
@@ -691,12 +700,22 @@
             generate.disabled = true;
             generate.textContent = 'AI 正在生成…';
             fallback.hidden = true;
+            onArchiveWarning('');
             try {
-                await state.regenerate((materials) => (
-                    api.requestChatDraft(materials)
-                ));
-                renderMessageEditor();
-                await refreshPreview();
+                const result = await runChatGeneration({
+                    state,
+                    requestDraft: (materials) => (
+                        api.requestChatDraft(materials)
+                    ),
+                    renderDraft: async () => {
+                        renderMessageEditor();
+                        return refreshPreview({
+                            throwOnError: true,
+                        });
+                    },
+                    taskLifecycle,
+                });
+                onArchiveWarning(result.archiveWarning);
             } catch (generateError) {
                 showError(generateError.message || 'AI 对话暂时不可用');
                 fallback.hidden = false;

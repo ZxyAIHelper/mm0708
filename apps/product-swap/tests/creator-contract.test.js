@@ -111,6 +111,12 @@ test('chat template mounts its own editor and skips image generation', () => {
 
     assert.match(source, /const isChatTemplate\s*=/);
     assert.match(source, /WechatChatEditor\.mountWechatChatEditor/);
+    assert.match(source, /taskLifecycle:\s*createChatTaskLifecycle/);
+    assert.match(source, /taskType:\s*activeTemplate\?\.taskType/);
+    assert.match(
+        source,
+        /localHistory\.completeTask\([\s\S]*?pages\.map/,
+    );
     assert.match(source, /field\.type === 'chat-materials'/);
     assert.match(source, /if \(isChatTemplate\)[\s\S]*?return;/);
     assert.match(
