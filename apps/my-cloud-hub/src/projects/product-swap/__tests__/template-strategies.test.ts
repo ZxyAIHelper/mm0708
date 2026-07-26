@@ -43,6 +43,13 @@ describe('template generation strategies', () => {
         expect(generation.prompt).toContain(
             '不得遮挡菜品、餐具焦点或人脸',
         )
+        expect(generation.prompt).toContain('逐字核对最终文案')
+        expect(generation.prompt).toContain('错别字、漏字、重复字')
+        expect(generation.prompt).toContain('只能出现核对后的文字')
+        expect(generation.prompt).toMatch(/无法确认.*删除该句/)
+        expect(generation.prompt).toContain(
+            '不使用可能导致字形误判的手写体、艺术字或变形文字',
+        )
         expect(generation.prompt).toContain('不得添加 Logo 或水印')
         expect(generation.prompt).toContain('只生成一张结果图')
         expect(generation.prompt).toContain(

@@ -567,6 +567,37 @@ body[data-template-id="dish-ranking-guide"] .example-card {
     padding: 12px;
 }
 
+.text-review-gate {
+    display: grid;
+    gap: 10px;
+    border-top: 1px solid #efd7a3;
+    padding: 12px 14px;
+    background: #fff7e6;
+    color: #6f4600;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.text-review-gate p {
+    margin: 0;
+}
+
+.text-review-gate label {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.text-review-gate input {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    flex: 0 0 auto;
+    accent-color: var(--accent);
+}
+
 .result-actions button {
     flex: 1;
     min-height: 44px;
@@ -575,6 +606,11 @@ body[data-template-id="dish-ranking-guide"] .example-card {
     background: var(--panel-soft);
     color: var(--text);
     cursor: pointer;
+}
+
+.result-actions button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
 }
 
 .archive-notice {

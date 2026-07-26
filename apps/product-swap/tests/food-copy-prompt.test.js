@@ -38,6 +38,19 @@ test('builds an initial food copy layout prompt from fixed inputs', () => {
     assert.match(prompt, /result\.png/);
 });
 
+test('requires exact copy proofreading before rendering text', () => {
+    const prompt = buildPrompt({
+        hasPreviousImage: false,
+        requirements: '',
+    });
+
+    assert.match(prompt, /逐字核对最终文案/);
+    assert.match(prompt, /错别字、漏字、重复字/);
+    assert.match(prompt, /只能出现核对后的文字/);
+    assert.match(prompt, /无法确认.*删除该句/);
+    assert.match(prompt, /不使用.*手写体、艺术字或变形文字/);
+});
+
 test('builds a constrained refinement prompt around the previous result', () => {
     const correction = '日期改为 7 月 15 日，文案换到右上角';
     const prompt = buildPrompt({

@@ -973,6 +973,25 @@ function attachPageErrorListeners(page, errors, label) {
             && document.querySelectorAll('#versionRail .version-item')
                 .length === 1
         ), { timeout: 60000 });
+        const initialTextReview = await page.evaluate(() => ({
+            gateVisible: Boolean(
+                document.getElementById('textReviewGate')
+                && !document.getElementById('textReviewGate').hidden,
+            ),
+            confirmed:
+                document.getElementById('textReviewConfirmed')?.checked
+                ?? null,
+            downloadDisabled:
+                document.getElementById('downloadButton')?.disabled
+                ?? null,
+        }));
+        await page.evaluate(() => {
+            document.getElementById('textReviewConfirmed')?.click();
+        });
+        const downloadEnabledAfterReview = await page.$eval(
+            '#downloadButton',
+            (button) => !button.disabled,
+        );
         const requestsBeforeQuickPrompt = generationCount;
         await page.click('#quickPrompts .quick-prompt');
         const quickPromptState = await page.evaluate(() => ({
@@ -988,6 +1007,14 @@ function attachPageErrorListeners(page, errors, label) {
             document.querySelectorAll('#versionRail .version-item')
                 .length === 2
         ), { timeout: 60000 });
+        const refinedTextReview = await page.evaluate(() => ({
+            confirmed:
+                document.getElementById('textReviewConfirmed')?.checked
+                ?? null,
+            downloadDisabled:
+                document.getElementById('downloadButton')?.disabled
+                ?? null,
+        }));
         const foodVersionSources = await page.$$eval(
             '#versionRail .version-select img',
             (images) => images.map((image) => image.src),
@@ -1030,6 +1057,9 @@ function attachPageErrorListeners(page, errors, label) {
                 '#resultSection',
                 (section) => !section.hidden,
             ),
+            initialTextReview,
+            downloadEnabledAfterReview,
+            refinedTextReview,
             formError: await page.$eval(
                 '#formError',
                 (element) => element.textContent || '',
@@ -1111,6 +1141,12 @@ function attachPageErrorListeners(page, errors, label) {
             || !foodState.distinctGeneratedVersions
             || foodState.finalVersionCount !== 3
             || !foodState.resultVisible
+            || !foodState.initialTextReview.gateVisible
+            || foodState.initialTextReview.confirmed !== false
+            || foodState.initialTextReview.downloadDisabled !== true
+            || !foodState.downloadEnabledAfterReview
+            || foodState.refinedTextReview.confirmed !== false
+            || foodState.refinedTextReview.downloadDisabled !== true
             || foodState.formError.trim() !== ''
             || foodState.refineSubmitCount !== 1
             || historyState.title !== '作品'

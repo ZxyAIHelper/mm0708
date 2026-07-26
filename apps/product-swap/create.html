@@ -102,6 +102,23 @@
                 class="version-rail"
                 aria-label="生成版本"
             ></div>
+            <div
+                id="textReviewGate"
+                class="text-review-gate"
+                hidden
+            >
+                <p>
+                    <strong>下载前检查文字</strong>
+                    AI 生成的图片文字可能有误，请逐字核对文案、日期和标点。
+                </p>
+                <label>
+                    <input
+                        id="textReviewConfirmed"
+                        type="checkbox"
+                    >
+                    <span>我已核对当前版本，确认文字无误</span>
+                </label>
+            </div>
             <div class="result-actions">
                 <button
                     id="regenerateButton"

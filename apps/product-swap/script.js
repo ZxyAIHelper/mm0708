@@ -462,6 +462,8 @@ function boot() {
         activeTemplate.id === 'wechat-chat-screenshot';
     const isDishRankingTemplate =
         activeTemplate.id === 'dish-ranking-guide';
+    const isFoodCopyTemplate =
+        activeTemplate.id === 'food-copy-layout';
     const CreatorForm = window.CreatorForm;
     const DishLibraryClient = window.DishLibraryClient;
     const DishRankingClient = window.DishRankingClient;
@@ -504,6 +506,13 @@ function boot() {
     const resultImage =
         document.getElementById('resultImage');
     const versionRail = document.getElementById('versionRail');
+    const textReviewGate =
+        document.getElementById('textReviewGate');
+    const textReviewConfirmed =
+        document.getElementById('textReviewConfirmed');
+    const downloadButton =
+        document.getElementById('downloadButton');
+    const reviewedTextVersionIds = new Set();
     const templateFields =
         document.getElementById('templateFields');
     const refineForm = document.getElementById('refineForm');
@@ -606,9 +615,29 @@ function boot() {
         }));
         resultImage.src = version.imageUrl;
         resultSection.hidden = false;
+        if (isFoodCopyTemplate) {
+            textReviewGate.hidden = false;
+            textReviewConfirmed.checked =
+                reviewedTextVersionIds.has(version.id);
+            downloadButton.disabled = !textReviewConfirmed.checked;
+        } else {
+            textReviewGate.hidden = true;
+            downloadButton.disabled = false;
+        }
         renderMessages();
         renderVersions();
     }
+
+    textReviewConfirmed.addEventListener('change', () => {
+        const current = versions.current();
+        if (!isFoodCopyTemplate || !current) return;
+        if (textReviewConfirmed.checked) {
+            reviewedTextVersionIds.add(current.id);
+        } else {
+            reviewedTextVersionIds.delete(current.id);
+        }
+        downloadButton.disabled = !textReviewConfirmed.checked;
+    });
 
     function renderVersions() {
         const items = versions.list();
@@ -1667,6 +1696,14 @@ function boot() {
     async function downloadCurrentVersion() {
         const current = versions.current();
         if (!current) return;
+        if (
+            isFoodCopyTemplate
+            && !reviewedTextVersionIds.has(current.id)
+        ) {
+            showError('请先逐字核对当前图片中的文字并勾选确认');
+            textReviewConfirmed.focus();
+            return;
+        }
 
         let objectUrl = '';
         let revokeScheduled = false;
@@ -1716,9 +1753,7 @@ function boot() {
         }
     }
 
-    document
-        .getElementById('downloadButton')
-        .addEventListener('click', downloadCurrentVersion);
+    downloadButton.addEventListener('click', downloadCurrentVersion);
 
     document
         .getElementById('backButton')
