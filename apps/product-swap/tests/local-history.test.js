@@ -38,6 +38,46 @@ test('converts image data urls to compact blobs', async () => {
     assert.equal(await blob.text(), 'image');
 });
 
+test('creates a persisted asset directly from a Blob', () => {
+    const source = new Blob(['page'], { type: 'image/png' });
+    const asset = history.assetFromSource(
+        'task_1',
+        'output',
+        source,
+        100,
+    );
+
+    assert.equal(asset.blob, source);
+    assert.equal(asset.sourceUrl, '');
+    assert.equal(asset.contentType, 'image/png');
+    assert.equal(asset.byteSize, 4);
+});
+
+test('normalizes explicit multi-page outputs and legacy imageUrl', () => {
+    const one = new Blob(['one'], { type: 'image/png' });
+    const two = new Blob(['two'], { type: 'image/png' });
+
+    assert.deepEqual(history.outputSources(
+        { imageUrl: 'https://example.com/legacy.png' },
+    ), ['https://example.com/legacy.png']);
+    assert.deepEqual(history.outputSources(
+        { imageUrl: '' },
+        [one, two],
+    ), [one, two]);
+});
+
+test('keeps multi-page output assets in page order', () => {
+    const assets = history.sortTaskAssets([
+        { id: 'page-2', role: 'output', order: 1 },
+        { id: 'page-1', role: 'output', order: 0 },
+    ]);
+
+    assert.deepEqual(assets.map(({ id }) => id), [
+        'page-1',
+        'page-2',
+    ]);
+});
+
 test('keeps task-list previews free of image blobs', () => {
     const preview = history.previewAssetFromAsset({
         id: 'asset_1',

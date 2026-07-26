@@ -153,6 +153,18 @@ function assetFromSource(taskId, role, source, createdAt) {
         expiresAt: createdAt + ASSET_TTL_MS,
         deletedAt: null,
     };
+    if (source instanceof Blob) {
+        return {
+            ...common,
+            blob: source,
+            sourceUrl: '',
+            contentType: source.type.toLowerCase(),
+            byteSize: source.size,
+        };
+    }
+    if (typeof source !== 'string') {
+        throw new Error('INVALID_IMAGE');
+    }
     if (source.startsWith('data:')) {
         const blob = dataUrlToBlob(source);
         return {
@@ -170,6 +182,25 @@ function assetFromSource(taskId, role, source, createdAt) {
         contentType: '',
         byteSize: 0,
     };
+}
+
+function outputSources(result, outputs) {
+    if (Array.isArray(outputs)) {
+        return outputs.filter((source) => (
+            source instanceof Blob
+            || (typeof source === 'string' && source)
+        ));
+    }
+    return result?.imageUrl ? [result.imageUrl] : [];
+}
+
+function sortTaskAssets(assets) {
+    return assets.slice().sort((left, right) => {
+        if (left.role !== 'output' || right.role !== 'output') {
+            return 0;
+        }
+        return Number(left.order || 0) - Number(right.order || 0);
+    });
 }
 
 function previewAssetFromAsset(asset) {
@@ -283,11 +314,19 @@ function transitionTaskToCompleted(
     };
 }
 
-async function completeTask(taskId, result) {
+async function completeTask(taskId, result, outputs) {
     const completedAt = Date.now();
-    const outputAsset = result?.imageUrl
-        ? assetFromSource(taskId, 'output', result.imageUrl, completedAt)
-        : null;
+    const outputAssets = outputSources(result, outputs)
+        .map((source, order) => ({
+            ...assetFromSource(
+                taskId,
+                'output',
+                source,
+                completedAt,
+            ),
+            order,
+        }));
+    const previewAsset = outputAssets[0] || null;
     const database = await openDatabase();
     const transaction = database.transaction(
         ['tasks', 'assets'],
@@ -303,14 +342,14 @@ async function completeTask(taskId, result) {
     const task = transitionTaskToCompleted(
         current,
         result,
-        previewAssetFromAsset(outputAsset),
+        previewAssetFromAsset(previewAsset),
         completedAt,
     );
     if (task === current) {
         await done;
         return current;
     }
-    if (outputAsset) {
+    for (const outputAsset of outputAssets) {
         transaction.objectStore('assets').put(outputAsset);
     }
     taskStore.put(task);
@@ -349,9 +388,10 @@ function failTask(taskId, code, message) {
 
 async function assetsForTask(database, taskId) {
     const transaction = database.transaction('assets', 'readonly');
-    return requestValue(
+    const assets = await requestValue(
         transaction.objectStore('assets').index('taskId').getAll(taskId),
     );
+    return sortTaskAssets(assets);
 }
 
 async function getAsset(assetId) {
@@ -602,6 +642,9 @@ const localHistory = {
     taskTitle,
     isExpired,
     dataUrlToBlob,
+    assetFromSource,
+    outputSources,
+    sortTaskAssets,
     ensureUserId,
     previewAssetFromAsset,
     isStaleProcessingTask,
