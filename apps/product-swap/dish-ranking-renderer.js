@@ -82,29 +82,55 @@
             const gap = 12;
             const verticalGap = 10;
             const verticalPadding = 12;
-            const cardWidth = (
+            const availableWidth = (
                 contentWidth - gap * (columnCount - 1)
-            ) / columnCount;
-            const cardHeight = (
+            );
+            const cardWidth = Math.min(
+                232,
+                availableWidth / columnCount,
+            );
+            const availableHeight = (
                 rowHeight
                 - verticalPadding * 2
                 - verticalGap * (gridRowCount - 1)
-            ) / gridRowCount;
+            );
+            const cardHeight = Math.min(
+                248,
+                availableHeight / gridRowCount,
+            );
+            const groupHeight = (
+                cardHeight * gridRowCount
+                + verticalGap * (gridRowCount - 1)
+            );
+            const groupTop = (
+                rowIndex * rowHeight
+                + (rowHeight - groupHeight) / 2
+            );
             const commentHeight = Math.min(
                 42,
                 Math.max(24, cardHeight * 0.24),
             );
             const y = rowIndex * rowHeight;
             const cards = rowItems.map((item, index) => {
-                const column = index % 6;
-                const gridRow = Math.floor(index / 6);
+                const column = index % columnCount;
+                const gridRow = Math.floor(index / columnCount);
+                const currentRowCount = Math.min(
+                    columnCount,
+                    rowItems.length - gridRow * columnCount,
+                );
+                const currentRowWidth = (
+                    currentRowCount * cardWidth
+                    + gap * (currentRowCount - 1)
+                );
+                const rowLeft = (
+                    contentLeft + (contentWidth - currentRowWidth) / 2
+                );
                 return {
                     ...item,
                     column,
                     gridRow,
-                    x: contentLeft + column * (cardWidth + gap),
-                    y: y
-                        + verticalPadding
+                    x: rowLeft + column * (cardWidth + gap),
+                    y: groupTop
                         + gridRow * (cardHeight + verticalGap),
                     width: cardWidth,
                     height: cardHeight,

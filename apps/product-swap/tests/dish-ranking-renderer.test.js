@@ -31,6 +31,34 @@ const ranking = {
     ],
 };
 
+function tierItems(count) {
+    return Array.from({ length: count }, (_, index) => ({
+        refId: `dish-${index}`,
+        tier: 'top',
+        order: index,
+        comment: '闭眼冲',
+        owned: index === 0,
+        inputIndex: index,
+    }));
+}
+
+function cardGroupCenter(cards) {
+    const left = Math.min(...cards.map((card) => card.x));
+    const right = Math.max(...cards.map(
+        (card) => card.x + card.width,
+    ));
+    return (left + right) / 2;
+}
+
+function rectanglesOverlap(left, right) {
+    return (
+        left.x < right.x + right.width
+        && left.x + left.width > right.x
+        && left.y < right.y + right.height
+        && left.y + left.height > right.y
+    );
+}
+
 test('uses fixed pixel sizes for all supported ratios', () => {
     assert.deepEqual(canvasSize('3:4'), {
         width: 1080,
@@ -93,23 +121,57 @@ test('lays out five fixed tiers with a bounded card area', () => {
     }
 });
 
-test('wraps a dense tier into at most six columns', () => {
-    const items = Array.from({ length: 12 }, (_, index) => ({
-        refId: `dish-${index}`,
-        tier: 'top',
-        order: index,
-        comment: '闭眼冲',
-        owned: true,
-        inputIndex: index,
-    }));
-    const row = layoutRanking({ ratio: '1:1', items }).rows[0];
+test('keeps one to three tier cards fixed-size and centered', () => {
+    const rows = [1, 2, 3].map((count) => {
+        const layout = layoutRanking({
+            ratio: '3:4',
+            items: tierItems(count),
+        });
+        return { layout, row: layout.rows[0] };
+    });
 
-    assert.equal(row.cards.length, 12);
-    assert.equal(new Set(row.cards.map((card) => card.y)).size, 2);
-    assert.equal(
-        Math.max(...row.cards.map((card) => card.column)),
-        5,
-    );
+    assert.equal(rows[0].row.cards[0].width, rows[1].row.cards[0].width);
+    assert.equal(rows[1].row.cards[0].width, rows[2].row.cards[0].width);
+    assert.ok(rows[0].row.cards[0].width <= 240);
+    for (const { layout, row } of rows) {
+        const contentCenter = (
+            layout.labelWidth + 18 + layout.width - 18
+        ) / 2;
+        assert.ok(
+            Math.abs(cardGroupCenter(row.cards) - contentCenter) < 1,
+        );
+    }
+});
+
+test('wraps a dense tier into at most six columns', () => {
+    for (const ratio of ['3:4', '1:1', '9:16']) {
+        const row = layoutRanking({
+            ratio,
+            items: tierItems(12),
+        }).rows[0];
+
+        assert.equal(row.cards.length, 12);
+        assert.equal(new Set(row.cards.map((card) => card.y)).size, 2);
+        assert.equal(
+            Math.max(...row.cards.map((card) => card.column)),
+            5,
+        );
+        for (let left = 0; left < row.cards.length; left += 1) {
+            for (
+                let right = left + 1;
+                right < row.cards.length;
+                right += 1
+            ) {
+                assert.equal(
+                    rectanglesOverlap(
+                        row.cards[left],
+                        row.cards[right],
+                    ),
+                    false,
+                );
+            }
+        }
+    }
 });
 
 test('draws original images and exports the same canvas as PNG', async () => {
