@@ -91,6 +91,7 @@ type ProductSwapRouterOptions = {
 }
 
 const MAX_MAP_BYTES = 2 * 1024 * 1024
+const MAX_LOCATION_SEARCH_BYTES = 512 * 1024
 const MAP_UPSTREAM_REFERER = 'https://product-swap.mm0708.top/'
 
 function chatProviderStatus(code: ChatDraftProviderError['code']) {
@@ -113,6 +114,15 @@ function mapCoordinates(c: Context<{ Bindings: Bindings }>) {
         return null
     }
     return { lat, lng }
+}
+
+function validMapCoordinates(lat: number, lng: number) {
+    return Number.isFinite(lat)
+        && Number.isFinite(lng)
+        && lat >= 3.5
+        && lat <= 53.6
+        && lng >= 73.5
+        && lng <= 135.1
 }
 
 function providerStatus(code: ProductSwapProviderError['code']) {
@@ -192,6 +202,163 @@ export function createProductSwapRouter(
             referer,
         }, 200, {
             'Cache-Control': 'public, max-age=300',
+        })
+    })
+
+    router.get('/location-search', async (c) => {
+        const region = (c.req.query('region') || '').trim()
+        const keyword = (c.req.query('keyword') || '').trim()
+        const key = c.env?.TENCENT_MAP_KEY?.trim()
+        if (
+            !region
+            || !keyword
+            || region.length > 40
+            || keyword.length > 40
+        ) {
+            return c.json({
+                success: false,
+                error: {
+                    code: 'INVALID_INPUT',
+                    message: '请填写有效的城市或区域和地点关键词',
+                },
+            }, 400)
+        }
+        if (!key) {
+            return c.json({
+                success: false,
+                error: {
+                    code: 'TENCENT_MAP_NOT_CONFIGURED',
+                    message: '腾讯地图尚未配置',
+                },
+            }, 503)
+        }
+
+        const upstreamUrl = new URL(
+            'https://apis.map.qq.com/ws/place/v1/search',
+        )
+        upstreamUrl.searchParams.set('boundary', `region(${region},1)`)
+        upstreamUrl.searchParams.set('keyword', keyword)
+        upstreamUrl.searchParams.set('page_size', '12')
+        upstreamUrl.searchParams.set('page_index', '1')
+        upstreamUrl.searchParams.set('output', 'json')
+        upstreamUrl.searchParams.set('key', key)
+
+        let upstream: Response
+        try {
+            upstream = await fetchImpl(upstreamUrl.toString(), {
+                headers: {
+                    Referer: MAP_UPSTREAM_REFERER,
+                },
+                signal: AbortSignal.timeout(15_000),
+            })
+        } catch {
+            return c.json({
+                success: false,
+                error: {
+                    code: 'LOCATION_SEARCH_FAILED',
+                    message: '地点搜索暂时不可用',
+                },
+            }, 502)
+        }
+
+        const contentLength = Number(
+            upstream.headers.get('content-length'),
+        )
+        if (
+            !upstream.ok
+            || (
+                Number.isFinite(contentLength)
+                && contentLength > MAX_LOCATION_SEARCH_BYTES
+            )
+        ) {
+            return c.json({
+                success: false,
+                error: {
+                    code: 'LOCATION_SEARCH_FAILED',
+                    message: '地点搜索暂时不可用',
+                },
+            }, 502)
+        }
+        const text = await upstream.text()
+        if (
+            new TextEncoder().encode(text).byteLength
+                > MAX_LOCATION_SEARCH_BYTES
+        ) {
+            return c.json({
+                success: false,
+                error: {
+                    code: 'LOCATION_SEARCH_FAILED',
+                    message: '地点搜索暂时不可用',
+                },
+            }, 502)
+        }
+        let payload: unknown
+        try {
+            payload = JSON.parse(text)
+        } catch {
+            payload = null
+        }
+        const result = payload as {
+            status?: unknown
+            data?: unknown
+        } | null
+        if (
+            !result
+            || result.status !== 0
+            || !Array.isArray(result.data)
+        ) {
+            return c.json({
+                success: false,
+                error: {
+                    code: 'LOCATION_SEARCH_FAILED',
+                    message: '地点搜索暂时不可用',
+                },
+            }, 502)
+        }
+
+        const locations = result.data.flatMap((item: unknown) => {
+            const poi = item as {
+                id?: unknown
+                title?: unknown
+                address?: unknown
+                location?: { lat?: unknown; lng?: unknown }
+                ad_info?: { city?: unknown }
+            }
+            const id = typeof poi?.id === 'string' ? poi.id.trim() : ''
+            const name = typeof poi?.title === 'string'
+                ? poi.title.trim()
+                : ''
+            const address = typeof poi?.address === 'string'
+                ? poi.address.trim()
+                : ''
+            const city = typeof poi?.ad_info?.city === 'string'
+                ? poi.ad_info.city.trim()
+                : ''
+            const lat = Number(poi?.location?.lat)
+            const lng = Number(poi?.location?.lng)
+            if (
+                !id
+                || !name
+                || !address
+                || !validMapCoordinates(lat, lng)
+            ) {
+                return []
+            }
+            return [{
+                id,
+                name,
+                address,
+                city,
+                lat,
+                lng,
+            }]
+        }).slice(0, 12)
+
+        return c.json({
+            success: true,
+            locations,
+        }, 200, {
+            'Cache-Control': 'private, max-age=60',
         })
     })
 

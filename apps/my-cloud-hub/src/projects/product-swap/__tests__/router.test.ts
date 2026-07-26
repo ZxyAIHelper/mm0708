@@ -50,6 +50,10 @@ describe('product swap router', () => {
                     { id: 'm4', side: 'left' as const, type: 'text' as const, text: '下次一起去。' },
                     { id: 'm5', side: 'right' as const, type: 'text' as const, text: '好呀。' },
                     { id: 'm6', side: 'left' as const, type: 'text' as const, text: '说定了。' },
+                    { id: 'm7', side: 'right' as const, type: 'text' as const, text: '我现在还在回味。' },
+                    { id: 'm8', side: 'left' as const, type: 'text' as const, text: '被你说得马上想去。' },
+                    { id: 'm9', side: 'right' as const, type: 'text' as const, text: '真的很适合慢慢坐。' },
+                    { id: 'm10', side: 'left' as const, type: 'text' as const, text: '那就周末去。' },
                 ],
             },
         }))
@@ -82,7 +86,7 @@ describe('product swap router', () => {
         expect(response.status).toBe(200)
         expect(data.success).toBe(true)
         expect(data.provider).toBe('volcano')
-        expect(data.draft.messages).toHaveLength(6)
+        expect(data.draft.messages).toHaveLength(10)
         expect(data.requestId).toMatch(/^chat_/)
         expect(chatGenerator).toHaveBeenCalledOnce()
     })
@@ -106,6 +110,119 @@ describe('product swap router', () => {
             success: true,
             key: 'map-key',
             referer: 'product-swap',
+        })
+    })
+
+    it('searches Tencent POIs through a fixed, normalized proxy', async () => {
+        const fetchMock = vi.fn(async () => Response.json({
+            status: 0,
+            message: 'query ok',
+            count: 2,
+            data: [{
+                id: 'poi-1',
+                title: '颐和园',
+                address: '新建宫门路19号',
+                location: { lat: 39.998766, lng: 116.273938 },
+                ad_info: { city: '北京市' },
+                tel: 'should-not-leak',
+            }, {
+                id: 'invalid',
+                title: '海外地点',
+                address: 'invalid',
+                location: { lat: 80, lng: 10 },
+                ad_info: { city: '无效' },
+            }],
+        }))
+        const provider: ProductSwapProvider = {
+            name: 'fake',
+            generate: async () => ({ imageUrl: targetImage }),
+        }
+        const app = new Hono()
+        app.route('/api/product-swap', createProductSwapRouter(
+            () => provider,
+            noOpArchive,
+            { fetchImpl: fetchMock },
+        ))
+
+        const response = await app.request(
+            '/api/product-swap/location-search?region=北京&keyword=颐和园',
+            undefined,
+            { TENCENT_MAP_KEY: 'map-key' },
+        )
+        const url = new URL(fetchMock.mock.calls[0][0] as string)
+        const data = await response.json() as any
+
+        expect(response.status).toBe(200)
+        expect(url.origin).toBe('https://apis.map.qq.com')
+        expect(url.pathname).toBe('/ws/place/v1/search')
+        expect(url.searchParams.get('boundary')).toBe('region(北京,1)')
+        expect(url.searchParams.get('keyword')).toBe('颐和园')
+        expect(url.searchParams.get('page_size')).toBe('12')
+        expect(fetchMock.mock.calls[0][1]).toMatchObject({
+            headers: {
+                Referer: 'https://product-swap.mm0708.top/',
+            },
+        })
+        expect(data).toEqual({
+            success: true,
+            locations: [{
+                id: 'poi-1',
+                name: '颐和园',
+                address: '新建宫门路19号',
+                city: '北京市',
+                lat: 39.998766,
+                lng: 116.273938,
+            }],
+        })
+        expect(JSON.stringify(data)).not.toContain('map-key')
+        expect(JSON.stringify(data)).not.toContain('should-not-leak')
+    })
+
+    it.each([
+        '',
+        '?region=&keyword=颐和园',
+        '?region=北京&keyword=',
+        `?region=${'北'.repeat(41)}&keyword=颐和园`,
+        `?region=北京&keyword=${'园'.repeat(41)}`,
+    ])('rejects invalid location search input %s', async (query) => {
+        const provider: ProductSwapProvider = {
+            name: 'fake',
+            generate: async () => ({ imageUrl: targetImage }),
+        }
+        const response = await createApp(provider).request(
+            `/api/product-swap/location-search${query}`,
+            undefined,
+            { TENCENT_MAP_KEY: 'map-key' },
+        )
+
+        expect(response.status).toBe(400)
+    })
+
+    it('maps a Tencent location search error to a stable response', async () => {
+        const fetchMock = vi.fn(async () => Response.json({
+            status: 110,
+            message: 'source is not authorized',
+        }))
+        const provider: ProductSwapProvider = {
+            name: 'fake',
+            generate: async () => ({ imageUrl: targetImage }),
+        }
+        const app = new Hono()
+        app.route('/api/product-swap', createProductSwapRouter(
+            () => provider,
+            noOpArchive,
+            { fetchImpl: fetchMock },
+        ))
+
+        const response = await app.request(
+            '/api/product-swap/location-search?region=北京&keyword=颐和园',
+            undefined,
+            { TENCENT_MAP_KEY: 'map-key' },
+        )
+
+        expect(response.status).toBe(502)
+        expect(await response.json()).toMatchObject({
+            error: { code: 'LOCATION_SEARCH_FAILED' },
         })
     })
 

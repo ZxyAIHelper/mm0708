@@ -323,12 +323,42 @@
         const closeDialog = element('button', '', '关闭');
         closeDialog.type = 'button';
         dialogBar.appendChild(closeDialog);
-        const mapFrame = element('iframe', 'chat-map-frame');
-        mapFrame.title = '腾讯地图选点';
-        dialog.append(dialogBar, mapFrame);
+        const mapSearch = element('div', 'chat-map-search');
+        const regionLabel = element('label', '', '城市或区域');
+        const regionInput = element('input', 'chat-map-region');
+        regionInput.type = 'text';
+        regionInput.maxLength = 40;
+        regionInput.placeholder = '例如：北京';
+        regionLabel.appendChild(regionInput);
+        const keywordLabel = element('label', '', '店铺或地点名称');
+        const keywordInput = element('input', 'chat-map-keyword');
+        keywordInput.type = 'search';
+        keywordInput.maxLength = 40;
+        keywordInput.placeholder = '例如：颐和园';
+        keywordLabel.appendChild(keywordInput);
+        const searchButton = element(
+            'button',
+            'chat-map-search-button',
+            '搜索真实地点',
+        );
+        searchButton.type = 'button';
+        const searchStatus = element(
+            'p',
+            'chat-map-search-status',
+            '填写城市和地点名称后搜索',
+        );
+        searchStatus.setAttribute('role', 'status');
+        const searchResults = element('div', 'chat-map-results');
+        mapSearch.append(
+            regionLabel,
+            keywordLabel,
+            searchButton,
+            searchStatus,
+            searchResults,
+        );
+        dialog.append(dialogBar, mapSearch);
         section.appendChild(dialog);
 
-        let pickerConfig = null;
         let renderedPages = [];
         let renderVersion = 0;
 
@@ -586,32 +616,65 @@
             });
         });
         closeDialog.addEventListener('click', () => dialog.close());
-        locationButton.disabled = true;
         locationButton.addEventListener('click', () => {
-            if (!pickerConfig) return;
-            mapFrame.src = map.buildPickerUrl(pickerConfig);
             if (typeof dialog.showModal === 'function') dialog.showModal();
             else dialog.setAttribute('open', '');
+            regionInput.focus();
         });
-        const pickerListener = (event) => {
-            const location = map.normalizePickerMessage(event);
-            if (!location) return;
-            state.setLocation(location);
-            renderLocation();
-            dialog.close();
-        };
-        global.addEventListener('message', pickerListener);
-
-        Promise.resolve(map.getMapConfig())
-            .then((config) => {
-                pickerConfig = config;
-                locationButton.disabled = false;
-                mapStatus.textContent = '由腾讯地图提供真实地点搜索';
-            })
-            .catch(() => {
-                mapStatus.textContent = '腾讯地图 Key 待配置';
-                locationButton.disabled = true;
-            });
+        async function runLocationSearch() {
+            searchButton.disabled = true;
+            searchStatus.textContent = '正在搜索腾讯地图…';
+            searchResults.replaceChildren();
+            try {
+                const locations = await map.searchLocations({
+                    region: regionInput.value,
+                    keyword: keywordInput.value,
+                });
+                if (locations.length === 0) {
+                    searchStatus.textContent =
+                        '没有找到地点，请尝试更具体的名称';
+                    return;
+                }
+                searchStatus.textContent =
+                    `找到 ${locations.length} 个真实地点`;
+                for (const location of locations) {
+                    const item = element(
+                        'button',
+                        'chat-map-result',
+                    );
+                    item.type = 'button';
+                    item.append(
+                        element('strong', '', location.name),
+                        element(
+                            'span',
+                            '',
+                            [location.city, location.address]
+                                .filter(Boolean)
+                                .join(' · '),
+                        ),
+                    );
+                    item.addEventListener('click', () => {
+                        state.setLocation(location);
+                        renderLocation();
+                        dialog.close();
+                    });
+                    searchResults.appendChild(item);
+                }
+            } catch (searchError) {
+                searchStatus.textContent = searchError.message
+                    || '地点搜索暂时不可用';
+            } finally {
+                searchButton.disabled = false;
+            }
+        }
+        searchButton.addEventListener('click', runLocationSearch);
+        keywordInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                runLocationSearch();
+            }
+        });
+        mapStatus.textContent = '由腾讯地图提供真实地点搜索';
 
         renderImageList();
         renderLocation();
@@ -622,7 +685,6 @@
             state,
             refreshPreview,
             destroy() {
-                global.removeEventListener('message', pickerListener);
                 renderedPages.forEach(
                     (page) => URL.revokeObjectURL(page.url),
                 );

@@ -6,6 +6,8 @@ const {
     getMapConfig,
     mapPreviewUrl,
     normalizePickerMessage,
+    normalizeSearchResults,
+    searchLocations,
 } = require('../tencent-map-picker');
 
 const pickerEvent = {
@@ -93,4 +95,64 @@ test('loads picker configuration through the shared api client', async () => {
         key: 'map-key',
         referer: 'product-swap',
     });
+});
+
+test('searches and normalizes real Tencent locations through the shared api', async () => {
+    const calls = [];
+    const locations = await searchLocations({
+        region: ' 北京 ',
+        keyword: ' 颐和园 ',
+        apiJson: async (path) => {
+            calls.push(path);
+            return {
+                success: true,
+                locations: [{
+                    id: 'poi-1',
+                    name: '颐和园',
+                    address: '新建宫门路19号',
+                    city: '北京市',
+                    lat: 39.998766,
+                    lng: 116.273938,
+                    tel: 'must-be-removed',
+                }, {
+                    id: 'bad',
+                    name: '无效',
+                    address: '无效',
+                    city: '',
+                    lat: 90,
+                    lng: 116,
+                }],
+            };
+        },
+    });
+
+    assert.equal(calls.length, 1);
+    const request = new URL(calls[0], 'https://api.mm0708.top');
+    assert.equal(request.pathname, '/api/product-swap/location-search');
+    assert.equal(request.searchParams.get('region'), '北京');
+    assert.equal(request.searchParams.get('keyword'), '颐和园');
+    assert.deepEqual(locations, [{
+        id: 'store-location',
+        sourceId: 'poi-1',
+        name: '颐和园',
+        address: '新建宫门路19号',
+        city: '北京市',
+        lat: 39.998766,
+        lng: 116.273938,
+    }]);
+});
+
+test('rejects empty search terms and malformed search responses', async () => {
+    await assert.rejects(
+        searchLocations({
+            region: '',
+            keyword: '颐和园',
+            apiJson: async () => ({ success: true, locations: [] }),
+        }),
+        /城市|区域/,
+    );
+    assert.throws(
+        () => normalizeSearchResults({ success: true, locations: null }),
+        /地点/,
+    );
 });

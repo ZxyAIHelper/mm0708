@@ -114,3 +114,16 @@ test('renders and downloads chat screenshots as multiple pages', () => {
     assert.match(source, /chat-page-preview/);
     assert.match(source, /chat-download-all-button/);
 });
+
+test('uses the first-party Tencent location search dialog', () => {
+    const source = fs.readFileSync(
+        path.join(__dirname, '..', 'wechat-chat-editor.js'),
+        'utf8',
+    );
+
+    assert.match(source, /chat-map-region/);
+    assert.match(source, /chat-map-keyword/);
+    assert.match(source, /chat-map-results/);
+    assert.match(source, /map\.searchLocations/);
+    assert.doesNotMatch(source, /chat-map-frame/);
+});

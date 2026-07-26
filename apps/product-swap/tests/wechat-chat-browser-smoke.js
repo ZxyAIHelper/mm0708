@@ -41,12 +41,17 @@ function draftFor(input) {
         { type: 'text', text: '位置挺好找的，下次一起去。' },
         { type: 'text', text: '可以呀，周末约。' },
         { type: 'text', text: '说定了。' },
-    ].slice(0, 10).map((message, index) => ({
+        { type: 'text', text: '我现在还在回味，越想越想再去一次。' },
+        { type: 'text', text: '被你说得我现在就想出门。' },
+        { type: 'text', text: '真的很适合慢慢坐，拍照也很有氛围。' },
+        { type: 'text', text: '那就别等了，周末直接安排。' },
+        { type: 'text', text: '好，已经开始期待了！' },
+    ].slice(0, 16).map((message, index) => ({
         id: `smoke-${index + 1}`,
         side: index % 2 === 0 ? 'right' : 'left',
         ...message,
     }));
-    while (messages.length < 6) {
+    while (messages.length < 10) {
         const index = messages.length;
         messages.push({
             id: `smoke-${index + 1}`,
@@ -115,11 +120,17 @@ function draftFor(input) {
         await page.setRequestInterception(true);
         page.on('request', (request) => {
             const url = new URL(request.url());
-            if (url.pathname === '/api/product-swap/map-config') {
+            if (url.pathname === '/api/product-swap/location-search') {
                 respondJson(request, {
                     success: true,
-                    key: 'browser-map-key',
-                    referer: 'product-swap',
+                    locations: [{
+                        id: 'poi-1',
+                        name: '颐和园',
+                        address: '北京市海淀区新建宫门路19号',
+                        city: '北京市',
+                        lat: 39.998766,
+                        lng: 116.273938,
+                    }],
                 }, origin);
                 return;
             }
@@ -160,21 +171,12 @@ function draftFor(input) {
             { waitUntil: 'networkidle0' },
         );
         await page.type('.chat-store-name', '三山山');
-        await page.evaluate(() => {
-            window.dispatchEvent(new MessageEvent('message', {
-                origin: 'https://apis.map.qq.com',
-                data: {
-                    module: 'locationPicker',
-                    poiname: '颐和园',
-                    poiaddress: '北京市海淀区新建宫门路19号',
-                    cityname: '北京市',
-                    latlng: {
-                        lat: 39.998766,
-                        lng: 116.273938,
-                    },
-                },
-            }));
-        });
+        await page.click('.chat-location-button');
+        await page.type('.chat-map-region', '北京');
+        await page.type('.chat-map-keyword', '颐和园');
+        await page.click('.chat-map-search-button');
+        await page.waitForSelector('.chat-map-result');
+        await page.click('.chat-map-result');
         const input = await page.$('.chat-image-input');
         await input.uploadFile(uploadPath);
         await page.waitForFunction(() => (
@@ -182,7 +184,7 @@ function draftFor(input) {
         ));
         await page.click('.chat-generate-button');
         await page.waitForFunction(() => (
-            document.querySelectorAll('.chat-edit-message').length >= 6
+            document.querySelectorAll('.chat-edit-message').length >= 10
             && !document.querySelector('.chat-generate-button').disabled
         ), { timeout: 10000 });
 

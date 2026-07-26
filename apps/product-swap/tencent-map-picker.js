@@ -70,6 +70,63 @@
         return { key, referer };
     }
 
+    function normalizeSearchResults(value) {
+        if (!value?.success || !Array.isArray(value.locations)) {
+            throw new Error('腾讯地点搜索结果无效');
+        }
+        return value.locations.slice(0, 12).flatMap((item) => {
+            const sourceId = cleanText(item?.id);
+            const name = cleanText(item?.name);
+            const address = cleanText(item?.address);
+            const city = cleanText(item?.city);
+            const lat = Number(item?.lat);
+            const lng = Number(item?.lng);
+            if (
+                !sourceId
+                || !name
+                || !address
+                || !validCoordinates(lat, lng)
+            ) {
+                return [];
+            }
+            return [{
+                id: 'store-location',
+                sourceId,
+                name,
+                address,
+                city,
+                lat,
+                lng,
+            }];
+        });
+    }
+
+    async function searchLocations({
+        region,
+        keyword,
+        apiJson = global.ProductSwapApi?.apiJson,
+    } = {}) {
+        const cleanRegion = cleanText(region);
+        const cleanKeyword = cleanText(keyword);
+        if (!cleanRegion || cleanRegion.length > 40) {
+            throw new Error('请填写有效的城市或区域');
+        }
+        if (!cleanKeyword || cleanKeyword.length > 40) {
+            throw new Error('请填写有效的店铺或地点名称');
+        }
+        if (typeof apiJson !== 'function') {
+            throw new Error('地点搜索接口不可用');
+        }
+        const query = new URLSearchParams({
+            region: cleanRegion,
+            keyword: cleanKeyword,
+        });
+        const data = await apiJson(
+            `/api/product-swap/location-search?${query.toString()}`,
+        );
+        return normalizeSearchResults(data);
+    }
+
     function mapPreviewUrl(
         location,
         apiBase = global.API_BASE_URL || DEFAULT_API_BASE,
@@ -95,6 +152,8 @@
         getMapConfig,
         mapPreviewUrl,
         normalizePickerMessage,
+        normalizeSearchResults,
+        searchLocations,
         validCoordinates,
     };
     global.TencentMapPicker = api;
