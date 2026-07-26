@@ -650,6 +650,43 @@ body[data-template-id="wechat-chat-screenshot"] #swapForm {
     color: #252321;
 }
 
+.chat-location-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.chat-location-fallback-badge,
+.chat-map-result .chat-location-fallback-badge {
+    justify-self: start;
+    border-radius: 999px;
+    padding: 3px 8px;
+    background: #fff1d6;
+    color: #9a5b00;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.chat-location-map-state {
+    display: grid;
+    min-height: 54px;
+    place-items: center;
+    border-radius: 10px;
+    background: #e8ece9;
+    color: #6f6b67;
+    font-size: 13px;
+    overflow: hidden;
+}
+
+.chat-location-map-preview {
+    display: block;
+    width: 100%;
+    aspect-ratio: 640 / 260;
+    border-radius: 10px;
+    object-fit: cover;
+}
+
 .chat-location-summary button {
     justify-self: start;
     margin-top: 6px;

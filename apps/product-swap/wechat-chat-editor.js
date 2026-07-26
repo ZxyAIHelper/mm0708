@@ -457,10 +457,47 @@
                 locationSummary.textContent = '尚未选择地点';
                 return;
             }
+            const title = element('div', 'chat-location-title');
+            title.appendChild(element('strong', '', location.name));
+            if (location.fallback) {
+                title.appendChild(element(
+                    'span',
+                    'chat-location-fallback-badge',
+                    '备用位置',
+                ));
+            }
             locationSummary.append(
-                element('strong', '', location.name),
+                title,
                 element('span', '', location.address),
             );
+            const mapPreview = element(
+                'div',
+                'chat-location-map-state',
+                '正在加载地图…',
+            );
+            locationSummary.appendChild(mapPreview);
+            if (typeof map?.loadMapPreviewImage === 'function') {
+                map.loadMapPreviewImage(location).then((image) => {
+                    const current =
+                        state.snapshot().materials.location;
+                    if (
+                        !current
+                        || current.lat !== location.lat
+                        || current.lng !== location.lng
+                    ) {
+                        return;
+                    }
+                    if (!image) {
+                        mapPreview.textContent = '地图暂不可用';
+                        return;
+                    }
+                    image.className = 'chat-location-map-preview';
+                    image.alt = `${location.name}地图`;
+                    mapPreview.replaceChildren(image);
+                });
+            } else {
+                mapPreview.textContent = '地图暂不可用';
+            }
             const clear = element('button', '', '清除');
             clear.type = 'button';
             clear.addEventListener('click', () => {
@@ -697,8 +734,11 @@
                         '没有找到地点，请尝试更具体的名称';
                     return;
                 }
-                searchStatus.textContent =
-                    `找到 ${locations.length} 个真实地点`;
+                searchStatus.textContent = locations.some(
+                    (location) => location.fallback,
+                )
+                    ? '地图暂不可用，已提供备用地点'
+                    : `找到 ${locations.length} 个真实地点`;
                 for (const location of locations) {
                     const item = element(
                         'button',
@@ -715,6 +755,13 @@
                                 .join(' · '),
                         ),
                     );
+                    if (location.fallback) {
+                        item.appendChild(element(
+                            'span',
+                            'chat-location-fallback-badge',
+                            '备用位置',
+                        ));
+                    }
                     item.addEventListener('click', () => {
                         state.setLocation(location);
                         renderLocation();
