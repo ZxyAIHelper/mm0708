@@ -299,7 +299,7 @@ function draftFor(input) {
             pages: expectedPages,
             selectedRightAvatar: 'true',
             oldGenerateHidden: true,
-            canvas: { width: 1080, height: 1920 },
+            canvas: { width: 1179, height: 2556 },
         });
         assert.deepEqual(pageErrors, []);
         console.log(JSON.stringify({

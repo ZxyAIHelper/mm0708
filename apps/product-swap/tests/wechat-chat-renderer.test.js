@@ -2,6 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+    DEFAULT_HEIGHT,
+    DEFAULT_WIDTH,
+    containSize,
     layoutChat,
     loadAvatarResources,
     loadChromeResources,
@@ -32,8 +35,6 @@ test('wraps Chinese and long latin words within the measured width', () => {
 
 test('lays out text, image, and location messages inside the canvas', () => {
     const layout = layoutChat({
-        width: 1080,
-        height: 1920,
         contactName: '小林',
         messages,
         measureText: (text) => Array.from(text).length * 34,
@@ -43,15 +44,49 @@ test('lays out text, image, and location messages inside the canvas', () => {
         },
     });
 
-    assert.equal(layout.width, 1080);
-    assert.equal(layout.height, 1920);
+    assert.equal(layout.width, 1179);
+    assert.equal(layout.height, 2556);
     assert.equal(layout.items.length, messages.length);
     assert.equal(layout.overflow, false);
-    assert.ok(layout.items.every((item) => item.bottom <= 1760));
+    assert.ok(layout.items.every((item) => (
+        item.bottom <= layout.safeBottom
+    )));
     assert.equal(layout.items[0].side, 'right');
     assert.equal(layout.items[1].side, 'left');
     assert.ok(layout.items[0].height > layout.items[1].height);
     assert.ok(layout.items[2].height > layout.items[3].height);
+});
+
+test('uses the exact reference screenshot aspect ratio', () => {
+    assert.equal(DEFAULT_WIDTH, 1179);
+    assert.equal(DEFAULT_HEIGHT, 2556);
+    assert.equal(DEFAULT_WIDTH / DEFAULT_HEIGHT, 1179 / 2556);
+});
+
+test('uses reference-sized chat geometry without stretching content', () => {
+    const layout = layoutChat({
+        messages: messages.slice(0, 2),
+        measureText: (text) => Array.from(text).length * 42,
+        assets: {
+            'image-1': { width: 1200, height: 900 },
+        },
+    });
+
+    assert.equal(layout.items[0].width, 650);
+    assert.equal(layout.items[0].x, 335);
+    assert.equal(layout.items[1].x, 194);
+    assert.equal(
+        layout.items[1].y,
+        layout.items[0].bottom + 38,
+    );
+});
+
+test('fits cropped chrome without changing its source ratio', () => {
+    const fitted = containSize(115, 108, 82, 86);
+
+    assert.ok(fitted.width <= 82);
+    assert.ok(fitted.height <= 86);
+    assert.equal(fitted.width / fitted.height, 115 / 108);
 });
 
 test('preserves image aspect ratio within safe bounds', () => {
@@ -70,8 +105,8 @@ test('preserves image aspect ratio within safe bounds', () => {
         },
     }).items[0];
 
-    assert.equal(portrait.width, 360);
-    assert.equal(portrait.height, 520);
+    assert.equal(portrait.width, 450);
+    assert.equal(portrait.height, 650);
 });
 
 test('paginates a long conversation without splitting or reordering messages', () => {
@@ -126,9 +161,13 @@ test('reserves phone status and composer chrome outside messages', () => {
 
     assert.deepEqual(layout.chrome.statusBar, {
         top: 0,
-        height: 104,
+        height: 130,
     });
-    assert.equal(layout.chrome.composer.height, 156);
+    assert.deepEqual(layout.chrome.header, {
+        top: 0,
+        height: 294,
+    });
+    assert.equal(layout.chrome.composer.height, 268);
     assert.equal(
         layout.chrome.composer.top,
         layout.height - layout.chrome.composer.height,
