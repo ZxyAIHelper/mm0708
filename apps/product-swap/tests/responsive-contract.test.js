@@ -89,6 +89,56 @@ test('food creator has explicit desktop and 640px responsive layout contracts', 
     );
 });
 
+test('desktop pages use independent wide layouts while mobile widths remain the default', () => {
+    const appDesktop = atRuleBlockFor(
+        appCss,
+        '@media (min-width: 900px)',
+    );
+    const creatorDesktop = atRuleBlockFor(
+        creatorCss,
+        '@media (min-width: 900px)',
+    );
+
+    assert.notEqual(appDesktop, '');
+    assert.match(
+        ruleFor(appDesktop, '.app-shell'),
+        /width:\s*min\(calc\(100% - 64px\),\s*1180px\)/,
+    );
+    assert.match(
+        ruleFor(appDesktop, '.home-header'),
+        /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(360px,\s*0\.8fr\)/,
+    );
+    assert.match(
+        ruleFor(appDesktop, '.template-grid'),
+        /grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/,
+    );
+    assert.match(
+        ruleFor(appDesktop, '.profile-shell'),
+        /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
+    );
+
+    assert.notEqual(creatorDesktop, '');
+    assert.match(
+        ruleFor(creatorDesktop, '.product-swap-shell'),
+        /width:\s*min\(calc\(100% - 64px\),\s*1180px\)/,
+    );
+    assert.match(
+        ruleFor(creatorDesktop, '.product-swap-shell'),
+        /grid-template-columns:\s*minmax\(300px,\s*0\.75fr\)\s+minmax\(460px,\s*1\.25fr\)/,
+    );
+    assert.match(
+        ruleFor(creatorDesktop, '.task-grid'),
+        /grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/,
+    );
+    assert.match(
+        ruleFor(
+            creatorDesktop,
+            'body[data-template-id="wechat-chat-screenshot"] .product-swap-shell',
+        ),
+        /display:\s*block/,
+    );
+});
+
 test('creator inputs and Works surfaces retain readable light-theme contrast', () => {
     assert.match(ruleFor(creatorCss, '#refineInput'), /background:\s*var\(--panel-soft\)/);
     assert.match(ruleFor(creatorCss, '.state-card'), /background:\s*var\(--panel-soft\)/);

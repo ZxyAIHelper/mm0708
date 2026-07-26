@@ -1252,3 +1252,73 @@ body.detail-open {
         padding: 18px;
     }
 }
+
+@media (min-width: 900px) {
+    .product-swap-shell {
+        display: grid;
+        width: min(calc(100% - 64px), 1180px);
+        grid-template-columns: minmax(300px, 0.75fr) minmax(460px, 1.25fr);
+        grid-template-areas:
+            "nav nav"
+            "intro form"
+            "example form"
+            "result result";
+        column-gap: 48px;
+        row-gap: 24px;
+        padding: 32px 0 96px;
+    }
+
+    .product-swap-shell .top-nav {
+        grid-area: nav;
+    }
+
+    .product-swap-shell .intro {
+        grid-area: intro;
+        align-self: end;
+    }
+
+    .product-swap-shell .intro h1 {
+        margin-top: 0;
+        font-size: clamp(28px, 3vw, 42px);
+    }
+
+    .product-swap-shell .example-card {
+        grid-area: example;
+        margin-top: 0;
+    }
+
+    .product-swap-shell #swapForm {
+        grid-area: form;
+        align-self: start;
+        padding: 24px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--panel);
+        box-shadow: 0 14px 40px rgb(44 38 32 / 8%);
+    }
+
+    .product-swap-shell #resultSection {
+        grid-area: result;
+    }
+
+    .history-shell {
+        display: block;
+        width: min(calc(100% - 64px), 1180px);
+    }
+
+    .task-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 20px;
+    }
+
+    body[data-template-id="wechat-chat-screenshot"] .product-swap-shell {
+        display: block;
+    }
+
+    body[data-template-id="wechat-chat-screenshot"] #swapForm {
+        padding: 0;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+}

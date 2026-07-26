@@ -870,6 +870,54 @@ function attachPageErrorListeners(page, errors, label) {
             }
         }
 
+        const desktopState = [];
+        await page.setViewport({
+            width: 1440,
+            height: 1000,
+            deviceScaleFactor: 1,
+        });
+        for (const responsivePage of responsivePages) {
+            await page.goto(`${appUrl}${responsivePage.path}`, {
+                waitUntil: 'networkidle0',
+                timeout: 60000,
+            });
+            if (responsivePage.name === 'home') {
+                await page.waitForSelector('#templateGrid .template-card');
+            }
+            if (responsivePage.name === 'history') {
+                await page.waitForSelector('.task-card');
+            }
+            desktopState.push(await page.evaluate((name) => {
+                const shell = document.querySelector(
+                    '.app-shell, .product-swap-shell',
+                );
+                const shellStyle = shell ? getComputedStyle(shell) : null;
+                const templateGrid = document.querySelector('.template-grid');
+                const taskGrid = document.querySelector('.task-grid');
+                const profileShell = document.querySelector('.profile-shell');
+                return {
+                    name,
+                    shellWidth: shell?.getBoundingClientRect().width || 0,
+                    shellColumns: shellStyle?.gridTemplateColumns || '',
+                    templateColumns: templateGrid
+                        ? getComputedStyle(templateGrid)
+                            .gridTemplateColumns.split(' ').length
+                        : 0,
+                    taskColumns: taskGrid
+                        ? getComputedStyle(taskGrid)
+                            .gridTemplateColumns.split(' ').length
+                        : 0,
+                    profileColumns: profileShell
+                        ? getComputedStyle(profileShell)
+                            .gridTemplateColumns.split(' ').length
+                        : 0,
+                    noPageOverflow:
+                        document.documentElement.scrollWidth
+                            <= document.documentElement.clientWidth + 1,
+                };
+            }, responsivePage.name));
+        }
+
         await page.setViewport({
             width: 456,
             height: 980,
@@ -1000,6 +1048,7 @@ function attachPageErrorListeners(page, errors, label) {
             profileState,
             restrictedProfileState,
             responsiveState,
+            desktopState,
             errors,
         }, null, 2));
 
@@ -1110,6 +1159,20 @@ function attachPageErrorListeners(page, errors, label) {
                 || !responsive.filtersFit
                 || !responsive.profileButtonsFit
             ))
+            || desktopState.length !== 4
+            || desktopState.some((desktop) => (
+                desktop.shellWidth < 1100
+                || desktop.shellWidth > 1180
+                || !desktop.noPageOverflow
+            ))
+            || desktopState.find((desktop) => desktop.name === 'home')
+                ?.templateColumns !== 4
+            || desktopState.find((desktop) => desktop.name === 'creator')
+                ?.shellColumns.split(' ').length !== 2
+            || desktopState.find((desktop) => desktop.name === 'history')
+                ?.taskColumns !== 3
+            || desktopState.find((desktop) => desktop.name === 'profile')
+                ?.profileColumns !== 2
         ) {
             process.exitCode = 1;
         }
