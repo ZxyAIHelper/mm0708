@@ -122,68 +122,130 @@ const { listenOnSafePort } = require('./safe-port');
             document.querySelectorAll('.dish-card').length === 2
         ));
         await page.click('.dish-owned-toggle');
-        await page.evaluate(() => {
-            document.getElementById('swapForm').requestSubmit();
+        const layouts = [
+            'tier',
+            'grid-4',
+            'grid-9',
+            'hero',
+            'leaderboard',
+        ];
+        const pickerState = await page.evaluate(() => ({
+            previewButtons: document.querySelectorAll(
+                '[data-field-key="layout"]'
+                + ' .choice-group-with-previews > button',
+            ).length,
+            previews: document.querySelectorAll(
+                '[data-field-key="layout"] .choice-preview',
+            ).length,
+            ordinaryRatioButtons: document.querySelectorAll(
+                '[data-field-key="aspectRatio"]'
+                + ' .choice-group:not(.choice-group-with-previews) > button',
+            ).length,
+        }));
+        assert.deepEqual(pickerState, {
+            previewButtons: 5,
+            previews: 5,
+            ordinaryRatioButtons: 3,
         });
-        await page.waitForFunction(() => (
-            !document.getElementById('resultSection').hidden
-            && document.getElementById('resultImage').complete
-            && document.getElementById('resultImage').naturalWidth > 0
-        ), { timeout: 12000 });
-
-        const state = await page.evaluate(() => {
-            const result = document.getElementById('resultImage');
-            return {
-                title: document.getElementById('creatorTitle').textContent,
-                cards: document.querySelectorAll('.dish-card').length,
-                owned: document.querySelectorAll('.dish-card.is-owned').length,
-                status: document.querySelector(
-                    '.dish-list-status',
-                ).textContent,
-                resultPrefix: result.src.slice(0, 22),
-                resultWidth: result.naturalWidth,
-                resultHeight: result.naturalHeight,
-                refinementHidden: document.querySelector(
-                    '.refinement-panel',
-                ).hidden,
-                error: document.getElementById('formError').textContent,
-            };
-        });
-        assert.equal(state.title, '菜品测评攻略图');
-        assert.equal(state.cards, 2);
-        assert.equal(state.owned, 1);
-        assert.match(state.status, /资源库补充 7 张/);
-        assert.equal(state.resultPrefix, 'data:image/png;base64,');
-        assert.equal(state.resultWidth, 1080);
-        assert.equal(state.resultHeight, 1440);
-        assert.equal(state.refinementHidden, true);
-        assert.equal(state.error, '');
-        assert.equal(rankingRequests, 1);
-        assert.equal(imageGenerationRequests, 0);
-
         const reviewDir = process.env.DISH_RANKING_REVIEW_DIR;
         if (reviewDir) {
             await fs.mkdir(reviewDir, { recursive: true });
             await page.screenshot({
-                path: path.join(reviewDir, 'dish-ranking-page.jpg'),
+                path: path.join(reviewDir, 'layout-picker.jpg'),
                 type: 'jpeg',
                 quality: 72,
                 fullPage: true,
             });
-            const resultDataUrl = await page.$eval(
+        }
+
+        const states = [];
+        for (const layout of layouts) {
+            await page.click(
+                `[data-field-key="layout"] button[data-value="${layout}"]`,
+            );
+            const selected = await page.$eval(
+                `[data-field-key="layout"] button[data-value="${layout}"]`,
+                (button) => button.getAttribute('aria-checked'),
+            );
+            assert.equal(selected, 'true');
+            const previousResult = await page.$eval(
                 '#resultImage',
                 (image) => image.src,
             );
-            await sharp(Buffer.from(
-                resultDataUrl.split(',')[1],
-                'base64',
-            ))
-                .resize({ width: 540 })
-                .jpeg({ quality: 76 })
-                .toFile(path.join(
-                    reviewDir,
-                    'dish-ranking-result.jpg',
-                ));
+            await page.evaluate(() => {
+                document.getElementById('swapForm').requestSubmit();
+            });
+            await page.waitForFunction((previous) => {
+                const result = document.getElementById('resultImage');
+                return (
+                    !document.getElementById('resultSection').hidden
+                    && result.complete
+                    && result.naturalWidth > 0
+                    && result.src !== previous
+                    && !document.getElementById('generateButton').disabled
+                );
+            }, { timeout: 12000 }, previousResult);
+
+            const state = await page.evaluate((layoutValue) => {
+                const result = document.getElementById('resultImage');
+                return {
+                    layout: layoutValue,
+                    title: document.getElementById(
+                        'creatorTitle',
+                    ).textContent,
+                    cards: document.querySelectorAll('.dish-card').length,
+                    owned: document.querySelectorAll(
+                        '.dish-card.is-owned',
+                    ).length,
+                    status: document.querySelector(
+                        '.dish-list-status',
+                    ).textContent,
+                    resultPrefix: result.src.slice(0, 22),
+                    resultWidth: result.naturalWidth,
+                    resultHeight: result.naturalHeight,
+                    refinementHidden: document.querySelector(
+                        '.refinement-panel',
+                    ).hidden,
+                    error: document.getElementById(
+                        'formError',
+                    ).textContent,
+                };
+            }, layout);
+            assert.equal(state.title, '菜品测评攻略图');
+            assert.equal(state.cards, 2);
+            assert.equal(state.owned, 1);
+            assert.match(state.status, /资源库补充 7 张/);
+            assert.equal(state.resultPrefix, 'data:image/png;base64,');
+            assert.equal(state.resultWidth, 1080);
+            assert.equal(state.resultHeight, 1440);
+            assert.equal(state.refinementHidden, true);
+            assert.equal(state.error, '');
+            states.push(state);
+
+            if (reviewDir) {
+                const resultDataUrl = await page.$eval(
+                    '#resultImage',
+                    (image) => image.src,
+                );
+                await sharp(Buffer.from(
+                    resultDataUrl.split(',')[1],
+                    'base64',
+                ))
+                    .resize({ width: 540 })
+                    .jpeg({ quality: 76 })
+                    .toFile(path.join(reviewDir, `${layout}.jpg`));
+            }
+        }
+        assert.equal(rankingRequests, layouts.length);
+        assert.equal(imageGenerationRequests, 0);
+
+        if (reviewDir) {
+            await page.screenshot({
+                path: path.join(reviewDir, 'completed-page.jpg'),
+                type: 'jpeg',
+                quality: 72,
+                fullPage: true,
+            });
         }
 
         await page.click('#downloadButton');
@@ -206,7 +268,12 @@ const { listenOnSafePort } = require('./safe-port');
             0x89, 0x50, 0x4e, 0x47,
             0x0d, 0x0a, 0x1a, 0x0a,
         ]);
-        console.log(JSON.stringify(state, null, 2));
+        console.log(JSON.stringify({
+            pickerState,
+            states,
+            rankingRequests,
+            imageGenerationRequests,
+        }, null, 2));
     } finally {
         await browser?.close();
         await new Promise((resolve) => server.close(resolve));
