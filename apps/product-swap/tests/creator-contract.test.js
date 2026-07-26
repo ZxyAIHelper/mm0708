@@ -350,3 +350,20 @@ test('pending uploads gate both submit paths before payload creation', () => {
         < refine.indexOf('buildRefinePayload'),
     );
 });
+
+test('chat creator ships eight selectable local avatars', () => {
+    const avatarDir = path.join(root, 'assets', 'chat-avatars');
+    const avatars = fs.readdirSync(avatarDir)
+        .filter((file) => file.endsWith('.svg'))
+        .sort();
+    const editor = fs.readFileSync(
+        path.join(root, 'wechat-chat-editor.js'),
+        'utf8',
+    );
+
+    assert.equal(avatars.length, 8);
+    assert.match(editor, /chat-avatar-settings/);
+    assert.match(editor, /chat-avatar-choice/);
+    assert.match(editor, /avatarSelection/);
+    assert.match(editor, /avatars:\s*avatarSelection/);
+});

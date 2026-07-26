@@ -8,6 +8,16 @@
     )
         ? require('./chat-materials')
         : global.ChatMaterials;
+    const CHAT_AVATARS = [
+        { id: 'cat', label: '橘猫', src: '/assets/chat-avatars/cat.svg' },
+        { id: 'bear', label: '棕熊', src: '/assets/chat-avatars/bear.svg' },
+        { id: 'rabbit', label: '白兔', src: '/assets/chat-avatars/rabbit.svg' },
+        { id: 'penguin', label: '企鹅', src: '/assets/chat-avatars/penguin.svg' },
+        { id: 'fox', label: '狐狸', src: '/assets/chat-avatars/fox.svg' },
+        { id: 'panda', label: '熊猫', src: '/assets/chat-avatars/panda.svg' },
+        { id: 'chick', label: '小鸡', src: '/assets/chat-avatars/chick.svg' },
+        { id: 'dog', label: '小狗', src: '/assets/chat-avatars/dog.svg' },
+    ];
 
     function clone(value) {
         return value === null || value === undefined
@@ -208,6 +218,10 @@
         renderer = global.WechatChatRenderer,
     }) {
         const state = createChatEditorState();
+        const avatarSelection = {
+            left: CHAT_AVATARS[0].src,
+            right: CHAT_AVATARS[3].src,
+        };
         state.setDraft(createSafeExampleDraft({}));
         section.replaceChildren();
         section.classList.add('wechat-chat-editor-host');
@@ -239,6 +253,52 @@
         imageInput.accept = (field.accept || []).join(',');
         const imageList = element('div', 'chat-image-list');
         imageLabel.append(imageInput, imageList);
+
+        const avatarSettings = element('div', 'chat-avatar-settings');
+        avatarSettings.appendChild(
+            element('span', 'chat-avatar-title', '聊天头像'),
+        );
+        for (const [side, label] of [
+            ['left', '好友头像'],
+            ['right', '我的头像'],
+        ]) {
+            const group = element('div', 'chat-avatar-group');
+            group.appendChild(element('span', '', label));
+            const choices = element('div', 'chat-avatar-choices');
+            for (const avatar of CHAT_AVATARS) {
+                const choice = element(
+                    'button',
+                    'chat-avatar-choice',
+                );
+                choice.type = 'button';
+                choice.title = avatar.label;
+                choice.setAttribute(
+                    'aria-label',
+                    `${label}：${avatar.label}`,
+                );
+                choice.setAttribute(
+                    'aria-pressed',
+                    String(avatarSelection[side] === avatar.src),
+                );
+                const image = element('img');
+                image.src = avatar.src;
+                image.alt = '';
+                choice.appendChild(image);
+                choice.addEventListener('click', () => {
+                    avatarSelection[side] = avatar.src;
+                    for (const button of choices.children) {
+                        button.setAttribute(
+                            'aria-pressed',
+                            String(button === choice),
+                        );
+                    }
+                    refreshPreview();
+                });
+                choices.appendChild(choice);
+            }
+            group.appendChild(choices);
+            avatarSettings.appendChild(group);
+        }
 
         const locationRow = element('div', 'chat-location-field');
         locationRow.appendChild(element('span', '', '真实地点（选填）'));
@@ -296,6 +356,7 @@
             heading,
             nameLabel,
             imageLabel,
+            avatarSettings,
             locationRow,
             requirementsLabel,
             error,
@@ -485,6 +546,7 @@
                 const next = await renderer.renderChatPages(
                     snapshot.draft,
                     snapshot.materials,
+                    { avatars: avatarSelection },
                 );
                 if (version !== renderVersion) {
                     next.forEach((page) => URL.revokeObjectURL(page.url));
@@ -695,6 +757,7 @@
     }
 
     const api = {
+        CHAT_AVATARS,
         createChatEditorState,
         createSafeExampleDraft,
         mountWechatChatEditor,

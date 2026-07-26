@@ -329,7 +329,30 @@
             const avatarX = item.side === 'right'
                 ? layout.width - 70 - AVATAR_SIZE
                 : 70;
-            drawAvatar(ctx, item.side, avatarX, item.y);
+            const avatar = resources.avatars?.[item.side];
+            if (avatar) {
+                ctx.save();
+                roundedRect(
+                    ctx,
+                    avatarX,
+                    item.y,
+                    AVATAR_SIZE,
+                    AVATAR_SIZE,
+                    18,
+                );
+                ctx.clip();
+                drawImageCover(
+                    ctx,
+                    avatar,
+                    avatarX,
+                    item.y,
+                    AVATAR_SIZE,
+                    AVATAR_SIZE,
+                );
+                ctx.restore();
+            } else {
+                drawAvatar(ctx, item.side, avatarX, item.y);
+            }
             if (item.type === 'text') {
                 drawTextMessage(ctx, item);
             } else if (item.type === 'image_ref') {
@@ -358,6 +381,23 @@
         });
     }
 
+    async function loadAvatarResources(
+        avatars = {},
+        loader = loadImage,
+    ) {
+        const resources = {};
+        for (const side of ['left', 'right']) {
+            const source = avatars?.[side];
+            if (typeof source !== 'string' || !source.trim()) continue;
+            try {
+                resources[side] = await loader(source);
+            } catch {
+                // drawChat uses its built-in avatar when loading fails.
+            }
+        }
+        return resources;
+    }
+
     function canvasBlob(canvas) {
         return new Promise((resolve, reject) => {
             canvas.toBlob((blob) => {
@@ -383,8 +423,11 @@
         }${digits(date.getMinutes())}${pageSuffix}.png`;
     }
 
-    async function loadResources(materials, mapPreviewUrl) {
-        const resources = { locations: {} };
+    async function loadResources(materials, mapPreviewUrl, avatars) {
+        const resources = {
+            locations: {},
+            avatars: await loadAvatarResources(avatars),
+        };
         for (const image of materials.images || []) {
             resources[image.id] = await loadImage(image.dataUrl);
         }
@@ -409,9 +452,14 @@
         {
             canvasFactory = () => document.createElement('canvas'),
             mapPreviewUrl = global.TencentMapPicker?.mapPreviewUrl,
+            avatars = {},
         } = {},
     ) {
-        const resources = await loadResources(materials, mapPreviewUrl);
+        const resources = await loadResources(
+            materials,
+            mapPreviewUrl,
+            avatars,
+        );
         const measureCanvas = document.createElement('canvas');
         const measureContext = measureCanvas.getContext('2d');
         measureContext.font = '400 36px sans-serif';
@@ -448,6 +496,7 @@
         {
             canvas = document.createElement('canvas'),
             mapPreviewUrl = global.TencentMapPicker?.mapPreviewUrl,
+            avatars = {},
         } = {},
     ) {
         const pages = await renderChatPages(draft, materials, {
@@ -457,6 +506,7 @@
                     : document.createElement('canvas')
             ),
             mapPreviewUrl,
+            avatars,
         });
         return {
             ...pages[0],
@@ -469,6 +519,7 @@
         DEFAULT_WIDTH,
         drawChat,
         layoutChat,
+        loadAvatarResources,
         outputFileName,
         paginateChat,
         renderChatPages,

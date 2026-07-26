@@ -589,6 +589,54 @@ body[data-template-id="wechat-chat-screenshot"] #swapForm {
     bottom: 6px;
 }
 
+.chat-avatar-settings {
+    display: grid;
+    gap: 12px;
+    border: 1px solid #e1ddd8;
+    border-radius: 14px;
+    padding: 14px;
+    background: #faf9f7;
+}
+
+.chat-avatar-title,
+.chat-avatar-group > span {
+    color: #383430;
+    font-weight: 650;
+}
+
+.chat-avatar-group {
+    display: grid;
+    gap: 8px;
+}
+
+.chat-avatar-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.chat-avatar-choice {
+    width: 46px;
+    height: 46px;
+    border: 2px solid transparent;
+    border-radius: 12px;
+    padding: 0;
+    overflow: hidden;
+    background: #ffffff;
+    cursor: pointer;
+}
+
+.chat-avatar-choice[aria-pressed="true"] {
+    border-color: #07c160;
+    box-shadow: 0 0 0 2px rgb(7 193 96 / 16%);
+}
+
+.chat-avatar-choice img {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
 .chat-location-summary {
     display: grid;
     gap: 3px;

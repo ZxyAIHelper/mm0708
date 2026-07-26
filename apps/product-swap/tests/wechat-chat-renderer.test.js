@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
     layoutChat,
+    loadAvatarResources,
     paginateChat,
     wrapMessageText,
 } = require('../wechat-chat-renderer');
@@ -113,4 +114,23 @@ test('keeps a short conversation on one page', () => {
     assert.equal(pages.length, 1);
     assert.equal(pages[0].pageNumber, 1);
     assert.equal(pages[0].pageCount, 1);
+});
+
+test('loads independent avatars and keeps a fallback when one fails', async () => {
+    const calls = [];
+    const resources = await loadAvatarResources({
+        left: '/avatars/cat.svg',
+        right: '/avatars/missing.svg',
+    }, async (source) => {
+        calls.push(source);
+        if (source.includes('missing')) throw new Error('missing');
+        return { src: source, width: 88, height: 88 };
+    });
+
+    assert.deepEqual(calls, [
+        '/avatars/cat.svg',
+        '/avatars/missing.svg',
+    ]);
+    assert.equal(resources.left.src, '/avatars/cat.svg');
+    assert.equal(resources.right, undefined);
 });
