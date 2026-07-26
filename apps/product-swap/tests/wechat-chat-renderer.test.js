@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
     layoutChat,
     loadAvatarResources,
+    loadChromeResources,
     paginateChat,
     wrapMessageText,
 } = require('../wechat-chat-renderer');
@@ -152,4 +153,26 @@ test('loads independent avatars and keeps a fallback when one fails', async () =
     ]);
     assert.equal(resources.left.src, '/avatars/cat.svg');
     assert.equal(resources.right, undefined);
+});
+
+test('loads the cropped reference chrome assets', async () => {
+    const calls = [];
+    const resources = await loadChromeResources(async (source) => {
+        calls.push(source);
+        return { src: source };
+    });
+
+    assert.deepEqual(Object.keys(resources), [
+        'status',
+        'back',
+        'more',
+        'voice',
+        'mic',
+        'emoji',
+        'plus',
+    ]);
+    assert.ok(calls.every((source) => (
+        source.startsWith('/assets/chat-chrome/')
+        && source.endsWith('.png')
+    )));
 });

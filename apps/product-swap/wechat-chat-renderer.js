@@ -12,6 +12,15 @@
     const TEXT_PADDING_X = 28;
     const TEXT_PADDING_Y = 24;
     const TEXT_MAX_WIDTH = 680;
+    const CHROME_ASSET_SOURCES = {
+        status: '/assets/chat-chrome/status.png',
+        back: '/assets/chat-chrome/back.png',
+        more: '/assets/chat-chrome/more.png',
+        voice: '/assets/chat-chrome/voice.png',
+        mic: '/assets/chat-chrome/mic.png',
+        emoji: '/assets/chat-chrome/emoji.png',
+        plus: '/assets/chat-chrome/plus.png',
+    };
 
     function wrapMessageText(text, maxWidth, measureText) {
         const characters = Array.from(String(text || ''));
@@ -215,7 +224,7 @@
         );
     }
 
-    function drawHeader(ctx, layout) {
+    function drawHeader(ctx, layout, chrome = {}) {
         ctx.fillStyle = '#f7f7f7';
         ctx.fillRect(0, 0, layout.width, 230);
         ctx.fillStyle = '#111111';
@@ -223,17 +232,19 @@
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
         ctx.fillText('20:43', 54, 54);
-        drawStatusIcons(ctx);
+        if (chrome.status) {
+            ctx.drawImage(chrome.status, 772, 28, 258, 74);
+        }
         ctx.fillStyle = '#111111';
         ctx.textAlign = 'center';
         ctx.font = '600 42px sans-serif';
         ctx.fillText(layout.contactName, layout.width / 2, 162);
-        ctx.textAlign = 'left';
-        ctx.font = '500 58px sans-serif';
-        ctx.fillText('‹', 42, 164);
-        ctx.textAlign = 'right';
-        ctx.font = '600 48px sans-serif';
-        ctx.fillText('⋯', layout.width - 48, 153);
+        if (chrome.back) {
+            ctx.drawImage(chrome.back, 42, 126, 40, 72);
+        }
+        if (chrome.more) {
+            ctx.drawImage(chrome.more, 970, 136, 64, 44);
+        }
         ctx.strokeStyle = '#d9d9d9';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -246,47 +257,7 @@
         ctx.fillText('20:43', layout.width / 2, 268);
     }
 
-    function drawStatusIcons(ctx) {
-        ctx.fillStyle = '#111111';
-        for (let index = 0; index < 4; index += 1) {
-            const height = 12 + index * 8;
-            roundedRect(
-                ctx,
-                774 + index * 17,
-                72 - height,
-                11,
-                height,
-                4,
-            );
-            ctx.fill();
-        }
-
-        ctx.strokeStyle = '#111111';
-        ctx.lineWidth = 7;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.arc(862, 67, 32, Math.PI * 1.2, Math.PI * 1.8);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(862, 68, 20, Math.PI * 1.2, Math.PI * 1.8);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(862, 69, 7, Math.PI * 1.2, Math.PI * 1.8);
-        ctx.stroke();
-
-        roundedRect(ctx, 944, 35, 76, 43, 14);
-        ctx.fillStyle = '#111111';
-        ctx.fill();
-        roundedRect(ctx, 1022, 48, 7, 17, 3);
-        ctx.fill();
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '600 25px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('99', 982, 57);
-    }
-
-    function drawComposer(ctx, layout) {
+    function drawComposer(ctx, layout, chrome = {}) {
         const top = layout.chrome?.composer?.top
             ?? layout.height - COMPOSER_HEIGHT;
         ctx.fillStyle = '#f7f7f7';
@@ -301,57 +272,18 @@
         roundedRect(ctx, 112, top + 26, 700, 102, 14);
         ctx.fillStyle = '#ffffff';
         ctx.fill();
-
-        ctx.strokeStyle = '#161616';
-        ctx.fillStyle = '#161616';
-        ctx.lineWidth = 5;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        ctx.beginPath();
-        ctx.arc(58, top + 78, 34, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(58, top + 78, 18, -0.85, 0.85);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(52, top + 78, 9, -0.85, 0.85);
-        ctx.stroke();
-
-        const micX = 762;
-        const micY = top + 73;
-        roundedRect(ctx, micX - 9, micY - 22, 18, 38, 9);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(micX, micY - 1, 20, 0.15, Math.PI - 0.15);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(micX, micY + 19);
-        ctx.lineTo(micX, micY + 31);
-        ctx.moveTo(micX - 13, micY + 31);
-        ctx.lineTo(micX + 13, micY + 31);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(876, top + 78, 34, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(864, top + 70, 3, 0, Math.PI * 2);
-        ctx.arc(888, top + 70, 3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(876, top + 78, 17, 0.2, Math.PI - 0.2);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(1004, top + 78, 34, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(984, top + 78);
-        ctx.lineTo(1024, top + 78);
-        ctx.moveTo(1004, top + 58);
-        ctx.lineTo(1004, top + 98);
-        ctx.stroke();
+        if (chrome.voice) {
+            ctx.drawImage(chrome.voice, 20, top + 24, 82, 88);
+        }
+        if (chrome.mic) {
+            ctx.drawImage(chrome.mic, 730, top + 38, 66, 64);
+        }
+        if (chrome.emoji) {
+            ctx.drawImage(chrome.emoji, 838, top + 22, 82, 86);
+        }
+        if (chrome.plus) {
+            ctx.drawImage(chrome.plus, 964, top + 22, 82, 86);
+        }
     }
 
     function drawTextMessage(ctx, item) {
@@ -442,7 +374,7 @@
         const ctx = canvas.getContext('2d');
         ctx.fillStyle = '#ededed';
         ctx.fillRect(0, 0, layout.width, layout.height);
-        drawHeader(ctx, layout);
+        drawHeader(ctx, layout, resources.chrome);
         const locations = resources.locations || {};
         for (const item of layout.items) {
             const avatarX = item.side === 'right'
@@ -485,7 +417,7 @@
                 );
             }
         }
-        drawComposer(ctx, layout);
+        drawComposer(ctx, layout, resources.chrome);
         return canvas;
     }
 
@@ -513,6 +445,20 @@
                 resources[side] = await loader(source);
             } catch {
                 // drawChat uses its built-in avatar when loading fails.
+            }
+        }
+        return resources;
+    }
+
+    async function loadChromeResources(loader = loadImage) {
+        const resources = {};
+        for (const [name, source] of Object.entries(
+            CHROME_ASSET_SOURCES,
+        )) {
+            try {
+                resources[name] = await loader(source);
+            } catch {
+                // The chat remains usable if a decorative icon is unavailable.
             }
         }
         return resources;
@@ -547,6 +493,7 @@
         const resources = {
             locations: {},
             avatars: await loadAvatarResources(avatars),
+            chrome: await loadChromeResources(),
         };
         for (const image of materials.images || []) {
             resources[image.id] = await loadImage(image.dataUrl);
@@ -640,6 +587,7 @@
         drawChat,
         layoutChat,
         loadAvatarResources,
+        loadChromeResources,
         outputFileName,
         paginateChat,
         renderChatPages,
