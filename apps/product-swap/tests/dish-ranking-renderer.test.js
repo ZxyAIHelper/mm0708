@@ -5,8 +5,10 @@ const assert = require('node:assert/strict');
 const {
     canvasSize,
     coverRect,
+    layoutDishRanking,
     layoutRanking,
     renderDishRankingDataUrl,
+    selectRankingItems,
 } = require('../dish-ranking-renderer');
 
 const ranking = {
@@ -57,6 +59,41 @@ function rectanglesOverlap(left, right) {
         && left.y < right.y + right.height
         && left.y + left.height > right.y
     );
+}
+
+function layoutCards(layout) {
+    return layout.cards || layout.rows.flatMap((row) => row.cards);
+}
+
+function assertBoundedLayout(layout, expectedCount) {
+    const cards = layoutCards(layout);
+    assert.equal(cards.length, expectedCount);
+    assert.equal(
+        new Set(cards.map((card) => card.refId)).size,
+        expectedCount,
+    );
+    for (const card of cards) {
+        assert.ok(card.width > 0);
+        assert.ok(card.height > 0);
+        assert.ok(card.imageHeight > 0);
+        assert.ok(card.commentHeight > 0);
+        assert.ok(card.x >= 0);
+        assert.ok(card.y >= 0);
+        assert.ok(card.x + card.width <= layout.width);
+        assert.ok(card.y + card.height <= layout.height);
+    }
+    for (let left = 0; left < cards.length; left += 1) {
+        for (
+            let right = left + 1;
+            right < cards.length;
+            right += 1
+        ) {
+            assert.equal(
+                rectanglesOverlap(cards[left], cards[right]),
+                false,
+            );
+        }
+    }
 }
 
 test('uses fixed pixel sizes for all supported ratios', () => {
@@ -174,6 +211,84 @@ test('wraps a dense tier into at most six columns', () => {
     }
 });
 
+test('selects only the highest ranked dishes for bounded layouts', () => {
+    const items = tierItems(12);
+
+    assert.equal(selectRankingItems('tier', items).length, 12);
+    assert.deepEqual(
+        selectRankingItems('grid-4', items)
+            .map((item) => item.refId),
+        ['dish-0', 'dish-1', 'dish-2', 'dish-3'],
+    );
+    assert.equal(selectRankingItems('grid-9', items).length, 9);
+    assert.equal(selectRankingItems('hero', items).length, 5);
+    assert.equal(selectRankingItems('leaderboard', items).length, 9);
+    assert.equal(selectRankingItems('unknown', items).length, 12);
+    assert.notEqual(selectRankingItems('grid-4', items), items);
+});
+
+test('lays out every ranking template within all canvas ratios', () => {
+    const cases = [
+        ['tier', 12],
+        ['grid-4', 4],
+        ['grid-9', 9],
+        ['hero', 5],
+        ['leaderboard', 9],
+    ];
+    for (const ratio of ['3:4', '1:1', '9:16']) {
+        for (const [layout, count] of cases) {
+            assertBoundedLayout(layoutDishRanking({
+                layout,
+                ratio,
+                items: tierItems(12),
+            }), count);
+        }
+    }
+});
+
+test('marks the hero and the top three leaderboard cards', () => {
+    const hero = layoutDishRanking({
+        layout: 'hero',
+        items: tierItems(12),
+    });
+    assert.equal(
+        hero.cards.filter((card) => card.role === 'hero').length,
+        1,
+    );
+
+    const leaderboard = layoutDishRanking({
+        layout: 'leaderboard',
+        items: tierItems(12),
+    });
+    assert.deepEqual(
+        leaderboard.cards.slice(0, 3).map((card) => card.rank),
+        [1, 2, 3],
+    );
+    assert.deepEqual(
+        leaderboard.cards.slice(3).map((card) => card.rank),
+        [4, 5, 6, 7, 8, 9],
+    );
+});
+
+test('falls back to tier and leaves natural gaps for short lists', () => {
+    const fallback = layoutDishRanking({
+        layout: 'not-a-layout',
+        items: tierItems(2),
+    });
+    assert.equal(fallback.kind, 'tier');
+    assertBoundedLayout(fallback, 2);
+
+    const grid = layoutDishRanking({
+        layout: 'grid-9',
+        items: tierItems(2),
+    });
+    assert.equal(grid.cards.length, 2);
+    assert.deepEqual(
+        grid.cards.map((card) => card.refId),
+        ['dish-0', 'dish-1'],
+    );
+});
+
 test('draws original images and exports the same canvas as PNG', async () => {
     const calls = [];
     const context = {
@@ -237,4 +352,60 @@ test('draws original images and exports the same canvas as PNG', async () => {
         call[0] === 'fillText' && call[2] === '闭眼冲'
     ));
     assert.match(commentCall[1], /(?:2[6-9]|[3-9]\d)px/);
+});
+
+test('renders only selected cards and layout-specific headings', async () => {
+    const calls = [];
+    const context = {
+        fillStyle: '',
+        font: '',
+        textAlign: '',
+        textBaseline: '',
+        save: () => calls.push(['save']),
+        restore: () => calls.push(['restore']),
+        beginPath: () => calls.push(['beginPath']),
+        rect: (...args) => calls.push(['rect', ...args]),
+        clip: () => calls.push(['clip']),
+        fillRect: (...args) => calls.push(['fillRect', ...args]),
+        fillText: (...args) => calls.push([
+            'fillText',
+            context.font,
+            ...args,
+        ]),
+        drawImage: (...args) => calls.push(['drawImage', ...args]),
+    };
+    const canvas = {
+        width: 0,
+        height: 0,
+        getContext: () => context,
+        toDataURL: () => 'data:image/png;base64,grid',
+    };
+    const dishes = tierItems(12).map((item) => ({
+        image: item.refId,
+        owned: item.owned,
+    }));
+
+    await renderDishRankingDataUrl({
+        layout: 'grid-4',
+        ratio: '3:4',
+        dishes,
+        ranking: { version: 1, items: tierItems(12) },
+        canvas,
+        imageLoader: async () => ({
+            naturalWidth: 640,
+            naturalHeight: 640,
+        }),
+    });
+
+    assert.equal(
+        calls.filter((call) => call[0] === 'drawImage').length,
+        4,
+    );
+    const labels = calls
+        .filter((call) => call[0] === 'fillText')
+        .map((call) => call[2]);
+    assert.ok(labels.includes('必吃四强'));
+    assert.ok(labels.includes('精选菜品 · 闭眼点不踩雷'));
+    assert.ok(labels.includes('1'));
+    assert.equal(labels.includes('夯'), false);
 });
