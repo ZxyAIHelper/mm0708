@@ -64,6 +64,22 @@ test('page exposes the screenshot-matching controls', () => {
     assert.match(html, /id="swapForm" novalidate/);
 });
 
+test('passes layout only to the deterministic dish renderer', () => {
+    const source = fs.readFileSync(
+        path.join(root, 'script.js'),
+        'utf8',
+    );
+
+    assert.match(
+        source,
+        /requestDishRankingDraft\(\s*payload\.dishes,\s*\)/,
+    );
+    assert.match(
+        source,
+        /renderDishRankingDataUrl\(\{[\s\S]*?layout:\s*payload\.layout,[\s\S]*?ratio:\s*payload\.aspectRatio,/,
+    );
+});
+
 test('builds a bounded conversational refinement payload', () => {
     const payload = buildRefinePayload({
         target: 'target',

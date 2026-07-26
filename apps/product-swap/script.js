@@ -866,6 +866,7 @@ function boot() {
         );
         const imageUrl = await DishRankingRenderer
             .renderDishRankingDataUrl({
+                layout: payload.layout,
                 ratio: payload.aspectRatio,
                 dishes: payload.dishes,
                 ranking,
