@@ -21,6 +21,15 @@ import {
     ChatDraftProviderError,
     generateChatDraft,
 } from './chat-provider'
+import {
+    DishRankingDraftValidationError,
+    validateDishRankingDraftRequest,
+    type DishRankingDraftRequest,
+} from './dish-ranking-draft'
+import {
+    DishRankingProviderError,
+    generateDishRankingDraft,
+} from './dish-ranking-provider'
 
 type Bindings = ProductSwapEnv
 
@@ -87,6 +96,7 @@ const defaultTaskArchive: ProductSwapTaskArchive = {
 
 type ProductSwapRouterOptions = {
     chatGenerator?: typeof generateChatDraft
+    dishRankingGenerator?: typeof generateDishRankingDraft
     fetchImpl?: typeof fetch
 }
 
@@ -110,6 +120,16 @@ type LocationFallbackReason =
 
 function chatProviderStatus(code: ChatDraftProviderError['code']) {
     if (code === 'CHAT_PROVIDER_NOT_CONFIGURED') return 503 as const
+    if (code === 'PROVIDER_TIMEOUT') return 504 as const
+    return 502 as const
+}
+
+function dishRankingProviderStatus(
+    code: DishRankingProviderError['code'],
+) {
+    if (code === 'DISH_RANKING_PROVIDER_NOT_CONFIGURED') {
+        return 503 as const
+    }
     if (code === 'PROVIDER_TIMEOUT') return 504 as const
     return 502 as const
 }
@@ -157,7 +177,50 @@ export function createProductSwapRouter(
 ) {
     const router = new Hono<{ Bindings: Bindings }>()
     const chatGenerator = options.chatGenerator || generateChatDraft
+    const dishRankingGenerator = options.dishRankingGenerator
+        || generateDishRankingDraft
     const fetchImpl = options.fetchImpl || fetch
+
+    router.post('/dish-ranking-draft', async (c) => {
+        const requestId = `dish_rank_${crypto.randomUUID()}`
+        let input: DishRankingDraftRequest
+        try {
+            input = validateDishRankingDraftRequest(
+                await c.req.json().catch(() => null),
+            )
+        } catch (error) {
+            if (
+                !(error instanceof DishRankingDraftValidationError)
+            ) throw error
+            return c.json({
+                success: false,
+                error: {
+                    code: error.code,
+                    message: error.message,
+                },
+                requestId,
+            }, 400)
+        }
+        try {
+            const result = await dishRankingGenerator(input, c.env)
+            return c.json({
+                success: true,
+                draft: result.draft,
+                provider: result.provider,
+                requestId,
+            })
+        } catch (error) {
+            if (!(error instanceof DishRankingProviderError)) throw error
+            return c.json({
+                success: false,
+                error: {
+                    code: error.code,
+                    message: error.message,
+                },
+                requestId,
+            }, dishRankingProviderStatus(error.code))
+        }
+    })
 
     router.post('/chat-draft', async (c) => {
         const requestId = `chat_${crypto.randomUUID()}`

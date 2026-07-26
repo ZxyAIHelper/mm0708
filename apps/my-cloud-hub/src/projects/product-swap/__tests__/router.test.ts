@@ -11,6 +11,9 @@ import {
 import type {
     ChatDraftRequest,
 } from '../chat-draft'
+import type {
+    DishRankingDraftRequest,
+} from '../dish-ranking-draft'
 
 const targetImage = 'data:image/png;base64,iVBORw0KGgo='
 
@@ -45,6 +48,91 @@ function createApp(
 }
 
 describe('product swap router', () => {
+    it('returns a structured dish ranking draft', async () => {
+        const dishRankingGenerator = vi.fn(async (
+            input: DishRankingDraftRequest,
+        ) => ({
+            provider: 'volcano' as const,
+            draft: {
+                version: 1 as const,
+                items: input.dishes.map((dish, order) => ({
+                    refId: dish.id,
+                    tier: dish.owned ? 'top' as const : 'good' as const,
+                    order,
+                    comment: dish.owned ? '闭眼冲' : '挺稳的',
+                })),
+            },
+        }))
+        const provider: ProductSwapProvider = {
+            name: 'fake',
+            generate: async () => ({ imageUrl: targetImage }),
+        }
+        const app = new Hono()
+        app.route('/api/product-swap', createProductSwapRouter(
+            () => provider,
+            noOpArchive,
+            { dishRankingGenerator },
+        ))
+        const response = await app.request(
+            '/api/product-swap/dish-ranking-draft',
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    templateId: 'dish-ranking-guide',
+                    dishes: [{
+                        id: 'dish-0',
+                        image: targetImage,
+                        owned: true,
+                        source: 'user',
+                    }],
+                }),
+            },
+        )
+        const data = await response.json() as any
+
+        expect(response.status).toBe(200)
+        expect(Object.keys(data).sort()).toEqual([
+            'draft',
+            'provider',
+            'requestId',
+            'success',
+        ])
+        expect(data.draft.items[0].refId).toBe('dish-0')
+        expect(data.requestId).toMatch(/^dish_rank_/)
+        expect(dishRankingGenerator).toHaveBeenCalledOnce()
+    })
+
+    it('rejects an invalid dish ranking request before generation', async () => {
+        const dishRankingGenerator = vi.fn()
+        const provider: ProductSwapProvider = {
+            name: 'fake',
+            generate: async () => ({ imageUrl: targetImage }),
+        }
+        const app = new Hono()
+        app.route('/api/product-swap', createProductSwapRouter(
+            () => provider,
+            noOpArchive,
+            { dishRankingGenerator },
+        ))
+        const response = await app.request(
+            '/api/product-swap/dish-ranking-draft',
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    templateId: 'dish-ranking-guide',
+                    dishes: [],
+                }),
+            },
+        )
+        const data = await response.json() as any
+
+        expect(response.status).toBe(400)
+        expect(data.error.code).toBe('INVALID_DISH_RANKING_DRAFT')
+        expect(dishRankingGenerator).not.toHaveBeenCalled()
+    })
+
     it('returns a structured chat draft', async () => {
         const chatGenerator = vi.fn(async (
             input: ChatDraftRequest,
