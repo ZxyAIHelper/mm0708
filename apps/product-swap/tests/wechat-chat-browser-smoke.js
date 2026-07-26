@@ -46,6 +46,8 @@ function draftFor(input) {
         { type: 'text', text: '真的很适合慢慢坐，拍照也很有氛围。' },
         { type: 'text', text: '那就别等了，周末直接安排。' },
         { type: 'text', text: '好，已经开始期待了！' },
+        { type: 'text', text: '你这么一说，我感觉普通周末都能被它变得特别有仪式感。' },
+        { type: 'text', text: '对，就是那种离开以后还会忍不住和别人继续安利的程度。' },
     ].slice(0, 16).map((message, index) => ({
         id: `smoke-${index + 1}`,
         side: index % 2 === 0 ? 'right' : 'left',
@@ -170,7 +172,23 @@ function draftFor(input) {
             `${origin}/create.html?template=wechat-chat-screenshot`,
             { waitUntil: 'networkidle0' },
         );
+        assert.equal(
+            await page.$$eval(
+                '.chat-avatar-choice img',
+                (images) => (
+                    images.length === 16
+                    && images.every((image) => (
+                        image.complete && image.naturalWidth > 0
+                    ))
+                ),
+            ),
+            true,
+            'all built-in chat avatars load',
+        );
         await page.type('.chat-store-name', '三山山');
+        await page.click(
+            '.chat-avatar-group:last-child .chat-avatar-choice:last-child',
+        );
         await page.click('.chat-location-button');
         await page.type('.chat-map-region', '北京');
         await page.type('.chat-map-keyword', '颐和园');
@@ -207,6 +225,9 @@ function draftFor(input) {
             document.querySelectorAll('.chat-edit-message').length
                 === count - 1
         ), {}, messageCount);
+        await page.waitForFunction(() => (
+            document.querySelectorAll('.chat-page-preview').length >= 2
+        ));
 
         await page.screenshot({
             path: path.join(tempDir, 'creator.png'),
@@ -214,19 +235,26 @@ function draftFor(input) {
         });
         await page.click('.chat-download-button');
         let pngPath = '';
+        let downloadedPngs = [];
+        const expectedPages = await page.$$eval(
+            '.chat-page-preview',
+            (items) => items.length,
+        );
         for (let attempt = 0; attempt < 50; attempt += 1) {
             const files = await fs.readdir(tempDir);
-            pngPath = files
+            downloadedPngs = files
                 .map((file) => path.join(tempDir, file))
-                .find((file) => (
+                .filter((file) => (
                     path.basename(file).startsWith('微信聊天截图-')
                     && file.endsWith('.png')
                     && !file.endsWith('.crdownload')
-                )) || '';
-            if (pngPath) break;
+                ));
+            pngPath = downloadedPngs[0] || '';
+            if (downloadedPngs.length >= expectedPages) break;
             await new Promise((resolve) => setTimeout(resolve, 100));
         }
         assert.ok(pngPath, 'PNG download completes');
+        assert.equal(downloadedPngs.length, expectedPages);
         const signature = await fs.readFile(pngPath)
             .then((buffer) => [...buffer.subarray(0, 8)]);
         assert.deepEqual(signature, [
@@ -244,6 +272,13 @@ function draftFor(input) {
             messages: document.querySelectorAll(
                 '.chat-edit-message',
             ).length,
+            pages: document.querySelectorAll(
+                '.chat-page-preview',
+            ).length,
+            selectedRightAvatar: document.querySelector(
+                '.chat-avatar-group:last-child '
+                + '.chat-avatar-choice:last-child',
+            )?.getAttribute('aria-pressed'),
             oldGenerateHidden: getComputedStyle(
                 document.getElementById('generateButton'),
             ).display === 'none',
@@ -261,6 +296,8 @@ function draftFor(input) {
             location: '颐和园',
             images: 1,
             messages: messageCount - 1,
+            pages: expectedPages,
+            selectedRightAvatar: 'true',
             oldGenerateHidden: true,
             canvas: { width: 1080, height: 1920 },
         });

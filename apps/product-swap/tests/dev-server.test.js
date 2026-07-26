@@ -416,6 +416,24 @@ test('rejects private application files from static GET and HEAD', async (t) => 
     }
 });
 
+test('serves chat avatar SVGs with an image MIME type', async (t) => {
+    const server = createProductSwapServer();
+    await listenOnSafePort(server);
+    t.after(() => server.close());
+
+    const { port } = server.address();
+    const response = await fetch(
+        `http://127.0.0.1:${port}/assets/chat-avatars/cat.svg`,
+    );
+
+    assert.equal(response.status, 200);
+    assert.equal(
+        response.headers.get('content-type'),
+        'image/svg+xml; charset=utf-8',
+    );
+    assert.match(await response.text(), /^<svg /);
+});
+
 test('serves the public template catalog for GET and HEAD', async (t) => {
     const server = createProductSwapServer();
     await listenOnSafePort(server);

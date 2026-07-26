@@ -66,6 +66,7 @@ const STATIC_MIME_TYPES = {
     '.jpg': 'image/jpeg',
     '.jpeg': 'image/jpeg',
     '.png': 'image/png',
+    '.svg': 'image/svg+xml; charset=utf-8',
     '.webp': 'image/webp',
 };
 class ProductSwapError extends Error {
