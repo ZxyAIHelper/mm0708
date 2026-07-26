@@ -133,3 +133,20 @@ test('uses the first-party Tencent location search dialog', () => {
     assert.match(source, /chat-location-map-preview/);
     assert.doesNotMatch(source, /chat-map-frame/);
 });
+
+test('keeps the browser preview at the exported canvas ratio', () => {
+    const css = fs.readFileSync(
+        path.join(__dirname, '..', 'app.css'),
+        'utf8',
+    );
+    const rule = css.match(
+        /(?:^|\n)\.chat-preview-canvas\s*\{([^}]*)\}/m,
+    );
+
+    assert.ok(rule);
+    assert.match(rule[1], /height:\s*auto/);
+    assert.doesNotMatch(
+        rule[1],
+        /aspect-ratio:\s*9\s*\/\s*16/,
+    );
+});
