@@ -97,6 +97,7 @@
                 city,
                 lat,
                 lng,
+                fallback: item?.fallback === true,
             }];
         });
     }

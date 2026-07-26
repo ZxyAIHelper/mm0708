@@ -42,6 +42,7 @@
             city: cleanText(value.city),
             lat,
             lng,
+            fallback: value?.fallback === true,
         };
     }
 

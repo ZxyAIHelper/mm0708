@@ -104,12 +104,23 @@
         const normalized = global.ChatMaterials
             ? global.ChatMaterials.normalizeChatMaterials(materials)
             : materials;
+        const requestMaterials = {
+            ...normalized,
+            location: normalized.location ? {
+                id: normalized.location.id,
+                name: normalized.location.name,
+                address: normalized.location.address,
+                city: normalized.location.city,
+                lat: normalized.location.lat,
+                lng: normalized.location.lng,
+            } : null,
+        };
         const data = await apiJson('/api/product-swap/chat-draft', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 templateId: 'wechat-chat-screenshot',
-                ...normalized,
+                ...requestMaterials,
             }),
         });
         return normalizeChatDraftResponse(data, normalized);
