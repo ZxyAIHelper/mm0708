@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+    COMMENT_POOLS,
     fallbackRanking,
     normalizeRanking,
     requestDishRankingDraft,
@@ -111,6 +112,8 @@ test('forces every owned dish to the front of the top tier', () => {
         'top',
         'top',
     ]);
+    assert.ok(COMMENT_POOLS.top.includes(result.items[0].comment));
+    assert.ok(COMMENT_POOLS.top.includes(result.items[1].comment));
 });
 
 test('ignores invalid AI items and completes every input exactly once', () => {

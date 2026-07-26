@@ -104,7 +104,7 @@
                 order: entry.dish?.owned
                     ? entry.inputIndex
                     : (ai?.order ?? entry.inputIndex),
-                comment: validComment(ai?.comment)
+                comment: ai?.tier === tier && validComment(ai.comment)
                     ? ai.comment.trim()
                     : fallbackComment(tier, entry.refId),
                 owned: Boolean(entry.dish?.owned),
