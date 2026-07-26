@@ -32,6 +32,8 @@ test('publishes the live dish ranking template', () => {
 
     assert.ok(template);
     assert.equal(template.status, 'live');
+    assert.equal(template.creditCost, 0);
+    assert.deepEqual(template.quickPrompts, []);
     assert.deepEqual(template.fields[0], {
         key: 'dishes',
         type: 'dish-list',
@@ -43,6 +45,15 @@ test('publishes the live dish ranking template', () => {
         minOwned: 1,
         accept: ['image/jpeg', 'image/png', 'image/webp'],
     });
+    const layout = template.fields.find((field) => field.key === 'layout');
+    assert.deepEqual(layout.options, [{
+        value: 'tier',
+        label: '从拉到夯',
+    }]);
+    assert.equal(
+        template.fields.some((field) => field.key === 'requirements'),
+        false,
+    );
 });
 
 test('validates dish-list bounds', () => {

@@ -43,6 +43,8 @@ test('creator page exposes the template-driven generator controls', () => {
         '/chat-draft-client.js',
         '/wechat-chat-renderer.js',
         '/wechat-chat-editor.js',
+        '/dish-ranking-client.js',
+        '/dish-ranking-renderer.js',
         '/local-history.js',
         '/script.js',
     ];
@@ -52,6 +54,27 @@ test('creator page exposes the template-driven generator controls', () => {
         assert.ok(index > previousIndex, `${script} is in dependency order`);
         previousIndex = index;
     }
+});
+
+test('dish ranking uses a local canvas instead of image generation', () => {
+    const source = fs.readFileSync(
+        path.join(root, 'script.js'),
+        'utf8',
+    );
+
+    assert.match(source, /const isDishRankingTemplate\s*=/);
+    assert.match(source, /requestDishRankingDraft/);
+    assert.match(source, /normalizeRanking/);
+    assert.match(source, /renderDishRankingDataUrl/);
+    assert.match(source, /AI 评价暂不可用，已使用默认排序生成/);
+    assert.match(
+        source,
+        /!\(isChatTemplate \|\| isDishRankingTemplate\)[\s\S]*?'serviceWorker' in navigator/,
+    );
+    assert.match(
+        source,
+        /isDishRankingTemplate[\s\S]*?refinementPanel\.hidden = true/,
+    );
 });
 
 test('resolves only live creator templates', () => {
@@ -121,7 +144,7 @@ test('chat template mounts its own editor and skips image generation', () => {
     assert.match(source, /if \(isChatTemplate\)[\s\S]*?return;/);
     assert.match(
         source,
-        /!isChatTemplate[\s\S]*?'serviceWorker' in navigator/,
+        /!\(isChatTemplate \|\| isDishRankingTemplate\)[\s\S]*?'serviceWorker' in navigator/,
     );
     assert.match(
         css,

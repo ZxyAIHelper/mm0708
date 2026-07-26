@@ -11,8 +11,8 @@ module.exports = {
     status: 'live',
     href: '/create.html?template=dish-ranking-guide',
     cover: '/assets/dish-ranking-guide-cover.webp',
-    outputLabel: '生成 1 张测评攻略图',
-    creditCost: 3,
+    outputLabel: '生成测评攻略图',
+    creditCost: 0,
     fields: [
         {
             key: 'dishes',
@@ -33,9 +33,6 @@ module.exports = {
             default: 'tier',
             options: [
                 { value: 'tier', label: '从拉到夯' },
-                { value: 'grid', label: '九宫格点评' },
-                { value: 'quad', label: '四宫格攻略' },
-                { value: 'collage', label: '自由拼贴' },
             ],
         },
         {
@@ -50,19 +47,6 @@ module.exports = {
                 { value: '9:16', label: '9:16' },
             ],
         },
-        {
-            key: 'requirements',
-            type: 'text',
-            label: '补充想法',
-            required: false,
-            maxLength: 200,
-            placeholder: '例如：整体更像探店攻略，标题醒目一点',
-        },
     ],
-    quickPrompts: [
-        '标题大一点',
-        '文字少一点',
-        '更像真实探店攻略',
-        '突出自家菜品',
-    ],
+    quickPrompts: [],
 };

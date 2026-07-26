@@ -32,6 +32,8 @@ const publicEntries = [
     'wechat-chat-renderer.js',
     'wechat-chat-editor.js',
     'dish-library-client.js',
+    'dish-ranking-client.js',
+    'dish-ranking-renderer.js',
     'assets',
 ];
 

@@ -460,8 +460,12 @@ function boot() {
     if (!activeTemplate) return;
     const isChatTemplate =
         activeTemplate.id === 'wechat-chat-screenshot';
+    const isDishRankingTemplate =
+        activeTemplate.id === 'dish-ranking-guide';
     const CreatorForm = window.CreatorForm;
     const DishLibraryClient = window.DishLibraryClient;
+    const DishRankingClient = window.DishRankingClient;
+    const DishRankingRenderer = window.DishRankingRenderer;
     const WechatChatEditor = window.WechatChatEditor;
     const versions = VersionHistory.createVersionHistory();
     let selectedVersionIndex = -1;
@@ -482,7 +486,7 @@ function boot() {
     );
     const apiClient = window.ProductSwapApi;
     const localHistory = window.LocalTaskHistory;
-    const workerRegistration = !isChatTemplate
+    const workerRegistration = !(isChatTemplate || isDishRankingTemplate)
         && 'serviceWorker' in navigator
         ? navigator.serviceWorker.register('/generation-worker.js', {
             scope: '/',
@@ -507,6 +511,7 @@ function boot() {
     const refineButton = document.getElementById('refineButton');
     const chatTimeline = document.getElementById('chatTimeline');
     const quickPrompts = document.getElementById('quickPrompts');
+    const refinementPanel = refineForm.closest('.refinement-panel');
     const fields = Array.isArray(activeTemplate?.fields)
         ? activeTemplate.fields
         : [];
@@ -525,6 +530,10 @@ function boot() {
     function showArchiveNotice(message) {
         archiveNotice.textContent = message;
         archiveNotice.hidden = !message;
+    }
+
+    if (isDishRankingTemplate && refinementPanel) {
+        refinementPanel.hidden = true;
     }
 
     function createChatTaskLifecycle() {
@@ -839,6 +848,46 @@ function boot() {
             });
         }
         return data;
+    }
+
+    async function runDishRankingGeneration(localTask, payload) {
+        let draft = null;
+        let usedFallback = false;
+        try {
+            draft = await DishRankingClient.requestDishRankingDraft(
+                payload.dishes,
+            );
+        } catch {
+            usedFallback = true;
+        }
+        const ranking = DishRankingClient.normalizeRanking(
+            payload.dishes,
+            draft,
+        );
+        const imageUrl = await DishRankingRenderer
+            .renderDishRankingDataUrl({
+                ratio: payload.aspectRatio,
+                dishes: payload.dishes,
+                ranking,
+            });
+        const assistantMessage = '已完成菜品排序和评价。';
+        if (localTask) {
+            await localHistory.completeTask(localTask.id, {
+                imageUrl,
+                conversationId: '',
+                assistantMessage,
+            });
+            clearActiveTask(localTask.id);
+        }
+        return {
+            success: true,
+            imageUrl,
+            conversationId: '',
+            assistantMessage,
+            archiveWarning: usedFallback
+                ? 'AI 评价暂不可用，已使用默认排序生成。'
+                : '',
+        };
     }
 
     function setGenerating(value) {
@@ -1463,7 +1512,9 @@ function boot() {
             }
             lastInitialPayload = payload;
             localTask = await startLocalTask(payload);
-            const data = await runGeneration(localTask, payload);
+            const data = isDishRankingTemplate
+                ? await runDishRankingGeneration(localTask, payload)
+                : await runGeneration(localTask, payload);
 
             state.conversationId = data.conversationId || '';
             state.messages = [];
@@ -1479,7 +1530,11 @@ function boot() {
             state.messages.push({
                 role: 'assistant',
                 content: data.assistantMessage
-                    || '已完成第一版，可以继续告诉我需要调整的地方。',
+                    || (
+                        isDishRankingTemplate
+                            ? '已完成菜品排序和评价。'
+                            : '已完成第一版，可以继续告诉我需要调整的地方。'
+                    ),
             });
             addVersion({
                 imageUrl: data.imageUrl,

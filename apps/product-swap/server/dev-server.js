@@ -53,6 +53,8 @@ const PUBLIC_STATIC_PATHS = new Set([
     'wechat-chat-renderer.js',
     'wechat-chat-editor.js',
     'dish-library-client.js',
+    'dish-ranking-client.js',
+    'dish-ranking-renderer.js',
 ].map((entry) => path.join(APP_ROOT, entry)));
 const SUPPORTED_MIME_TYPES = new Map([
     ['image/jpeg', '.jpg'],
