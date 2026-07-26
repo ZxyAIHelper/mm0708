@@ -14,6 +14,16 @@ import type {
 
 const targetImage = 'data:image/png;base64,iVBORw0KGgo='
 
+const hubeiliFallback = {
+    id: 'fallback-shenzhen-hubeili',
+    name: '深圳湖贝里',
+    address: '深圳市罗湖区湖贝路1068号',
+    city: '深圳市',
+    lat: 22.546394,
+    lng: 114.128133,
+    fallback: true,
+}
+
 const noOpArchive: ProductSwapTaskArchive = {
     start: async () => ({
         taskId: 'task_test',
@@ -219,10 +229,15 @@ describe('product swap router', () => {
             { TENCENT_MAP_KEY: 'map-key' },
         )
 
-        expect(response.status).toBe(502)
-        expect(await response.json()).toMatchObject({
-            error: { code: 'LOCATION_SEARCH_FAILED' },
+        expect(response.status).toBe(200)
+        expect(response.headers.get('Cache-Control')).toBe('no-store')
+        expect(await response.json()).toEqual({
+            success: true,
+            locations: [hubeiliFallback],
+            fallback: true,
+            fallbackReason: 'upstream_unavailable',
         })
+        expect(fetchMock).toHaveBeenCalledTimes(1)
     })
 
     it('reports exhausted Tencent location quota clearly', async () => {
@@ -247,10 +262,106 @@ describe('product swap router', () => {
             { TENCENT_MAP_KEY: 'map-key' },
         )
 
-        expect(response.status).toBe(429)
-        expect(await response.json()).toMatchObject({
-            error: { code: 'TENCENT_MAP_QUOTA_EXHAUSTED' },
+        expect(response.status).toBe(200)
+        expect(response.headers.get('Cache-Control')).toBe('no-store')
+        expect(await response.json()).toEqual({
+            success: true,
+            locations: [hubeiliFallback],
+            fallback: true,
+            fallbackReason: 'quota_exhausted',
         })
+        expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('uses the template fallback without calling Tencent when the key is missing', async () => {
+        const fetchMock = vi.fn()
+        const provider: ProductSwapProvider = {
+            name: 'fake',
+            generate: async () => ({ imageUrl: targetImage }),
+        }
+        const app = new Hono()
+        app.route('/api/product-swap', createProductSwapRouter(
+            () => provider,
+            noOpArchive,
+            { fetchImpl: fetchMock },
+        ))
+
+        const response = await app.request(
+            '/api/product-swap/location-search?region=深圳&keyword=湖贝里',
+        )
+
+        expect(response.status).toBe(200)
+        expect(response.headers.get('Cache-Control')).toBe('no-store')
+        expect(await response.json()).toEqual({
+            success: true,
+            locations: [hubeiliFallback],
+            fallback: true,
+            fallbackReason: 'not_configured',
+        })
+        expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('uses the template fallback after one failed Tencent request', async () => {
+        const fetchMock = vi.fn(async () => {
+            throw new Error('mocked network failure')
+        })
+        const provider: ProductSwapProvider = {
+            name: 'fake',
+            generate: async () => ({ imageUrl: targetImage }),
+        }
+        const app = new Hono()
+        app.route('/api/product-swap', createProductSwapRouter(
+            () => provider,
+            noOpArchive,
+            { fetchImpl: fetchMock },
+        ))
+
+        const response = await app.request(
+            '/api/product-swap/location-search?region=深圳&keyword=湖贝里',
+            undefined,
+            { TENCENT_MAP_KEY: 'mock-key' },
+        )
+
+        expect(response.status).toBe(200)
+        expect(response.headers.get('Cache-Control')).toBe('no-store')
+        expect(await response.json()).toEqual({
+            success: true,
+            locations: [hubeiliFallback],
+            fallback: true,
+            fallbackReason: 'upstream_unavailable',
+        })
+        expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps a valid empty Tencent location result empty', async () => {
+        const fetchMock = vi.fn(async () => Response.json({
+            status: 0,
+            message: 'query ok',
+            data: [],
+        }))
+        const provider: ProductSwapProvider = {
+            name: 'fake',
+            generate: async () => ({ imageUrl: targetImage }),
+        }
+        const app = new Hono()
+        app.route('/api/product-swap', createProductSwapRouter(
+            () => provider,
+            noOpArchive,
+            { fetchImpl: fetchMock },
+        ))
+
+        const response = await app.request(
+            '/api/product-swap/location-search?region=深圳&keyword=不存在的地点',
+            undefined,
+            { TENCENT_MAP_KEY: 'mock-key' },
+        )
+
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual({
+            success: true,
+            locations: [],
+        })
+        expect(fetchMock).toHaveBeenCalledTimes(1)
     })
 
     it('proxies only a fixed Tencent static map request', async () => {
