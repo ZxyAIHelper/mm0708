@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const {
     createChatEditorState,
@@ -100,4 +102,15 @@ test('creates a safe editable example with every supplied reference', () => {
         draft.messages.find((message) => message.type === 'text').text,
         /三山山/,
     );
+});
+
+test('renders and downloads chat screenshots as multiple pages', () => {
+    const source = fs.readFileSync(
+        path.join(__dirname, '..', 'wechat-chat-editor.js'),
+        'utf8',
+    );
+
+    assert.match(source, /renderChatPages/);
+    assert.match(source, /chat-page-preview/);
+    assert.match(source, /chat-download-all-button/);
 });

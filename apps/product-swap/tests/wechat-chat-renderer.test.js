@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
     layoutChat,
+    paginateChat,
     wrapMessageText,
 } = require('../wechat-chat-renderer');
 
@@ -71,20 +72,45 @@ test('preserves image aspect ratio within safe bounds', () => {
     assert.equal(portrait.height, 520);
 });
 
-test('marks a long conversation as overflowing instead of shrinking text', () => {
-    const layout = layoutChat({
+test('paginates a long conversation without splitting or reordering messages', () => {
+    const longMessages = Array.from({ length: 10 }, (_, index) => ({
+        id: `m${index}`,
+        side: index % 2 ? 'left' : 'right',
+        type: 'text',
+        text: '很长的聊天内容'.repeat(10),
+    }));
+    const pages = paginateChat({
         width: 1080,
         height: 1920,
-        messages: Array.from({ length: 10 }, (_, index) => ({
-            id: `m${index}`,
-            side: index % 2 ? 'left' : 'right',
-            type: 'text',
-            text: '很长的聊天内容'.repeat(10),
-        })),
+        messages: longMessages,
         measureText: (text) => Array.from(text).length * 34,
         assets: {},
     });
 
-    assert.equal(layout.overflow, true);
-    assert.ok(layout.items.at(-1).bottom > 1760);
+    assert.ok(pages.length > 1);
+    assert.deepEqual(
+        pages.flatMap((page) => page.items.map((item) => item.id)),
+        longMessages.map((message) => message.id),
+    );
+    assert.ok(pages.every((page) => page.overflow === false));
+    assert.ok(pages.every((page) => (
+        page.items.every((item) => item.bottom <= page.safeBottom)
+    )));
+    assert.deepEqual(
+        pages.map((page) => page.pageNumber),
+        pages.map((_, index) => index + 1),
+    );
+    assert.ok(pages.every((page) => page.pageCount === pages.length));
+});
+
+test('keeps a short conversation on one page', () => {
+    const pages = paginateChat({
+        messages: messages.slice(-3),
+        measureText: (text) => Array.from(text).length * 34,
+        assets: {},
+    });
+
+    assert.equal(pages.length, 1);
+    assert.equal(pages[0].pageNumber, 1);
+    assert.equal(pages[0].pageCount, 1);
 });

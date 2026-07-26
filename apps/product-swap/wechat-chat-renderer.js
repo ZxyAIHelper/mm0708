@@ -113,6 +113,42 @@
         };
     }
 
+    function paginateChat(input = {}) {
+        const messages = Array.isArray(input.messages)
+            ? input.messages
+            : [];
+        const pages = [];
+        let currentMessages = [];
+        for (const message of messages) {
+            const nextMessages = [...currentMessages, message];
+            const nextLayout = layoutChat({
+                ...input,
+                messages: nextMessages,
+            });
+            if (currentMessages.length > 0 && nextLayout.overflow) {
+                pages.push(layoutChat({
+                    ...input,
+                    messages: currentMessages,
+                }));
+                currentMessages = [message];
+            } else {
+                currentMessages = nextMessages;
+            }
+        }
+        if (currentMessages.length > 0 || pages.length === 0) {
+            pages.push(layoutChat({
+                ...input,
+                messages: currentMessages,
+            }));
+        }
+        const pageCount = pages.length;
+        return pages.map((page, index) => ({
+            ...page,
+            pageNumber: index + 1,
+            pageCount,
+        }));
+    }
+
     function roundedRect(ctx, x, y, width, height, radius) {
         const r = Math.min(radius, width / 2, height / 2);
         ctx.beginPath();
@@ -331,23 +367,23 @@
         });
     }
 
-    function outputFileName(date = new Date()) {
+    function outputFileName(
+        date = new Date(),
+        pageNumber = null,
+        pageCount = 1,
+    ) {
         const digits = (value) => String(value).padStart(2, '0');
+        const pageSuffix = pageCount > 1 && pageNumber
+            ? `-${digits(pageNumber)}`
+            : '';
         return `微信聊天截图-${
             date.getFullYear()
         }${digits(date.getMonth() + 1)}${digits(date.getDate())}-${
             digits(date.getHours())
-        }${digits(date.getMinutes())}.png`;
+        }${digits(date.getMinutes())}${pageSuffix}.png`;
     }
 
-    async function renderChatPng(
-        draft,
-        materials,
-        {
-            canvas = document.createElement('canvas'),
-            mapPreviewUrl = global.TencentMapPicker?.mapPreviewUrl,
-        } = {},
-    ) {
+    async function loadResources(materials, mapPreviewUrl) {
         const resources = { locations: {} };
         for (const image of materials.images || []) {
             resources[image.id] = await loadImage(image.dataUrl);
@@ -364,28 +400,67 @@
                 }
             }
         }
+        return resources;
+    }
+
+    async function renderChatPages(
+        draft,
+        materials,
+        {
+            canvasFactory = () => document.createElement('canvas'),
+            mapPreviewUrl = global.TencentMapPicker?.mapPreviewUrl,
+        } = {},
+    ) {
+        const resources = await loadResources(materials, mapPreviewUrl);
         const measureCanvas = document.createElement('canvas');
         const measureContext = measureCanvas.getContext('2d');
         measureContext.font = '400 36px sans-serif';
-        const layout = layoutChat({
+        const layouts = paginateChat({
             contactName: draft.contactName,
             messages: draft.messages,
             assets: resources,
             measureText: (text) => measureContext.measureText(text).width,
         });
-        if (layout.overflow) {
-            const error = new Error('聊天内容超出画布，请删减消息');
-            error.code = 'CHAT_OVERFLOW';
-            throw error;
+        const renderedAt = new Date();
+        const pages = [];
+        for (const layout of layouts) {
+            const canvas = canvasFactory(layout.pageNumber);
+            drawChat(canvas, layout, resources);
+            const blob = await canvasBlob(canvas);
+            pages.push({
+                canvas,
+                blob,
+                url: URL.createObjectURL(blob),
+                fileName: outputFileName(
+                    renderedAt,
+                    layout.pageNumber,
+                    layout.pageCount,
+                ),
+                layout,
+            });
         }
-        drawChat(canvas, layout, resources);
-        const blob = await canvasBlob(canvas);
+        return pages;
+    }
+
+    async function renderChatPng(
+        draft,
+        materials,
+        {
+            canvas = document.createElement('canvas'),
+            mapPreviewUrl = global.TencentMapPicker?.mapPreviewUrl,
+        } = {},
+    ) {
+        const pages = await renderChatPages(draft, materials, {
+            canvasFactory: (pageNumber) => (
+                pageNumber === 1
+                    ? canvas
+                    : document.createElement('canvas')
+            ),
+            mapPreviewUrl,
+        });
         return {
-            canvas,
-            blob,
-            url: URL.createObjectURL(blob),
-            fileName: outputFileName(),
-            layout,
+            ...pages[0],
+            pages,
         };
     }
 
@@ -395,6 +470,8 @@
         drawChat,
         layoutChat,
         outputFileName,
+        paginateChat,
+        renderChatPages,
         renderChatPng,
         wrapMessageText,
     };

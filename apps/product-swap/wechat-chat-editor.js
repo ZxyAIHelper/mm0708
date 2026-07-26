@@ -304,18 +304,15 @@
 
         previewPanel.appendChild(element('h2', '', '微信单聊预览'));
         const canvasWrap = element('div', 'chat-canvas-wrap');
-        const canvas = element('canvas', 'chat-preview-canvas');
-        canvas.setAttribute('aria-label', '微信聊天截图预览');
-        canvasWrap.appendChild(canvas);
         const messagesEditor = element('div', 'chat-message-editor');
         const previewActions = element('div', 'chat-preview-actions');
-        const download = element(
+        const downloadAll = element(
             'button',
-            'chat-download-button',
-            '导出 PNG',
+            'chat-download-button chat-download-all-button',
+            '下载全部截图',
         );
-        download.type = 'button';
-        previewActions.appendChild(download);
+        downloadAll.type = 'button';
+        previewActions.appendChild(downloadAll);
         previewPanel.append(canvasWrap, messagesEditor, previewActions);
         root.append(inputs, previewPanel);
         section.appendChild(root);
@@ -332,7 +329,7 @@
         section.appendChild(dialog);
 
         let pickerConfig = null;
-        let rendered = null;
+        let renderedPages = [];
         let renderVersion = 0;
 
         function showError(message) {
@@ -455,21 +452,59 @@
             const snapshot = state.snapshot();
             if (!snapshot.draft) return;
             try {
-                const next = await renderer.renderChatPng(
+                const next = await renderer.renderChatPages(
                     snapshot.draft,
                     snapshot.materials,
-                    { canvas },
                 );
                 if (version !== renderVersion) {
-                    URL.revokeObjectURL(next.url);
+                    next.forEach((page) => URL.revokeObjectURL(page.url));
                     return;
                 }
-                if (rendered?.url) URL.revokeObjectURL(rendered.url);
-                rendered = next;
-                download.disabled = false;
+                renderedPages.forEach(
+                    (page) => URL.revokeObjectURL(page.url),
+                );
+                renderedPages = next;
+                canvasWrap.replaceChildren();
+                for (const page of renderedPages) {
+                    const pagePreview = element(
+                        'div',
+                        'chat-page-preview',
+                    );
+                    const pageLabel = element(
+                        'span',
+                        'chat-page-label',
+                        `第 ${page.layout.pageNumber} / ${
+                            page.layout.pageCount
+                        } 张`,
+                    );
+                    page.canvas.className = 'chat-preview-canvas';
+                    page.canvas.setAttribute(
+                        'aria-label',
+                        `微信聊天截图第 ${page.layout.pageNumber} 张`,
+                    );
+                    const pageDownload = element(
+                        'button',
+                        'chat-page-download',
+                        `下载第 ${page.layout.pageNumber} 张`,
+                    );
+                    pageDownload.type = 'button';
+                    pageDownload.addEventListener('click', () => {
+                        const anchor = element('a');
+                        anchor.href = page.url;
+                        anchor.download = page.fileName;
+                        anchor.click();
+                    });
+                    pagePreview.append(
+                        pageLabel,
+                        page.canvas,
+                        pageDownload,
+                    );
+                    canvasWrap.appendChild(pagePreview);
+                }
+                downloadAll.disabled = false;
                 showError('');
             } catch (renderError) {
-                download.disabled = true;
+                downloadAll.disabled = renderedPages.length === 0;
                 showError(renderError.message || '预览生成失败');
             }
         }
@@ -539,13 +574,16 @@
             renderMessageEditor();
             refreshPreview();
         });
-        download.addEventListener('click', async () => {
-            if (!rendered) await refreshPreview();
-            if (!rendered) return;
-            const anchor = element('a');
-            anchor.href = rendered.url;
-            anchor.download = rendered.fileName;
-            anchor.click();
+        downloadAll.addEventListener('click', async () => {
+            if (renderedPages.length === 0) await refreshPreview();
+            renderedPages.forEach((page, index) => {
+                global.setTimeout(() => {
+                    const anchor = element('a');
+                    anchor.href = page.url;
+                    anchor.download = page.fileName;
+                    anchor.click();
+                }, index * 180);
+            });
         });
         closeDialog.addEventListener('click', () => dialog.close());
         locationButton.disabled = true;
@@ -585,7 +623,9 @@
             refreshPreview,
             destroy() {
                 global.removeEventListener('message', pickerListener);
-                if (rendered?.url) URL.revokeObjectURL(rendered.url);
+                renderedPages.forEach(
+                    (page) => URL.revokeObjectURL(page.url),
+                );
                 dialog.remove();
                 root.remove();
             },
