@@ -1,0 +1,4 @@
+interface:
+  display_name: "商家内容助手"
+  short_description: "定位商家内容助手项目的架构、模板、生产接口、文档与测试入口"
+  default_prompt: "Use $merchant-content-assistant to work on the merchant content assistant project."

@@ -1,5 +1,10 @@
 # Repository Agent Instructions
 
+## 子项目路由
+
+- 当用户提到“商家内容助手”“商家内容平台”、`product-swap`，或任务明确涉及 `apps/product-swap` 时，必须先读取并遵循 `apps/product-swap/AGENTS.md`。
+- `apps/product-swap` 的项目约束只适用于该子项目，不得自动套用到仓库中的其他应用。
+
 ## 外部 Key、额度与计费接口
 
 - 自动化测试、冒烟测试、CI 和重复调试默认禁止调用真实的额度或计费接口，包括但不限于腾讯地图和豆包 AI。
